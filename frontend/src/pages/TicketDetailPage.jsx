@@ -1,0 +1,828 @@
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import ActivityTimeline from '../components/tickets/ActivityTimeline'
+import AttachmentList from '../components/tickets/AttachmentList'
+import CommentThread from '../components/tickets/CommentThread'
+import EditTicketModal from '../components/tickets/EditTicketModal'
+import PriorityBadge from '../components/tickets/PriorityBadge'
+import StatusBadge from '../components/tickets/StatusBadge'
+import Breadcrumbs from '../components/ui/Breadcrumbs'
+import Button from '../components/ui/Button'
+import Card from '../components/ui/Card'
+import Input from '../components/ui/Input'
+import SearchableSelect from '../components/ui/SearchableSelect'
+import Select from '../components/ui/Select'
+import Spinner from '../components/ui/Spinner'
+import Textarea from '../components/ui/Textarea'
+import SectionHeader from '../components/ui/SectionHeader'
+import {
+  BadgeIcon,
+  CalendarIcon,
+  ChatIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  FolderOpenIcon,
+  LockIcon,
+  PaperClipIcon,
+  SettingsIcon,
+  TicketIcon,
+  TrashIcon,
+  UserIcon,
+  UsersIcon,
+} from '../components/ui/icons'
+import { useAuth } from '../auth/useAuth'
+import { useAgents } from '../hooks/useAgents'
+import { useCustomers } from '../hooks/useCustomers'
+import {
+  useAssignTicket,
+  useDeleteTicket,
+  useSetTicketCollaborators,
+  useSetTicketCustomer,
+  useSetTicketDeadline,
+  useTicket,
+  useTicketActivity,
+  useUpdateTicketStatus,
+} from '../hooks/useTicket'
+import { useTicketSettings } from '../hooks/useTicketSettings'
+import { useI18n } from '../i18n/useI18n'
+
+// Local calendar date (YYYY-MM-DD) for the current day — for comparing against start_date.
+function todayLocal() {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+// ISO datetime -> value for <input type="datetime-local"> (local time, minute precision).
+function toDateTimeLocal(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// Small labelled group inside the Actions card.
+function ActionGroup({ label, children }) {
+  return (
+    <div className="flex flex-col gap-2 border-t border-gray-100 pt-4 first:border-0 first:pt-0 dark:border-white/10">
+      {label && (
+        <span className="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+          {label}
+        </span>
+      )}
+      {children}
+    </div>
+  )
+}
+
+function MetaItem({ icon: Icon, children }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+      <Icon className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
+      {children}
+    </span>
+  )
+}
+
+// One labelled row in the Details card: an indigo icon chip + micro label + value.
+// Rows are separated by hairline dividers (skipped on the first row).
+function DetailRow({ icon: Icon, label, children }) {
+  return (
+    <div className="flex items-start gap-3 border-t border-gray-100 py-3 first:border-0 first:pt-0 dark:border-white/5">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-500/10 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-400/20">
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <dt className="text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+          {label}
+        </dt>
+        <dd className="mt-0.5 break-words text-sm text-gray-800 dark:text-gray-200">{children}</dd>
+      </div>
+    </div>
+  )
+}
+
+export default function TicketDetailPage() {
+  const { t } = useI18n()
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const { data: ticket, isLoading, error } = useTicket(id)
+  const { data: activities } = useTicketActivity(id)
+  const { data: agents } = useAgents()
+  const { data: customers } = useCustomers({ enabled: user?.role !== 'customer' })
+  const { data: ticketSettings } = useTicketSettings()
+  const updateStatus = useUpdateTicketStatus(id)
+  const assignTicket = useAssignTicket(id)
+  const setDeadline = useSetTicketDeadline(id)
+  const setCollaborators = useSetTicketCollaborators(id)
+  const setTicketCustomer = useSetTicketCustomer(id)
+  const deleteTicket = useDeleteTicket(id)
+  const [status, setStatus] = useState('')
+  const [holdReason, setHoldReason] = useState('')
+  const [agentId, setAgentId] = useState('')
+  const [notice, setNotice] = useState('')
+  const [customerId, setCustomerId] = useState('')
+  const [customerBranchId, setCustomerBranchId] = useState('')
+  const [reassignId, setReassignId] = useState('')
+  const [collaboratorId, setCollaboratorId] = useState('')
+  const [deadline, setDeadlineInput] = useState('')
+  const [editOpen, setEditOpen] = useState(false)
+
+  // Auto-dismiss the action confirmation after a few seconds.
+  useEffect(() => {
+    if (!notice) return undefined
+    const timer = setTimeout(() => setNotice(''), 5000)
+    return () => clearTimeout(timer)
+  }, [notice])
+
+  // The ticket was deleted (or never existed) — don't render stale, actionable data.
+  if (error?.response?.status === 404) {
+    return (
+      <div className="mx-auto max-w-md py-16 text-center">
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          {t('tickets.notFound')}
+        </h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('tickets.notFoundHint')}</p>
+        <Button className="mt-4" onClick={() => navigate('/tickets')}>
+          {t('nav.tickets')}
+        </Button>
+      </div>
+    )
+  }
+
+  if (isLoading || !ticket) {
+    return (
+      <div className="flex justify-center py-12">
+        <Spinner />
+      </div>
+    )
+  }
+
+  const isOverdue =
+    ticket.due_at &&
+    new Date(ticket.due_at) < new Date() &&
+    !['resolved', 'closed'].includes(ticket.status)
+  // The ticket has a future start date — its work hasn't begun yet, so actions are
+  // locked until that date arrives. start_date is a plain calendar date (YYYY-MM-DD),
+  // so a lexicographic compare against today's local date is exact. Admins bypass the
+  // lock so they can set the ticket up before its start date.
+  const notStarted =
+    user?.role !== 'admin' && ticket.start_date && ticket.start_date > todayLocal()
+  const canAssign = user?.role === 'admin'
+  const isCustomer = user?.role === 'customer'
+  const isAssignedToMe = ticket.assigned_agent?.id === user?.id
+  const collaborators = ticket.collaborators || []
+  const collaboratorIds = collaborators.map((c) => c.id)
+  const isCollaborator = collaboratorIds.includes(user?.id)
+  const isAdmin = user?.role === 'admin'
+  // A closed ticket is locked for everyone but admins. Agents can also edit a closed
+  // ticket only when an admin has enabled that permission; customers never can.
+  // Admins can always reopen/edit.
+  const closedLocked =
+    ticket.status === 'closed' &&
+    !isAdmin &&
+    !(user?.role === 'agent' && ticketSettings?.allow_agent_edit_after_close)
+  // Admin, the assigned agent, or an added collaborator may edit; other agents are
+  // read-only — and nobody but an admin may edit once the ticket is closed & locked.
+  const canEdit = (isAdmin || isAssignedToMe || isCollaborator) && !closedLocked
+  // Delete: admin or the agent the ticket is assigned to.
+  // Admins always; the assigned agent only when the delete permission is enabled — and,
+  // like every other change, never once the ticket is closed & locked.
+  const canDelete =
+    isAdmin || (isAssignedToMe && ticketSettings?.allow_agent_delete && !closedLocked)
+  // Watching agent = an agent who is neither assigned nor a collaborator (read-only view).
+  const isWatchingAgent = user?.role === 'agent' && !isAssignedToMe && !isCollaborator
+  // Customers reply on their own tickets; admins, the assigned agent, and collaborators too.
+  const canReply =
+    (isAdmin || user?.role === 'customer' || isAssignedToMe || isCollaborator) && !closedLocked
+  // Agents can claim an unassigned ticket, but can't unassign themselves once they take it.
+  // A closed & locked ticket blocks these too — only an admin can change a closed ticket.
+  const canSelfAssign =
+    user?.role === 'agent' &&
+    ticketSettings?.allow_agent_self_assign &&
+    ticket.assigned_agent === null &&
+    !closedLocked
+  const canReassign =
+    user?.role === 'agent' &&
+    ticketSettings?.allow_agent_reassign &&
+    isAssignedToMe &&
+    !closedLocked
+  // Guest-origin tickets carry contact details even after being linked to a customer.
+  const isGuestOrigin = Boolean(
+    ticket.guest_name || ticket.guest_phone || ticket.guest_email || ticket.guest_company
+  )
+  // Linking/changing a guest ticket's customer follows its own permission: admins always,
+  // agents only when it's enabled — and never on a closed & locked ticket.
+  const canManageTicketCustomer =
+    isAdmin ||
+    (user?.role === 'agent' && ticketSettings?.allow_agent_link_customer && !closedLocked)
+  const canLinkCustomer = canManageTicketCustomer && isGuestOrigin && !ticket.customer
+  const canUnlinkCustomer = canManageTicketCustomer && isGuestOrigin && Boolean(ticket.customer)
+  const hasActions =
+    canAssign || canSelfAssign || canReassign || canEdit || canDelete ||
+    canLinkCustomer || canUnlinkCustomer
+
+  // Branches of the customer currently chosen in the link picker.
+  const linkCustomer = (customers || []).find((c) => String(c.id) === String(customerId))
+  const linkBranchOptions = (linkCustomer?.branches || []).map((b) => ({
+    value: b.id,
+    label: b.address ? `${b.name} — ${b.address}` : b.name,
+  }))
+
+  // Show a confirmation banner at the top of the page for any ticket change.
+  function showNotice(message) {
+    setNotice(message)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function handleUpdateStatus() {
+    if (!status) return
+    updateStatus.mutate(
+      { status, holdReason: status === 'on_hold' ? holdReason : undefined },
+      {
+        onSuccess: () => {
+          setHoldReason('')
+          showNotice(t('tickets.noticeStatusUpdated'))
+        },
+      }
+    )
+  }
+
+  function handleLinkCustomerChange(value) {
+    setCustomerId(value)
+    setCustomerBranchId('')
+  }
+
+  function handleLinkCustomer() {
+    if (customerId) {
+      setTicketCustomer.mutate(
+        { customer: customerId, branch: customerBranchId },
+        {
+          onSuccess: () => {
+            setCustomerId('')
+            setCustomerBranchId('')
+            showNotice(t('tickets.noticeCustomerLinked'))
+          },
+        }
+      )
+    }
+  }
+
+  function handleRemoveCustomer() {
+    setTicketCustomer.mutate(
+      { customer: '' },
+      { onSuccess: () => showNotice(t('tickets.noticeCustomerRemoved')) }
+    )
+  }
+
+  function agentNameById(aid) {
+    return (agents || []).find((a) => String(a.id) === String(aid))?.full_name || ''
+  }
+
+  function noticeAssignedTo(name) {
+    showNotice(`${t('tickets.assignedTo')} ${name}`)
+  }
+
+  function handleAssign() {
+    if (agentId) {
+      const name = agentNameById(agentId)
+      assignTicket.mutate(agentId, {
+        onSuccess: () => {
+          noticeAssignedTo(name)
+          setAgentId('')
+        },
+      })
+    }
+  }
+
+  function handleReassign() {
+    if (reassignId) {
+      // After handing off, this agent loses access to the ticket, so return to the list.
+      assignTicket.mutate(reassignId, { onSuccess: () => navigate('/tickets') })
+    }
+  }
+
+  function handleSetDeadline() {
+    if (deadline) {
+      setDeadline.mutate(deadline, {
+        onSuccess: () => showNotice(t('tickets.noticeDueDateSet')),
+      })
+      setDeadlineInput('')
+    }
+  }
+
+  function handleDelete() {
+    if (
+      !window.confirm(
+        `${t('tickets.confirmDeletePrefix')}${ticket.reference || `#${ticket.id}`}${t('tickets.confirmDeleteSuffix')}`
+      )
+    )
+      return
+    deleteTicket.mutate(undefined, { onSuccess: () => navigate('/tickets') })
+  }
+
+  function handleAddCollaborator() {
+    if (collaboratorId && !collaboratorIds.includes(Number(collaboratorId))) {
+      setCollaborators.mutate([...collaboratorIds, Number(collaboratorId)], {
+        onSuccess: () => showNotice(t('tickets.noticeCollaboratorAdded')),
+      })
+      setCollaboratorId('')
+    }
+  }
+
+  function handleRemoveCollaborator(removeId) {
+    setCollaborators.mutate(collaboratorIds.filter((cid) => cid !== removeId), {
+      onSuccess: () => showNotice(t('tickets.noticeCollaboratorRemoved')),
+    })
+  }
+
+  // Agents eligible to be added as collaborators: exclude the primary assignee and any
+  // already-added collaborators.
+  const availableCollaborators = (agents || []).filter(
+    (a) => a.id !== ticket.assigned_agent?.id && !collaboratorIds.includes(a.id)
+  )
+
+  return (
+    <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
+      <Breadcrumbs
+        items={[
+          { label: t('crumb.dashboard'), to: '/dashboard' },
+          { label: t('nav.tickets'), to: '/tickets' },
+          { label: ticket.reference || `#${ticket.id}` },
+        ]}
+      />
+      {notice && (
+        <div className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800 dark:border-green-900/50 dark:bg-green-900/20 dark:text-green-300">
+          <CheckCircleIcon className="h-4 w-4 shrink-0" />
+          <span>{notice}</span>
+        </div>
+      )}
+      {isWatchingAgent && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300">
+          <UserIcon className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            {t('tickets.watchingPrefix')}
+            {ticket.assigned_agent?.full_name || t('tickets.theAssignedAgent')}
+            {t('tickets.watchingSuffix')}
+          </span>
+        </div>
+      )}
+      {closedLocked && (
+        <div className="flex items-start gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
+          <LockIcon className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{t('tickets.closedLocked')}</span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-3">
+        <div className="flex flex-col gap-6 lg:col-span-2 lg:min-h-0 lg:overflow-y-auto lg:pe-1">
+          {/* Hero header */}
+          <Card className="relative overflow-hidden">
+            {/* Ambient indigo glow — premium depth without noise */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-indigo-500/10 blur-3xl dark:bg-indigo-500/20"
+            />
+            <div className="relative">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">
+                  {ticket.reference || `#${ticket.id}`}
+                </span>
+                {ticket.reference && (
+                  <span className="rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">
+                    #{ticket.id}
+                  </span>
+                )}
+                <PriorityBadge priority={ticket.priority} />
+                <StatusBadge status={ticket.status} assigned={Boolean(ticket.assigned_agent)} />
+                {isOverdue && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-500/20 dark:bg-red-900/40 dark:text-red-300">
+                    <ClockIcon className="h-3 w-3" />
+                    {t('tickets.overdue')}
+                  </span>
+                )}
+              </div>
+              <h1 className="mt-3 text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+                {ticket.subject}
+              </h1>
+
+              <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs">
+                <MetaItem icon={UserIcon}>
+                  {ticket.customer
+                    ? ticket.customer.full_name
+                    : `${ticket.guest_name || t('tickets.guest')} (${t('tickets.guest')})`}
+                </MetaItem>
+                <MetaItem icon={FolderOpenIcon}>{ticket.category?.name}</MetaItem>
+                <MetaItem icon={CalendarIcon}>
+                  {t('field.createdAt')} {new Date(ticket.created_at).toLocaleDateString()}
+                </MetaItem>
+              </div>
+
+              <div className="mt-5">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                  {t('field.description')}
+                </span>
+                <div className="mt-1.5 rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-white/10 dark:bg-white/5">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+                    {ticket.description}
+                  </p>
+                </div>
+              </div>
+
+              {ticket.status === 'on_hold' && ticket.hold_reason && (
+                <div className="mt-4 flex items-start gap-2 rounded-xl border border-purple-200 bg-purple-50 px-3 py-2 text-sm text-purple-800 dark:border-purple-900/50 dark:bg-purple-900/20 dark:text-purple-200">
+                  <ClockIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>
+                    <span className="font-medium">{t('tickets.onHold')}</span> {ticket.hold_reason}
+                  </span>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          <Card>
+            <SectionHeader icon={PaperClipIcon} title={t('field.attachments')} />
+            <AttachmentList attachments={ticket.attachments} />
+          </Card>
+
+          <Card>
+            <SectionHeader icon={ChatIcon} title={t('tickets.comments')} />
+            <CommentThread ticketId={ticket.id} comments={ticket.comments} canReply={canReply} />
+          </Card>
+        </div>
+
+        <div className="flex flex-col gap-6 lg:min-h-0 lg:overflow-y-auto lg:pe-1">
+          <Card>
+            <SectionHeader
+              icon={TicketIcon}
+              title={t('tickets.details')}
+              action={
+                isAdmin && (
+                  <Button variant="secondary" onClick={() => setEditOpen(true)}>
+                    {t('tickets.editDetails')}
+                  </Button>
+                )
+              }
+            />
+            <dl className="flex flex-col">
+              <DetailRow
+                icon={UserIcon}
+                label={ticket.customer ? t('field.customer') : t('tickets.guest')}
+              >
+                <div className="flex flex-col gap-1.5">
+                  {ticket.customer && (
+                    <span>{`${ticket.customer.full_name} (@${ticket.customer.username})`}</span>
+                  )}
+                  {isGuestOrigin && (
+                    <span className="flex flex-col gap-0.5">
+                      {ticket.customer && (
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                          {t('tickets.guest')}
+                        </span>
+                      )}
+                      <span>{ticket.guest_name || t('tickets.guest')}</span>
+                      {ticket.guest_company && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">🏢 {ticket.guest_company}</span>
+                      )}
+                      {ticket.guest_phone && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">📞 {ticket.guest_phone}</span>
+                      )}
+                      {ticket.guest_email && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">✉ {ticket.guest_email}</span>
+                      )}
+                    </span>
+                  )}
+                </div>
+              </DetailRow>
+
+              <DetailRow icon={FolderOpenIcon} label={t('field.category')}>
+                {ticket.category?.name}
+              </DetailRow>
+
+              {ticket.branch && (
+                <DetailRow icon={BadgeIcon} label={t('tickets.branch')}>
+                  {ticket.branch.name}
+                  {ticket.branch.address ? ` — ${ticket.branch.address}` : ''}
+                </DetailRow>
+              )}
+
+              {!isCustomer && (
+                <DetailRow icon={UserIcon} label={t('field.assignedAgent')}>
+                  {ticket.assigned_agent?.full_name || (
+                    <span className="text-gray-400 dark:text-gray-500">{t('status.open')}</span>
+                  )}
+                  {ticket.assigned_agent && ticket.assigned_at && (
+                    <span className="mt-0.5 block text-xs text-gray-400 dark:text-gray-500">
+                      {t('field.assignedOn')} {new Date(ticket.assigned_at).toLocaleString()}
+                    </span>
+                  )}
+                </DetailRow>
+              )}
+
+              {!isCustomer && (
+                <DetailRow icon={UsersIcon} label={t('tickets.collaboratingAgents')}>
+                  {collaborators.length ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {collaborators.map((c) => (
+                        <span
+                          key={c.id}
+                          className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700 ring-1 ring-inset ring-gray-500/15 dark:bg-white/10 dark:text-gray-200 dark:ring-white/10"
+                        >
+                          {c.full_name}
+                          {canAssign && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCollaborator(c.id)}
+                              className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                              aria-label={`${t('common.remove')} ${c.full_name}`}
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-gray-400 dark:text-gray-500">{t('tickets.none')}</span>
+                  )}
+                </DetailRow>
+              )}
+
+              <DetailRow icon={CalendarIcon} label={t('field.createdAt')}>
+                {new Date(ticket.created_at).toLocaleString()}
+              </DetailRow>
+
+              <DetailRow icon={CalendarIcon} label={t('field.startDate')}>
+                {ticket.start_date ? (
+                  new Date(ticket.start_date).toLocaleDateString()
+                ) : (
+                  <span className="text-gray-400 dark:text-gray-500">{t('tickets.none')}</span>
+                )}
+              </DetailRow>
+
+              <DetailRow icon={ClockIcon} label={t('field.dueDate')}>
+                {ticket.due_at ? (
+                  <span
+                    className={
+                      isOverdue ? 'font-medium text-red-600 dark:text-red-400' : undefined
+                    }
+                  >
+                    {new Date(ticket.due_at).toLocaleString()}
+                    {isOverdue && (
+                      <span className="ms-2 rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                        {t('tickets.overdue')}
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-gray-400 dark:text-gray-500">{t('tickets.none')}</span>
+                )}
+              </DetailRow>
+            </dl>
+          </Card>
+
+          {hasActions && (
+            <Card>
+              <SectionHeader icon={SettingsIcon} title={t('common.actions')} />
+              {notStarted && (
+                <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300">
+                  <LockIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>
+                    {t('tickets.actionsLockedUntilStart')} (
+                    {new Date(ticket.start_date).toLocaleDateString()})
+                  </span>
+                </div>
+              )}
+              <fieldset
+                disabled={notStarted}
+                className={`flex min-w-0 flex-col gap-4 ${
+                  notStarted ? 'pointer-events-none opacity-60' : ''
+                }`}
+              >
+                {(canLinkCustomer || canUnlinkCustomer) && (
+                  <ActionGroup label={t('field.customer')}>
+                    {canUnlinkCustomer ? (
+                      <Button
+                        variant="secondary"
+                        onClick={handleRemoveCustomer}
+                        loading={setTicketCustomer.isPending}
+                      >
+                        {t('tickets.editCustomer')}
+                      </Button>
+                    ) : (
+                      <>
+                        <SearchableSelect
+                          value={customerId}
+                          onChange={handleLinkCustomerChange}
+                          placeholder={t('tickets.selectCustomer')}
+                          options={(customers || []).map((c) => ({
+                            value: c.id,
+                            label: `${c.full_name} (@${c.username})`,
+                          }))}
+                        />
+                        {linkBranchOptions.length > 0 && (
+                          <SearchableSelect
+                            value={customerBranchId}
+                            onChange={setCustomerBranchId}
+                            placeholder={t('tickets.selectBranch')}
+                            options={linkBranchOptions}
+                          />
+                        )}
+                        <Button
+                          onClick={handleLinkCustomer}
+                          loading={setTicketCustomer.isPending}
+                          disabled={!customerId}
+                        >
+                          {t('tickets.linkCustomer')}
+                        </Button>
+                      </>
+                    )}
+                  </ActionGroup>
+                )}
+
+                {canAssign && (
+                  <ActionGroup label={t('tickets.assignAgent')}>
+                    <Select value={agentId} onChange={(e) => setAgentId(e.target.value)}>
+                      <option value="" disabled>
+                        {t('tickets.assignToAgent')}
+                      </option>
+                      {agents?.map((agent) => (
+                        <option key={agent.id} value={agent.id}>
+                          {agent.full_name}
+                        </option>
+                      ))}
+                    </Select>
+                    <Button onClick={handleAssign} loading={assignTicket.isPending} disabled={!agentId}>
+                      {t('tickets.assign')}
+                    </Button>
+                  </ActionGroup>
+                )}
+
+                {canAssign && (
+                  <ActionGroup label={t('tickets.collaborators')}>
+                    <Select
+                      value={collaboratorId}
+                      onChange={(e) => setCollaboratorId(e.target.value)}
+                    >
+                      <option value="" disabled>
+                        {t('tickets.addCollaboratingAgent')}
+                      </option>
+                      {availableCollaborators.map((agent) => (
+                        <option key={agent.id} value={agent.id}>
+                          {agent.full_name}
+                        </option>
+                      ))}
+                    </Select>
+                    <Button
+                      onClick={handleAddCollaborator}
+                      loading={setCollaborators.isPending}
+                      disabled={!collaboratorId}
+                    >
+                      {t('tickets.addCollaborator')}
+                    </Button>
+                  </ActionGroup>
+                )}
+
+                {canSelfAssign && (
+                  <ActionGroup label={t('tickets.assignment')}>
+                    <Button
+                      onClick={() =>
+                        assignTicket.mutate(user.id, {
+                          onSuccess: () => noticeAssignedTo(user.full_name),
+                        })
+                      }
+                      loading={assignTicket.isPending}
+                      className="w-full"
+                    >
+                      {t('tickets.assignToMe')}
+                    </Button>
+                  </ActionGroup>
+                )}
+
+                {canReassign && (
+                  <ActionGroup label={t('tickets.reassign')}>
+                    <Select value={reassignId} onChange={(e) => setReassignId(e.target.value)}>
+                      <option value="" disabled>
+                        {t('tickets.reassignToAnother')}
+                      </option>
+                      {agents
+                        ?.filter((agent) => agent.id !== user?.id)
+                        .map((agent) => (
+                          <option key={agent.id} value={agent.id}>
+                            {agent.full_name}
+                          </option>
+                        ))}
+                    </Select>
+                    <Button
+                      onClick={handleReassign}
+                      loading={assignTicket.isPending}
+                      disabled={!reassignId}
+                    >
+                      {t('tickets.reassign')}
+                    </Button>
+                  </ActionGroup>
+                )}
+
+                {canEdit && (
+                  <ActionGroup label={t('field.status')}>
+                    {ticket.assigned_agent ? (
+                      <>
+                        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+                          <option value="" disabled>
+                            {t('tickets.updateStatus')}
+                          </option>
+                          <option value="open">{t('status.open')}</option>
+                          <option value="in_progress">{t('status.in_progress')}</option>
+                          <option value="on_hold">{t('status.on_hold')}</option>
+                          <option value="resolved">{t('status.resolved')}</option>
+                          <option value="closed">{t('status.closed')}</option>
+                        </Select>
+                        {status === 'on_hold' && (
+                          <Textarea
+                            label={t('tickets.reasonForHold')}
+                            rows={2}
+                            placeholder={t('tickets.holdReasonPlaceholder')}
+                            value={holdReason}
+                            onChange={(e) => setHoldReason(e.target.value)}
+                          />
+                        )}
+                        <Button
+                          onClick={handleUpdateStatus}
+                          loading={updateStatus.isPending}
+                          disabled={!status || (status === 'on_hold' && !holdReason.trim())}
+                        >
+                          {t('tickets.updateStatus')}
+                        </Button>
+                      </>
+                    ) : (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {t('tickets.assignBeforeStatus')}
+                      </p>
+                    )}
+                  </ActionGroup>
+                )}
+
+                {canEdit && (
+                  <ActionGroup label={t('field.dueDate')}>
+                    <Input
+                      type="datetime-local"
+                      value={deadline || toDateTimeLocal(ticket.due_at)}
+                      onChange={(e) => setDeadlineInput(e.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleSetDeadline}
+                        loading={setDeadline.isPending}
+                        disabled={!deadline}
+                      >
+                        {t('tickets.setDueDate')}
+                      </Button>
+                      {ticket.due_at && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            setDeadline.mutate(null, {
+                              onSuccess: () => showNotice(t('tickets.noticeDueDateCleared')),
+                            })
+                            setDeadlineInput('')
+                          }}
+                          loading={setDeadline.isPending}
+                        >
+                          {t('tickets.clear')}
+                        </Button>
+                      )}
+                    </div>
+                  </ActionGroup>
+                )}
+
+                {canDelete && (
+                  <ActionGroup label={t('tickets.dangerZone')}>
+                    <Button
+                      variant="danger"
+                      onClick={handleDelete}
+                      loading={deleteTicket.isPending}
+                      className="w-full"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                      {t('tickets.deleteTicket')}
+                    </Button>
+                  </ActionGroup>
+                )}
+              </fieldset>
+            </Card>
+          )}
+
+          <Card>
+            <SectionHeader icon={ClockIcon} title={t('tickets.activityHistory')} />
+            <ActivityTimeline activities={activities} />
+          </Card>
+        </div>
+      </div>
+
+      {isAdmin && (
+        <EditTicketModal open={editOpen} onClose={() => setEditOpen(false)} ticket={ticket} id={id} />
+      )}
+    </div>
+  )
+}

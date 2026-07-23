@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---- Elevated / Premium design tokens ---- */
+@theme {
+  /* Soft, layered shadows used across cards, popovers and tiles */
+  --shadow-soft: 0 1px 2px 0 rgb(16 24 40 / 0.04), 0 8px 24px -8px rgb(16 24 40 / 0.10);
+  --shadow-soft-lg: 0 4px 10px -2px rgb(16 24 40 / 0.06), 0 22px 48px -12px rgb(16 24 40 / 0.20);
+}
+
+/* Subtle app background wash so surfaces read as elevated */
+body {
+  background-image: radial-gradient(60rem 60rem at 110% -10%, rgb(99 102 241 / 0.06), transparent 60%);
+  background-attachment: fixed;
+}
+.dark body {
+  background-image: radial-gradient(60rem 60rem at 110% -10%, rgb(99 102 241 / 0.12), transparent 60%);
+}

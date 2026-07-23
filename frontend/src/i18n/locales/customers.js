@@ -1,0 +1,104 @@
+// Customers area: list page, profile page, and the create/edit customer modal.
+export default {
+  en: {
+    // List page
+    'customers.title': 'Customers',
+    'customers.subtitle': 'People who submit tickets and their activity.',
+    'customers.searchPlaceholder': 'Search customers…',
+    'customers.addCustomer': 'Add customer',
+    'customers.editCustomer': 'Edit customer',
+    'customers.noCustomersFound': 'No customers found',
+    'customers.viewProfile': 'View profile',
+    'customers.activate': 'Activate',
+    'customers.deactivate': 'Deactivate',
+    'customers.active': 'Active',
+    'customers.inactive': 'Inactive',
+
+    // Columns / stats
+    'customers.tickets': 'Tickets',
+    'customers.openTickets': 'Open tickets',
+    'customers.open': 'Open',
+
+    // Profile page
+    'customers.customerFallback': 'Customer',
+    'customers.noEmail': 'No email on file',
+    'customers.details': 'Details',
+    'customers.softwareType': 'Software type',
+    'customers.taxNumber': 'Tax number',
+    'customers.licenses': 'Licenses',
+    'customers.licenseName': 'License name',
+    'customers.branches': 'Branches',
+    'customers.branchName': 'Branch name',
+    'customers.addBranch': 'Add branch',
+    'customers.noBranchesYet': 'No branches added yet.',
+    'customers.noBranches': 'No branches',
+    'customers.startDate': 'Start date',
+    'customers.endDate': 'End date',
+    'customers.noLicenses': 'No licenses',
+    'customers.noAttachments': 'No attachments',
+    'customers.noTickets': 'No tickets',
+
+    // Form modal
+    'customers.newPassword': 'New password',
+    'customers.addLicense': 'Add license',
+    'customers.noLicensesYet': 'No licenses added yet.',
+    'customers.addAttachments': 'Add attachments',
+    'customers.attachmentsNote': "New files are added to the customer's existing attachments.",
+    'customers.errorSave': 'Failed to save changes.',
+    'customers.errorCreate': 'Failed to create customer. The username may already be taken.',
+    'customers.deleteConfirm': "Delete this customer's account? This cannot be undone.",
+    'customers.deleteFailed': 'Failed to delete customer.',
+    'customers.deleteHasTickets':
+      'This customer has tickets and cannot be deleted. Deactivate the account instead.',
+  },
+  ar: {
+    // List page
+    'customers.title': 'العملاء',
+    'customers.subtitle': 'الأشخاص الذين يرسلون التذاكر ونشاطهم.',
+    'customers.searchPlaceholder': 'ابحث في العملاء…',
+    'customers.addCustomer': 'إضافة عميل',
+    'customers.editCustomer': 'تعديل عميل',
+    'customers.noCustomersFound': 'لا يوجد عملاء',
+    'customers.viewProfile': 'عرض الملف',
+    'customers.activate': 'تفعيل',
+    'customers.deactivate': 'إلغاء التفعيل',
+    'customers.active': 'نشط',
+    'customers.inactive': 'غير نشط',
+
+    // Columns / stats
+    'customers.tickets': 'التذاكر',
+    'customers.openTickets': 'التذاكر المفتوحة',
+    'customers.open': 'المفتوحة',
+
+    // Profile page
+    'customers.customerFallback': 'عميل',
+    'customers.noEmail': 'لا يوجد بريد إلكتروني مسجّل',
+    'customers.details': 'التفاصيل',
+    'customers.softwareType': 'نوع البرنامج',
+    'customers.taxNumber': 'الرقم الضريبي',
+    'customers.licenses': 'التراخيص',
+    'customers.licenseName': 'اسم الترخيص',
+    'customers.branches': 'الفروع',
+    'customers.branchName': 'اسم الفرع',
+    'customers.addBranch': 'إضافة فرع',
+    'customers.noBranchesYet': 'لم تتم إضافة فروع بعد.',
+    'customers.noBranches': 'لا توجد فروع',
+    'customers.startDate': 'تاريخ البدء',
+    'customers.endDate': 'تاريخ الانتهاء',
+    'customers.noLicenses': 'لا توجد تراخيص',
+    'customers.noAttachments': 'لا توجد مرفقات',
+    'customers.noTickets': 'لا توجد تذاكر',
+
+    // Form modal
+    'customers.newPassword': 'كلمة مرور جديدة',
+    'customers.addLicense': 'إضافة ترخيص',
+    'customers.noLicensesYet': 'لم تتم إضافة تراخيص بعد.',
+    'customers.addAttachments': 'إضافة مرفقات',
+    'customers.attachmentsNote': 'تُضاف الملفات الجديدة إلى مرفقات العميل الحالية.',
+    'customers.errorSave': 'تعذّر حفظ التغييرات.',
+    'customers.errorCreate': 'تعذّر إنشاء العميل. قد يكون اسم المستخدم مستخدَمًا بالفعل.',
+    'customers.deleteConfirm': 'حذف حساب هذا العميل؟ لا يمكن التراجع عن هذا الإجراء.',
+    'customers.deleteFailed': 'تعذّر حذف العميل.',
+    'customers.deleteHasTickets': 'لدى هذا العميل تذاكر ولا يمكن حذفه. قم بإلغاء تفعيل الحساب بدلاً من ذلك.',
+  },
+}
