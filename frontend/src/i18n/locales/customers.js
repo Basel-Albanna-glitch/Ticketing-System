@@ -1,6 +1,10 @@
 // Customers area: list page, profile page, and the create/edit customer modal.
 export default {
   en: {
+    // Customer's own account page
+    'account.title': 'My account',
+    'account.loadError': 'Could not load your account details.',
+
     // List page
     'customers.title': 'Customers',
     'customers.subtitle': 'People who submit tickets and their activity.',
@@ -29,6 +33,9 @@ export default {
     'customers.licenseName': 'License name',
     'customers.branches': 'Branches',
     'customers.branchName': 'Branch name',
+    'customers.branchTickets': 'Tickets',
+    'customers.viewBranchTickets': 'View this branch’s tickets',
+    'customers.branchNoTickets': 'No tickets for this branch',
     'customers.addBranch': 'Add branch',
     'customers.noBranchesYet': 'No branches added yet.',
     'customers.noBranches': 'No branches',
@@ -52,6 +59,10 @@ export default {
       'This customer has tickets and cannot be deleted. Deactivate the account instead.',
   },
   ar: {
+    // Customer's own account page
+    'account.title': 'حسابي',
+    'account.loadError': 'تعذّر تحميل تفاصيل حسابك.',
+
     // List page
     'customers.title': 'العملاء',
     'customers.subtitle': 'الأشخاص الذين يرسلون التذاكر ونشاطهم.',
@@ -80,6 +91,9 @@ export default {
     'customers.licenseName': 'اسم الترخيص',
     'customers.branches': 'الفروع',
     'customers.branchName': 'اسم الفرع',
+    'customers.branchTickets': 'التذاكر',
+    'customers.viewBranchTickets': 'عرض تذاكر هذا الفرع',
+    'customers.branchNoTickets': 'لا توجد تذاكر لهذا الفرع',
     'customers.addBranch': 'إضافة فرع',
     'customers.noBranchesYet': 'لم تتم إضافة فروع بعد.',
     'customers.noBranches': 'لا توجد فروع',

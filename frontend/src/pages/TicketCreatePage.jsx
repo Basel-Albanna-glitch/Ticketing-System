@@ -152,7 +152,7 @@ export default function TicketCreatePage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto w-1/2 [&_input]:py-3 [&_input]:text-base [&_label]:text-[15px] [&_select]:py-3 [&_select]:text-base [&_textarea]:py-3 [&_textarea]:text-base">
       <Breadcrumbs
         items={[
           { label: t('crumb.dashboard'), to: '/dashboard' },
@@ -160,9 +160,9 @@ export default function TicketCreatePage() {
           { label: t('tickets.newTicket') },
         ]}
       />
-      <h1 className="mb-4 text-2xl font-semibold text-gray-900 dark:text-gray-100">{t('tickets.create')}</h1>
-      <Card>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <h1 className="mb-6 text-3xl font-semibold text-gray-900 dark:text-gray-100">{t('tickets.create')}</h1>
+      <Card className="p-6 sm:p-8">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
           {isStaff && (
             <SearchableSelect
               label={t('field.customer')}
@@ -199,7 +199,7 @@ export default function TicketCreatePage() {
           <Input label={t('field.subject')} value={subject} onChange={(e) => setSubject(e.target.value)} required />
           <Textarea
             label={t('field.description')}
-            rows={5}
+            rows={7}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             required
@@ -225,22 +225,17 @@ export default function TicketCreatePage() {
           <FileInput label={t('tickets.attachment')} files={attachments} onChange={setAttachments} />
           {isAdmin && (
             <div className="flex flex-col gap-2">
-              <Select
+              <SearchableSelect
                 label={`${t('tickets.assignToAgents')} (${t('common.optional')})`}
                 value=""
-                onChange={(e) => {
-                  if (e.target.value) toggleAgent(e.target.value)
+                onChange={(value) => {
+                  if (value) toggleAgent(String(value))
                 }}
-              >
-                <option value="">{t('tickets.selectAgent')}</option>
-                {(agents || [])
+                placeholder={t('tickets.selectAgent')}
+                options={(agents || [])
                   .filter((a) => !assignedAgentIds.includes(String(a.id)))
-                  .map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.full_name}
-                    </option>
-                  ))}
-              </Select>
+                  .map((a) => ({ value: a.id, label: a.full_name }))}
+              />
               {assignedAgentIds.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {assignedAgentIds.map((id, index) => {
@@ -277,9 +272,11 @@ export default function TicketCreatePage() {
             </div>
           )}
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-          <Button type="submit" loading={mutation.isPending}>
-            {t('common.submit')}
-          </Button>
+          <div className="[&_button]:w-full [&_button]:py-3 [&_button]:text-base">
+            <Button type="submit" loading={mutation.isPending}>
+              {t('common.submit')}
+            </Button>
+          </div>
         </form>
       </Card>
     </div>

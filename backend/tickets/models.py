@@ -25,6 +25,9 @@ class TicketSettings(models.Model):
     allow_agent_delete = models.BooleanField(default=False)
     # When on, agents may link, change, or remove the customer on a guest ticket.
     allow_agent_link_customer = models.BooleanField(default=False)
+    # When on, agents may create, edit, and delete knowledge-base articles. When off,
+    # managing the knowledge base stays admin-only.
+    allow_agent_manage_kb = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Ticket settings'
@@ -60,6 +63,55 @@ class Category(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Article(models.Model):
+    """A knowledge-base help article / FAQ. Published articles are readable by anyone
+    (customers and guests); drafts are visible to staff only."""
+
+    title = models.CharField(max_length=200)
+    body = models.TextField()
+    # Reuse the ticket taxonomy so articles line up with the categories tickets use.
+    category = models.ForeignKey(
+        Category, null=True, blank=True, related_name='articles', on_delete=models.SET_NULL
+    )
+    is_published = models.BooleanField(default=True)
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['title']
+
+    def __str__(self):
+        return self.title
+
+
+def article_attachment_upload_path(instance, filename):
+    return f'articles/article_{instance.article_id}/{filename}'
+
+
+class ArticleAttachment(models.Model):
+    """A file published alongside a help article — a manual, form, or screenshot. Readable by
+    anyone who can read the article, so only attach files meant to be public."""
+
+    article = models.ForeignKey(Article, related_name='attachments', on_delete=models.CASCADE)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+'
+    )
+    file = models.FileField(upload_to=article_attachment_upload_path)
+    original_filename = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=100, blank=True)
+    size = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return self.original_filename
 
 
 class Ticket(models.Model):
@@ -100,6 +152,8 @@ class Ticket(models.Model):
     collaborators = models.ManyToManyField(
         settings.AUTH_USER_MODEL, related_name='tickets_collaborating', blank=True
     )
+    # Knowledge-base articles staff attach as related/suggested help for this ticket.
+    articles = models.ManyToManyField('Article', related_name='tickets', blank=True)
     # Human-facing serial, e.g. HERMES-TKT-26-000123. Assigned on first save; the numeric
     # part is a per-year sequence that restarts at 1 each calendar year (see save()).
     reference = models.CharField(max_length=30, unique=True, blank=True)
@@ -119,7 +173,19 @@ class Ticket(models.Model):
     due_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # When the ticket was first marked resolved. Set on the resolve transition (and on a
+    # direct close if it was never resolved), and kept when the ticket is later closed so
+    # resolution-time reporting still counts it. Cleared only if the ticket is reopened.
     resolved_at = models.DateTimeField(null=True, blank=True)
+    # When the ticket was closed. Cleared if the ticket is reopened.
+    closed_at = models.DateTimeField(null=True, blank=True)
+    # Customer satisfaction rating (1–5), collected via a link emailed when the ticket is
+    # closed. rating_token gates the public rating page so only the emailed customer/guest
+    # can submit; it's generated on close and cleared once a rating is submitted.
+    rating = models.PositiveSmallIntegerField(null=True, blank=True)
+    rating_comment = models.TextField(blank=True)
+    rating_token = models.CharField(max_length=64, blank=True)
+    rating_submitted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
@@ -211,6 +277,7 @@ class TicketActivity(models.Model):
         ATTACHMENT_ADDED = 'attachment_added', 'Attachment added'
         DEADLINE_SET = 'deadline_set', 'Deadline set'
         CUSTOMER_LINKED = 'customer_linked', 'Customer linked'
+        RATED = 'rated', 'Rated'
 
     ticket = models.ForeignKey(Ticket, related_name='activities', on_delete=models.CASCADE)
     actor = models.ForeignKey(

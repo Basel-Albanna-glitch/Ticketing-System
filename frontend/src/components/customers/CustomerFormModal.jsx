@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import AvatarUploader from '../ui/AvatarUploader'
 import Button from '../ui/Button'
 import FileInput from '../ui/FileInput'
 import Input from '../ui/Input'
@@ -8,6 +10,8 @@ import Table from '../ui/Table'
 import Textarea from '../ui/Textarea'
 import { PlusIcon } from '../ui/icons'
 import { useI18n } from '../../i18n/useI18n'
+import { useAuth } from '../../auth/useAuth'
+import { deleteUserAvatar, uploadUserAvatar } from '../../api/users'
 import { useCreateCustomer, useUpdateCustomerProfile } from '../../hooks/useCustomers'
 import { useSoftwareTypes } from '../../hooks/useSoftwareTypes'
 
@@ -56,7 +60,16 @@ function formToState(customer) {
 
 export default function CustomerFormModal({ open, onClose, customer = null }) {
   const { t } = useI18n()
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
   const isEdit = Boolean(customer)
+  // Setting someone else's picture is admin-only, even where agents may edit customers.
+  const canSetAvatar = user?.role === 'admin'
+  const [avatar, setAvatar] = useState(customer?.avatar || null)
+  // Picture picked while creating a customer, uploaded once the account has an id. If the
+  // account saved but the picture didn't, createdId keeps a retry from creating a duplicate.
+  const [pendingAvatar, setPendingAvatar] = useState(null)
+  const [createdId, setCreatedId] = useState(null)
   const { data: softwareTypes } = useSoftwareTypes()
   const createCustomer = useCreateCustomer()
   const updateCustomer = useUpdateCustomerProfile()
@@ -75,6 +88,9 @@ export default function CustomerFormModal({ open, onClose, customer = null }) {
     setLicenses(seededLicenses)
     setBranches(seededBranches)
     setAttachments([])
+    setAvatar(customer?.avatar || null)
+    setPendingAvatar(null)
+    setCreatedId(null)
     setError('')
   }, [open, customer])
 
@@ -120,10 +136,24 @@ export default function CustomerFormModal({ open, onClose, customer = null }) {
       attachments,
     }
     try {
-      if (isEdit) {
-        await updateCustomer.mutateAsync({ id: customer.id, ...payload })
+      let targetId = customer?.id || createdId
+      if (targetId) {
+        await updateCustomer.mutateAsync({ id: targetId, ...payload })
       } else {
-        await createCustomer.mutateAsync({ username: form.username, ...payload })
+        const created = await createCustomer.mutateAsync({ username: form.username, ...payload })
+        targetId = created.id
+      }
+      if (pendingAvatar) {
+        try {
+          await uploadUserAvatar(targetId, pendingAvatar)
+          queryClient.invalidateQueries({ queryKey: ['customers'] })
+        } catch {
+          // The account exists now, so don't fail the whole save — keep the modal open so
+          // the picture can be retried without creating a second customer.
+          setCreatedId(targetId)
+          setError(t('settings.avatar.savedWithoutPicture'))
+          return
+        }
       }
       onClose()
     } catch {
@@ -132,10 +162,32 @@ export default function CustomerFormModal({ open, onClose, customer = null }) {
   }
 
   const pending = createCustomer.isPending || updateCustomer.isPending
+  // Upload immediately once the account exists; before that the file is held locally.
+  const avatarTargetId = customer?.id || createdId
 
   return (
     <Modal open={open} onClose={onClose} title={isEdit ? t('customers.editCustomer') : t('customers.addCustomer')} size="xl">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {canSetAvatar && (
+          <AvatarUploader
+            name={form.full_name}
+            src={avatar}
+            size="lg"
+            onUpload={
+              avatarTargetId
+                ? (file) => uploadUserAvatar(avatarTargetId, file).then((u) => setAvatar(u.avatar))
+                : undefined
+            }
+            onSelect={avatarTargetId ? undefined : setPendingAvatar}
+            onRemove={
+              avatarTargetId
+                ? () => deleteUserAvatar(avatarTargetId).then((u) => setAvatar(u.avatar))
+                : undefined
+            }
+            onDone={() => queryClient.invalidateQueries({ queryKey: ['customers'] })}
+            className="border-b border-gray-100 pb-4 dark:border-white/10"
+          />
+        )}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {isEdit ? (
             <Input label={t('field.username')} value={form.username} disabled />

@@ -1,22 +1,11 @@
 import { useState } from 'react'
+import Avatar from '../ui/Avatar'
 import Button from '../ui/Button'
 import FileInput from '../ui/FileInput'
 import Textarea from '../ui/Textarea'
 import AttachmentList from './AttachmentList'
 import { usePostComment } from '../../hooks/useTicket'
 import { useI18n } from '../../i18n/useI18n'
-
-function initials(name = '') {
-  return (
-    name
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((w) => w[0])
-      .join('')
-      .toUpperCase() || '?'
-  )
-}
 
 export default function CommentThread({ ticketId, comments, canReply = true }) {
   const { t } = useI18n()
@@ -41,9 +30,11 @@ export default function CommentThread({ ticketId, comments, canReply = true }) {
               key={c.id}
               className="flex gap-3 rounded-xl border border-gray-200/70 bg-gray-50/50 p-3 dark:border-white/10 dark:bg-white/5"
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
-                {initials(c.author_name || c.author?.full_name)}
-              </span>
+              <Avatar
+                name={c.author_name || c.author?.full_name}
+                src={c.author?.avatar}
+                size="md"
+              />
               <div className="min-w-0 flex-1">
                 <div className="mb-1 flex items-center justify-between gap-2 text-xs text-gray-400 dark:text-gray-500">
                   <span className="font-medium text-gray-700 dark:text-gray-300">

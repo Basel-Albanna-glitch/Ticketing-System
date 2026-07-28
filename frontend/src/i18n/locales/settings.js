@@ -16,7 +16,16 @@ export default {
 
     // Profile section
     'settings.profile.title': 'Profile settings',
-    'settings.profile.description': 'Update your display name and contact email.',
+    'settings.profile.description': 'Update your picture, display name, and contact email.',
+    'settings.avatar.upload': 'Upload photo',
+    'settings.avatar.change': 'Change photo',
+    'settings.avatar.hint': 'JPG or PNG, up to 5 MB. Centred and cropped to a square.',
+    'settings.avatar.hintOnCreate': 'JPG or PNG, up to 5 MB. Uploaded when you save the account.',
+    'settings.avatar.savedWithoutPicture':
+      'The account was saved, but the picture could not be uploaded. Try adding it again.',
+    'settings.avatar.notImage': 'Choose an image file.',
+    'settings.avatar.tooLarge': 'Image must be 5 MB or smaller.',
+    'settings.avatar.uploadError': 'Could not update your picture. Please try again.',
     'settings.profile.updated': 'Profile updated.',
 
     // Password section
@@ -37,12 +46,26 @@ export default {
       'Get an email whenever someone comments on your tickets.',
     'settings.notifications.statusChange.label': 'Email me on status changes',
     'settings.notifications.statusChange.hint': "Get an email when a ticket's status is updated.",
+    'settings.notifications.assignment.label': 'Email me when a ticket is assigned to me',
+    'settings.notifications.assignment.hint':
+      'Get an email when someone hands a ticket over to you.',
+    'settings.notifications.emailGroup': 'Email',
+    'settings.notifications.saved': 'Saved',
+    'settings.notifications.inAppNote':
+      "In-app notifications in the bell menu are always on — these settings only control email.",
+    'settings.notifications.allOff':
+      "All email is off. You'll still see everything in the bell menu.",
+    'settings.notifications.noEmail':
+      'Your account has no email address, so none of these can be sent. Add one under Profile settings.',
 
     // Permissions section
     'settings.permissions.title': 'Permissions',
     'settings.permissions.description':
-      'Control what agents are allowed to do with ticket assignments.',
+      'Control what agents are allowed to do. Admins always have full access.',
     'settings.permissions.saved': 'Permissions saved.',
+    'settings.permissions.group.tickets': 'Tickets',
+    'settings.permissions.group.customers': 'Customers',
+    'settings.permissions.group.kb': 'Knowledge base',
     'settings.permissions.selfAssign.label': 'Allow agents to assign tickets to themselves',
     'settings.permissions.selfAssign.hint':
       "When enabled, agents can see unassigned tickets and either claim one for themselves or release one they no longer want. They still can't assign a ticket to another agent or take one already claimed — that stays admin-only.",
@@ -62,6 +85,9 @@ export default {
     'settings.permissions.linkCustomer.label': "Allow agents to change a guest ticket's customer",
     'settings.permissions.linkCustomer.hint':
       'When on, agents can link, change, or remove the customer on a guest ticket. When off, only admins can.',
+    'settings.permissions.manageKb.label': 'Allow agents to manage the knowledge base',
+    'settings.permissions.manageKb.hint':
+      'When on, agents can create, edit, and delete knowledge-base articles. When off, only admins can.',
 
     // Categories section
     'settings.categories.title': 'Categories',
@@ -113,7 +139,16 @@ export default {
 
     // Profile section
     'settings.profile.title': 'إعدادات الملف الشخصي',
-    'settings.profile.description': 'حدّث اسمك الظاهر والبريد الإلكتروني للتواصل.',
+    'settings.profile.description': 'حدّث صورتك واسمك الظاهر والبريد الإلكتروني للتواصل.',
+    'settings.avatar.upload': 'رفع صورة',
+    'settings.avatar.change': 'تغيير الصورة',
+    'settings.avatar.hint': 'JPG أو PNG، بحد أقصى 5 ميجابايت. تُقتطع لتكون مربّعة.',
+    'settings.avatar.hintOnCreate': 'JPG أو PNG، بحد أقصى 5 ميجابايت. تُرفع عند حفظ الحساب.',
+    'settings.avatar.savedWithoutPicture':
+      'تم حفظ الحساب، لكن تعذّر رفع الصورة. حاول إضافتها مرة أخرى.',
+    'settings.avatar.notImage': 'اختر ملف صورة.',
+    'settings.avatar.tooLarge': 'يجب ألا يتجاوز حجم الصورة 5 ميجابايت.',
+    'settings.avatar.uploadError': 'تعذّر تحديث صورتك. يرجى المحاولة مرة أخرى.',
     'settings.profile.updated': 'تم تحديث الملف الشخصي.',
 
     // Password section
@@ -135,11 +170,25 @@ export default {
     'settings.notifications.statusChange.label': 'أرسل لي بريدًا إلكترونيًا عند تغيّر الحالة',
     'settings.notifications.statusChange.hint':
       'استلم بريدًا إلكترونيًا عند تحديث حالة تذكرة.',
+    'settings.notifications.assignment.label': 'أرسل لي بريدًا إلكترونيًا عند إسناد تذكرة إليّ',
+    'settings.notifications.assignment.hint':
+      'استلم بريدًا إلكترونيًا عندما يُسند أحدهم تذكرة إليك.',
+    'settings.notifications.emailGroup': 'البريد الإلكتروني',
+    'settings.notifications.saved': 'تم الحفظ',
+    'settings.notifications.inAppNote':
+      'إشعارات التطبيق في قائمة الجرس تعمل دائمًا — هذه الإعدادات تتحكم بالبريد الإلكتروني فقط.',
+    'settings.notifications.allOff':
+      'جميع رسائل البريد الإلكتروني متوقفة. ستظل ترى كل شيء في قائمة الجرس.',
+    'settings.notifications.noEmail':
+      'لا يوجد بريد إلكتروني في حسابك، لذا لا يمكن إرسال أي منها. أضِف واحدًا من إعدادات الملف الشخصي.',
 
     // Permissions section
     'settings.permissions.title': 'الصلاحيات',
-    'settings.permissions.description': 'تحكّم فيما يُسمح للوكلاء فعله بخصوص تعيينات التذاكر.',
+    'settings.permissions.description': 'تحكّم فيما يُسمح للوكلاء فعله. المشرفون لديهم صلاحية كاملة دائماً.',
     'settings.permissions.saved': 'تم حفظ الصلاحيات.',
+    'settings.permissions.group.tickets': 'التذاكر',
+    'settings.permissions.group.customers': 'العملاء',
+    'settings.permissions.group.kb': 'قاعدة المعرفة',
     'settings.permissions.selfAssign.label': 'السماح للوكلاء بتعيين التذاكر لأنفسهم',
     'settings.permissions.selfAssign.hint':
       'عند التفعيل، يمكن للوكلاء رؤية التذاكر غير المُعيَّنة وإما استلام واحدة لأنفسهم أو التخلّي عن واحدة لم يعودوا يريدونها. لا يزال لا يمكنهم تعيين تذكرة لوكيل آخر أو أخذ تذكرة مُستلَمة بالفعل — يبقى ذلك للمدير فقط.',
@@ -155,6 +204,9 @@ export default {
     'settings.permissions.editCustomers.label': 'السماح للوكلاء بتعديل العملاء',
     'settings.permissions.editCustomers.hint':
       'عند التفعيل، يمكن للوكلاء تعديل بيانات العملاء. أما إنشاء العملاء وحذفهم فيبقى للمدير فقط.',
+    'settings.permissions.manageKb.label': 'السماح للوكلاء بإدارة قاعدة المعرفة',
+    'settings.permissions.manageKb.hint':
+      'عند التفعيل، يمكن للوكلاء إنشاء مقالات قاعدة المعرفة وتعديلها وحذفها. عند الإيقاف، للمشرفين فقط.',
     'settings.permissions.linkCustomer.label': 'السماح للوكلاء بتغيير عميل تذكرة الزائر',
     'settings.permissions.linkCustomer.hint':
       'عند التفعيل، يمكن للوكلاء ربط العميل بتذكرة الزائر أو تغييره أو إزالته. عند الإيقاف، يمكن للمديرين فقط.',

@@ -13,4 +13,4 @@ class TicketFilterSet(django_filters.FilterSet):
 
     class Meta:
         model = Ticket
-        fields = ['status', 'priority', 'category', 'assigned_agent', 'customer']
+        fields = ['status', 'priority', 'category', 'assigned_agent', 'customer', 'branch']

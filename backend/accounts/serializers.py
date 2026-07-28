@@ -13,7 +13,7 @@ from .models import (
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'full_name', 'email', 'role', 'is_available', 'date_joined']
+        fields = ['id', 'username', 'full_name', 'email', 'role', 'is_available', 'avatar', 'date_joined']
         read_only_fields = fields
 
 
@@ -39,8 +39,8 @@ class RegisterSerializer(serializers.ModelSerializer):
 class MeSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'full_name', 'email', 'role', 'is_available', 'date_joined']
-        read_only_fields = ['id', 'username', 'role', 'date_joined']
+        fields = ['id', 'username', 'full_name', 'email', 'role', 'is_available', 'avatar', 'date_joined']
+        read_only_fields = ['id', 'username', 'role', 'avatar', 'date_joined']
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -57,7 +57,7 @@ class ChangePasswordSerializer(serializers.Serializer):
 class NotificationPreferenceSerializer(serializers.ModelSerializer):
     class Meta:
         model = NotificationPreference
-        fields = ['email_on_new_comment', 'email_on_status_change']
+        fields = ['email_on_new_comment', 'email_on_status_change', 'email_on_assignment']
 
 
 class AgentSerializer(serializers.ModelSerializer):
@@ -68,7 +68,7 @@ class AgentSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'full_name', 'email', 'is_available', 'is_active',
-            'assigned_count', 'resolved_count', 'date_joined',
+            'assigned_count', 'resolved_count', 'avatar', 'date_joined',
         ]
 
 
@@ -120,6 +120,15 @@ class CustomerBranchSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'address']
 
 
+class CustomerBranchDetailSerializer(CustomerBranchSerializer):
+    # Number of tickets attached to this branch. Supplied by an annotation on the
+    # customer's branches queryset (see CustomerViewSet.get_queryset).
+    ticket_count = serializers.IntegerField(read_only=True)
+
+    class Meta(CustomerBranchSerializer.Meta):
+        fields = CustomerBranchSerializer.Meta.fields + ['ticket_count']
+
+
 class CustomerAttachmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerAttachment
@@ -131,7 +140,7 @@ class CustomerSerializer(serializers.ModelSerializer):
     ticket_count = serializers.IntegerField(read_only=True)
     open_count = serializers.IntegerField(read_only=True)
     licenses = CustomerLicenseSerializer(many=True, read_only=True)
-    branches = CustomerBranchSerializer(many=True, read_only=True)
+    branches = CustomerBranchDetailSerializer(many=True, read_only=True)
     attachments = CustomerAttachmentSerializer(
         source='customer_attachments', many=True, read_only=True
     )
@@ -141,7 +150,7 @@ class CustomerSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'full_name', 'email', 'address', 'phone',
             'tax_number', 'software_type', 'is_active', 'ticket_count', 'open_count',
-            'licenses', 'branches', 'attachments', 'date_joined',
+            'licenses', 'branches', 'attachments', 'avatar', 'date_joined',
         ]
 
 
@@ -175,5 +184,5 @@ class CustomerCreateUpdateSerializer(serializers.ModelSerializer):
 class AdminUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'full_name', 'email', 'role', 'is_available', 'date_joined']
-        read_only_fields = ['id', 'username', 'full_name', 'email', 'is_available', 'date_joined']
+        fields = ['id', 'username', 'full_name', 'email', 'role', 'is_available', 'avatar', 'date_joined']
+        read_only_fields = ['id', 'username', 'full_name', 'email', 'is_available', 'avatar', 'date_joined']

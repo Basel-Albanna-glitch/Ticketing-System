@@ -5,6 +5,7 @@ import Input from '../components/ui/Input'
 import ThemeToggle from '../components/ui/ThemeToggle'
 import LanguageToggle from '../components/ui/LanguageToggle'
 import Logo from '../components/ui/Logo'
+import Footer from '../components/layout/Footer'
 import { BoardIcon, LockIcon, ReportsIcon, TicketIcon, UserIcon } from '../components/ui/icons'
 import { useAuth } from '../auth/useAuth'
 import { useI18n } from '../i18n/useI18n'
@@ -93,66 +94,76 @@ export default function LoginPage() {
       </div>
 
       {/* Form panel */}
-      <div className="relative flex items-center justify-center overflow-hidden bg-gray-50 px-4 py-12 dark:bg-gray-950">
+      <div className="relative flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950">
         <div className="pointer-events-none absolute -top-24 right-0 h-72 w-72 rounded-full bg-indigo-500/10 blur-3xl dark:bg-indigo-500/15" />
-        <div className="absolute end-4 top-4 flex items-center gap-1">
+        {/* z-10 keeps these above the centred content wrapper below, which spans the whole
+            panel and would otherwise swallow the clicks. */}
+        <div className="absolute end-4 top-4 z-10 flex items-center gap-1">
           <LanguageToggle />
           <ThemeToggle />
         </div>
 
-        <div className="relative w-full max-w-sm">
-          <Logo className="mb-8 lg:hidden" />
+        <div className="relative flex flex-1 items-center justify-center px-4 py-12">
+          <div className="relative w-full max-w-sm">
+            <Logo className="mb-8 lg:hidden" />
 
-          <div className="rounded-2xl border border-gray-200/70 bg-white p-8 shadow-soft-lg dark:border-white/10 dark:bg-gray-900/70">
-            <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm ring-1 ring-inset ring-white/20">
-              <LockIcon className="h-6 w-6" />
+            <div className="rounded-2xl border border-gray-200/70 bg-white p-8 shadow-soft-lg dark:border-white/10 dark:bg-gray-900/70">
+              <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm ring-1 ring-inset ring-white/20">
+                <LockIcon className="h-6 w-6" />
+              </div>
+
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                {t('login.welcome')}
+              </h1>
+              <p className="mb-6 mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {t('login.subtitle')}
+              </p>
+
+              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                <Input
+                  label={t('login.username')}
+                  name="username"
+                  icon={UserIcon}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  autoFocus
+                />
+                <Input
+                  label={t('login.password')}
+                  type="password"
+                  name="password"
+                  icon={LockIcon}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+                <Button type="submit" loading={isSubmitting} className="mt-2 w-full">
+                  {t('login.signIn')}
+                </Button>
+              </form>
             </div>
 
-            <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-              {t('login.welcome')}
-            </h1>
-            <p className="mb-6 mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {t('login.subtitle')}
-            </p>
-
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              <Input
-                label={t('login.username')}
-                name="username"
-                icon={UserIcon}
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                autoFocus
-              />
-              <Input
-                label={t('login.password')}
-                type="password"
-                name="password"
-                icon={LockIcon}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-              <Button type="submit" loading={isSubmitting} className="mt-2 w-full">
-                {t('login.signIn')}
-              </Button>
-            </form>
-          </div>
-
-          <div className="mt-6 text-center text-sm">
-            <p className="text-gray-500 dark:text-gray-400">{t('login.noAccount')}</p>
-            <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1">
-              <Link to="/guest/new" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
-                {t('login.guestSubmit')}
-              </Link>
-              <span className="text-gray-300 dark:text-gray-600">·</span>
-              <Link to="/guest/track" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
-                {t('login.guestTrack')}
-              </Link>
+            <div className="mt-6 text-center text-sm">
+              <p className="text-gray-500 dark:text-gray-400">{t('login.noAccount')}</p>
+              <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1">
+                <Link to="/guest/new" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+                  {t('login.guestSubmit')}
+                </Link>
+                <span className="text-gray-300 dark:text-gray-600">·</span>
+                <Link to="/guest/track" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+                  {t('login.guestTrack')}
+                </Link>
+              </div>
             </div>
           </div>
+        </div>
+
+        {/* Below lg the branding panel (which carries its own copyright) is hidden, so the
+            shared footer stands in for it. */}
+        <div className="relative lg:hidden">
+          <Footer />
         </div>
       </div>
     </div>

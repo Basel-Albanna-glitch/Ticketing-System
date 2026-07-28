@@ -26,6 +26,22 @@ export async function updateMe(payload) {
   return data
 }
 
+// Profile picture. The server centre-crops and re-encodes whatever is sent, and returns the
+// updated `me` payload with the new avatar URL.
+export async function uploadMyAvatar(file) {
+  const form = new FormData()
+  form.append('avatar', file)
+  const { data } = await client.post('/auth/me/avatar/', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return data
+}
+
+export async function deleteMyAvatar() {
+  const { data } = await client.delete('/auth/me/avatar/')
+  return data
+}
+
 export async function changePassword(payload) {
   const { data } = await client.post('/auth/change-password/', payload)
   return data

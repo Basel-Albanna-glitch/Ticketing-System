@@ -62,6 +62,25 @@ export function LockIcon(props) {
   )
 }
 
+export function EyeIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 12S5.5 5.5 12 5.5 21.5 12 21.5 12 18.5 18.5 12 18.5 2.5 12 2.5 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </Icon>
+  )
+}
+
+export function EyeOffIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M9.9 5.7A9.8 9.8 0 0112 5.5c6.5 0 9.5 6.5 9.5 6.5a16.4 16.4 0 01-2.9 3.9M6.3 7.3A16.3 16.3 0 002.5 12S5.5 18.5 12 18.5c1.6 0 3-.4 4.2-1" />
+      <path d="M9.9 9.9a3 3 0 004.2 4.2" />
+      <path d="M3 3l18 18" />
+    </Icon>
+  )
+}
+
 export function BellIcon(props) {
   return (
     <Icon {...props}>
@@ -228,5 +247,48 @@ export function ChatIcon(props) {
     <Icon {...props}>
       <path d="M3.75 12a8.25 8.25 0 1114.13 5.77l.87 3.11-3.3-.86A8.25 8.25 0 013.75 12z" />
     </Icon>
+  )
+}
+
+export function RefreshIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M20.25 12a8.25 8.25 0 10-2.42 5.83" />
+      <path d="M20.25 6.75V12h-5.25" />
+    </Icon>
+  )
+}
+
+export function ChevronRightIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M9 5.25l6.75 6.75L9 18.75" />
+    </Icon>
+  )
+}
+
+export function BookIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M4 5.25A1.5 1.5 0 015.5 3.75H11a2 2 0 012 2v14.5a1.75 1.75 0 00-1.75-1.75H5.5A1.5 1.5 0 014 17V5.25z" />
+      <path d="M20 5.25a1.5 1.5 0 00-1.5-1.5H13a2 2 0 00-2 2v14.5a1.75 1.75 0 011.75-1.75H18.5A1.5 1.5 0 0020 17V5.25z" />
+    </Icon>
+  )
+}
+
+// Star for satisfaction ratings — `filled` toggles the solid fill.
+export function StarIcon({ filled = false, className = 'h-5 w-5' }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M12 3.5l2.6 5.27 5.82.85-4.21 4.1.99 5.79L12 16.98l-5.2 2.53.99-5.79-4.21-4.1 5.82-.85L12 3.5z" />
+    </svg>
   )
 }

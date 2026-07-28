@@ -4,7 +4,16 @@ from accounts.models import CustomerBranch, User
 from accounts.serializers import CustomerBranchSerializer, UserSerializer
 from rest_framework import serializers
 
-from .models import Attachment, Category, Comment, Ticket, TicketActivity, TicketSettings
+from .models import (
+    Article,
+    ArticleAttachment,
+    Attachment,
+    Category,
+    Comment,
+    Ticket,
+    TicketActivity,
+    TicketSettings,
+)
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -26,6 +35,51 @@ class CategorySerializer(serializers.ModelSerializer):
                 )
             ancestor = ancestor.parent
         return value
+
+
+class ArticleAttachmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ArticleAttachment
+        fields = ['id', 'file', 'original_filename', 'content_type', 'size', 'created_at']
+
+
+class ArticleListSerializer(serializers.ModelSerializer):
+    """Lightweight article for lists / linked-article chips — no full body."""
+    category = CategorySerializer(read_only=True)
+    excerpt = serializers.SerializerMethodField()
+    attachment_count = serializers.IntegerField(source='attachments.count', read_only=True)
+
+    class Meta:
+        model = Article
+        fields = [
+            'id', 'title', 'excerpt', 'category', 'is_published',
+            'attachment_count', 'updated_at',
+        ]
+
+    def get_excerpt(self, obj):
+        text = ' '.join(obj.body.split())
+        return f'{text[:160]}…' if len(text) > 160 else text
+
+
+class ArticleSerializer(serializers.ModelSerializer):
+    category = CategorySerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        source='category', queryset=Category.objects.all(),
+        write_only=True, required=False, allow_null=True,
+    )
+    author_name = serializers.SerializerMethodField()
+    attachments = ArticleAttachmentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Article
+        fields = [
+            'id', 'title', 'body', 'category', 'category_id',
+            'is_published', 'author_name', 'attachments', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['author_name', 'created_at', 'updated_at']
+
+    def get_author_name(self, obj):
+        return obj.author.full_name if obj.author_id else None
 
 
 class AttachmentSerializer(serializers.ModelSerializer):
@@ -81,10 +135,26 @@ class TicketListSerializer(serializers.ModelSerializer):
         ]
 
 
+class TicketCalendarSerializer(serializers.ModelSerializer):
+    """Minimal ticket row for the calendar grid — just enough to draw a chip and link it."""
+
+    assigned_agent_name = serializers.CharField(
+        source='assigned_agent.full_name', read_only=True, default=''
+    )
+
+    class Meta:
+        model = Ticket
+        fields = [
+            'id', 'reference', 'subject', 'priority', 'status',
+            'start_date', 'assigned_agent_name',
+        ]
+
+
 class TicketDetailSerializer(TicketListSerializer):
     comments = CommentSerializer(many=True, read_only=True)
     attachments = AttachmentSerializer(many=True, read_only=True)
     collaborators = UserSerializer(many=True, read_only=True)
+    articles = ArticleListSerializer(many=True, read_only=True)
     # Writable counterpart to the read-only nested `category`, so an admin can change it
     # when editing the ticket's details.
     category_id = serializers.PrimaryKeyRelatedField(
@@ -93,8 +163,9 @@ class TicketDetailSerializer(TicketListSerializer):
 
     class Meta(TicketListSerializer.Meta):
         fields = TicketListSerializer.Meta.fields + [
-            'description', 'updated_at', 'resolved_at', 'assigned_at', 'hold_reason',
-            'comments', 'attachments', 'collaborators', 'category_id',
+            'description', 'updated_at', 'resolved_at', 'closed_at', 'assigned_at', 'hold_reason',
+            'rating', 'rating_comment', 'rating_submitted_at',
+            'comments', 'attachments', 'collaborators', 'articles', 'category_id',
         ]
 
     def validate_subject(self, value):
@@ -114,6 +185,14 @@ class TicketCollaboratorsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ticket
         fields = ['collaborators']
+
+
+class TicketArticlesSerializer(serializers.ModelSerializer):
+    articles = serializers.PrimaryKeyRelatedField(many=True, queryset=Article.objects.all())
+
+    class Meta:
+        model = Ticket
+        fields = ['articles']
 
 
 class TicketCreateSerializer(serializers.ModelSerializer):
@@ -195,6 +274,7 @@ class TicketSettingsSerializer(serializers.ModelSerializer):
         fields = [
             'allow_agent_self_assign', 'allow_agent_reassign', 'allow_agent_edit_after_close',
             'allow_agent_edit_customers', 'allow_agent_delete', 'allow_agent_link_customer',
+            'allow_agent_manage_kb',
         ]
 
 
@@ -234,16 +314,21 @@ class GuestTicketCreateSerializer(serializers.ModelSerializer):
 
 class GuestCommentSerializer(serializers.ModelSerializer):
     author_name = serializers.SerializerMethodField()
+    # Lets the public tracker tell a support reply apart from the guest's own message.
+    is_staff = serializers.SerializerMethodField()
     attachments = AttachmentSerializer(many=True, read_only=True)
 
     class Meta:
         model = Comment
-        fields = ['id', 'author_name', 'body', 'attachments', 'created_at']
+        fields = ['id', 'author_name', 'is_staff', 'body', 'attachments', 'created_at']
 
     def get_author_name(self, obj):
         if obj.author:
             return obj.author.full_name
         return obj.guest_name or 'Guest'
+
+    def get_is_staff(self, obj):
+        return obj.author_id is not None
 
 
 class GuestTicketPublicSerializer(serializers.ModelSerializer):
@@ -263,7 +348,7 @@ class GuestTicketPublicSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'reference', 'subject', 'description', 'status', 'status_display',
             'priority', 'priority_display', 'category', 'guest_name',
-            'is_assigned', 'assigned_agent_name',
+            'is_assigned', 'assigned_agent_name', 'rating', 'rating_submitted_at',
             'created_at', 'updated_at', 'comments', 'attachments',
         ]
 

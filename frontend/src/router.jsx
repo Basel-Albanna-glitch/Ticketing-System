@@ -4,12 +4,17 @@ import AppShell from './components/layout/AppShell'
 import LoginPage from './pages/LoginPage'
 import GuestTicketPage from './pages/GuestTicketPage'
 import GuestTrackPage from './pages/GuestTrackPage'
+import RatePage from './pages/RatePage'
 import DashboardPage from './pages/DashboardPage'
 import TicketsListPage from './pages/TicketsListPage'
 import TicketCreatePage from './pages/TicketCreatePage'
 import TicketDetailPage from './pages/TicketDetailPage'
+import CalendarPage from './pages/CalendarPage'
 import CustomersPage from './pages/CustomersPage'
 import CustomerProfilePage from './pages/CustomerProfilePage'
+import MyAccountPage from './pages/MyAccountPage'
+import KbListPage from './pages/KbListPage'
+import KbArticlePage from './pages/KbArticlePage'
 import AgentsPage from './pages/AgentsPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
@@ -23,6 +28,7 @@ const router = createBrowserRouter([
   { path: '/register', element: <Navigate to="/login" replace /> },
   { path: '/guest/new', element: <GuestTicketPage /> },
   { path: '/guest/track', element: <GuestTrackPage /> },
+  { path: '/rate/:id', element: <RatePage /> },
   {
     element: <ProtectedRoute />,
     children: [
@@ -34,6 +40,10 @@ const router = createBrowserRouter([
           { path: '/tickets', element: <TicketsListPage /> },
           { path: '/tickets/new', element: <TicketCreatePage /> },
           { path: '/tickets/:id', element: <TicketDetailPage /> },
+          { path: '/calendar', element: <CalendarPage /> },
+          { path: '/account', element: <MyAccountPage /> },
+          { path: '/kb', element: <KbListPage /> },
+          { path: '/kb/:id', element: <KbArticlePage /> },
           { path: '/settings', element: <SettingsPage /> },
           {
             element: <ProtectedRoute allowedRoles={['admin', 'agent']} />,

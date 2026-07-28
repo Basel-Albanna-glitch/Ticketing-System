@@ -4,11 +4,39 @@ import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
 import Spinner from '../components/ui/Spinner'
 import StatTile from '../components/ui/StatTile'
-import { CheckCircleIcon, ClockIcon, FolderOpenIcon, InboxIcon, PlusIcon } from '../components/ui/icons'
+import {
+  BadgeIcon,
+  BookIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  FolderOpenIcon,
+  InboxIcon,
+  PlusIcon,
+  ReportsIcon,
+  TicketIcon,
+  UserIcon,
+  UsersIcon,
+} from '../components/ui/icons'
 import TicketTable from '../components/tickets/TicketTable'
 import { useAuth } from '../auth/useAuth'
 import { useDashboard } from '../hooks/useDashboard'
 import { useI18n } from '../i18n/useI18n'
+
+// Dashboard shortcuts, per role.
+const ADMIN_QUICK_ACTIONS = [
+  { to: '/tickets/new', label: 'dashboard.qa.createTicket', icon: PlusIcon },
+  { to: '/customers?new=1', label: 'dashboard.qa.addUser', icon: UsersIcon },
+  { to: '/agents?new=1', label: 'dashboard.qa.addAgent', icon: BadgeIcon },
+  { to: '/settings?section=categories', label: 'dashboard.qa.manageCategories', icon: FolderOpenIcon },
+  { to: '/reports', label: 'dashboard.qa.viewReports', icon: ReportsIcon },
+]
+
+const CUSTOMER_QUICK_ACTIONS = [
+  { to: '/tickets/new', label: 'dashboard.qa.createTicket', icon: PlusIcon },
+  { to: '/tickets', label: 'dashboard.qa.myTickets', icon: TicketIcon },
+  { to: '/kb', label: 'dashboard.qa.helpCenter', icon: BookIcon },
+  { to: '/settings?section=profile', label: 'dashboard.qa.editProfile', icon: UserIcon },
+]
 
 const STATUS_OPTIONS = [
   { value: 'open', label: 'status.open' },
@@ -37,6 +65,12 @@ function thisWeekRange() {
 export default function DashboardPage() {
   const { user } = useAuth()
   const { t } = useI18n()
+  const quickActions =
+    user?.role === 'admin'
+      ? ADMIN_QUICK_ACTIONS
+      : user?.role === 'customer'
+        ? CUSTOMER_QUICK_ACTIONS
+        : null
   // Default to showing only open + in-progress tickets, for the current week.
   const [statuses, setStatuses] = useState(['open', 'in_progress'])
   const [dateFrom, setDateFrom] = useState(() => thisWeekRange().from)
@@ -62,18 +96,32 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{t('dashboard.title')}</h1>
-          <p className="mt-1 truncate text-gray-500 dark:text-gray-400">{t('dashboard.welcome')}{user?.full_name}.</p>
-        </div>
-        <Link to="/tickets/new" className="shrink-0">
-          <Button className="whitespace-nowrap">
-            <PlusIcon className="h-4 w-4" />
-            {t('dashboard.createTicket')}
-          </Button>
-        </Link>
+      <div className="mb-6 min-w-0">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{t('dashboard.title')}</h1>
+        <p className="mt-1 truncate text-gray-500 dark:text-gray-400">{t('dashboard.welcome')}{user?.full_name}.</p>
       </div>
+
+      {quickActions && (
+        <div className="mb-6">
+          <h2 className="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {t('dashboard.quickActions')}
+          </h2>
+          <div className="flex flex-wrap gap-3">
+            {quickActions.map((a) => (
+              <Link
+                key={a.to}
+                to={a.to}
+                className="flex min-w-[160px] flex-1 items-center gap-3 rounded-2xl border border-gray-200/70 bg-white p-4 shadow-soft transition hover:border-indigo-300 hover:shadow-md dark:border-white/10 dark:bg-gray-900/70 dark:hover:border-indigo-400/40"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                  <a.icon className="h-5 w-5" />
+                </span>
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{t(a.label)}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {isLoading && !data && (
         <div className="flex justify-center py-12">

@@ -1,5 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import Avatar from '../components/ui/Avatar'
+import AvatarUploader from '../components/ui/AvatarUploader'
 import Badge from '../components/ui/Badge'
 import Breadcrumbs from '../components/ui/Breadcrumbs'
 import Button from '../components/ui/Button'
@@ -11,6 +14,7 @@ import Spinner from '../components/ui/Spinner'
 import Table from '../components/ui/Table'
 import { PlusIcon } from '../components/ui/icons'
 import { useAgents, useCreateAgent, useUpdateAgent } from '../hooks/useAgents'
+import { deleteUserAvatar, uploadUserAvatar } from '../api/users'
 import { useI18n } from '../i18n/useI18n'
 import { sortRows, useTableSort } from '../utils/tableSort'
 
@@ -25,7 +29,7 @@ const COLUMNS = [
   '',
 ]
 
-const EMPTY_FORM = { id: null, username: '', full_name: '', email: '', password: '', is_available: true }
+const EMPTY_FORM = { id: null, username: '', full_name: '', email: '', password: '', is_available: true, avatar: null }
 
 export default function AgentsPage() {
   const { t } = useI18n()
@@ -33,7 +37,10 @@ export default function AgentsPage() {
   const createAgent = useCreateAgent()
   const updateAgent = useUpdateAgent()
   const [modalOpen, setModalOpen] = useState(false)
+  const queryClient = useQueryClient()
   const [form, setForm] = useState(EMPTY_FORM)
+  // Picture picked while creating an agent, uploaded once the account has an id.
+  const [pendingAvatar, setPendingAvatar] = useState(null)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const { sortBy, sortDir, onSort } = useTableSort('full_name')
@@ -50,9 +57,21 @@ export default function AgentsPage() {
 
   function openCreate() {
     setForm(EMPTY_FORM)
+    setPendingAvatar(null)
     setError('')
     setModalOpen(true)
   }
+
+  // Open the "add agent" modal when arriving from a Quick Action (/agents?new=1).
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    if (searchParams.get('new')) {
+      openCreate()
+      searchParams.delete('new')
+      setSearchParams(searchParams, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   function openEdit(agent) {
     setForm({
@@ -62,7 +81,9 @@ export default function AgentsPage() {
       email: agent.email,
       password: '',
       is_available: agent.is_available,
+      avatar: agent.avatar,
     })
+    setPendingAvatar(null)
     setError('')
     setModalOpen(true)
   }
@@ -80,7 +101,7 @@ export default function AgentsPage() {
         if (form.password) payload.password = form.password
         await updateAgent.mutateAsync(payload)
       } else {
-        await createAgent.mutateAsync({
+        const created = await createAgent.mutateAsync({
           username: form.username,
           full_name: form.full_name,
           email: form.email,
@@ -88,6 +109,19 @@ export default function AgentsPage() {
           role: 'agent',
           is_available: form.is_available,
         })
+        if (pendingAvatar) {
+          try {
+            await uploadUserAvatar(created.id, pendingAvatar)
+            queryClient.invalidateQueries({ queryKey: ['agents'] })
+          } catch {
+            // The agent exists now, so don't fail the whole save. Turn the modal into an
+            // edit form for the new agent so the picture can be retried on the spot.
+            setForm((f) => ({ ...f, id: created.id, avatar: null }))
+            setPendingAvatar(null)
+            setError(t('settings.avatar.savedWithoutPicture'))
+            return
+          }
+        }
       }
       setModalOpen(false)
     } catch {
@@ -127,7 +161,7 @@ export default function AgentsPage() {
               <td className="px-4 py-2 text-gray-500 dark:text-gray-400">@{agent.username}</td>
               <td className="px-4 py-2">
                 <div className="flex items-center gap-2.5">
-                  <Avatar name={agent.full_name} />
+                  <Avatar name={agent.full_name} src={agent.avatar} />
                   <span className="font-medium text-gray-900 dark:text-gray-100">{agent.full_name}</span>
                 </div>
               </td>
@@ -164,6 +198,30 @@ export default function AgentsPage() {
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={form.id ? t('agents.editAgent') : t('agents.addAgent')}>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {/* An existing agent uploads immediately; a new one has no id yet, so the file is
+              held and uploaded right after the account is created. */}
+          <AvatarUploader
+            name={form.full_name}
+            src={form.avatar}
+            size="lg"
+            onUpload={
+              form.id
+                ? (file) =>
+                    uploadUserAvatar(form.id, file).then((u) =>
+                      setForm((f) => ({ ...f, avatar: u.avatar }))
+                    )
+                : undefined
+            }
+            onSelect={form.id ? undefined : setPendingAvatar}
+            onRemove={
+              form.id
+                ? () =>
+                    deleteUserAvatar(form.id).then((u) => setForm((f) => ({ ...f, avatar: u.avatar })))
+                : undefined
+            }
+            onDone={() => queryClient.invalidateQueries({ queryKey: ['agents'] })}
+            className="border-b border-gray-100 pb-4 dark:border-white/10"
+          />
           {!form.id && (
             <Input
               label={t('field.username')}

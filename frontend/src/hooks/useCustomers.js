@@ -3,6 +3,7 @@ import {
   createCustomer,
   deleteCustomer,
   fetchCustomers,
+  fetchMyProfile,
   updateCustomer,
   updateCustomerProfile,
 } from '../api/users'
@@ -11,6 +12,15 @@ export function useCustomers({ enabled = true } = {}) {
   return useQuery({
     queryKey: ['customers'],
     queryFn: fetchCustomers,
+    enabled,
+  })
+}
+
+// The logged-in customer's own account detail.
+export function useMyProfile({ enabled = true } = {}) {
+  return useQuery({
+    queryKey: ['my-profile'],
+    queryFn: fetchMyProfile,
     enabled,
   })
 }

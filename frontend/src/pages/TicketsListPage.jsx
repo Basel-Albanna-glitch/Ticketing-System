@@ -9,15 +9,37 @@ import { PlusIcon } from '../components/ui/icons'
 import TicketFilters from '../components/tickets/TicketFilters'
 import TicketTable from '../components/tickets/TicketTable'
 import { useTickets } from '../hooks/useTickets'
+import { exportTickets } from '../api/tickets'
 import { useTableSort } from '../utils/tableSort'
 import { useI18n } from '../i18n/useI18n'
 
 export default function TicketsListPage() {
   const { t } = useI18n()
   const [filters, setFilters] = useState({ page: 1 })
+  const [exporting, setExporting] = useState(false)
   const { sortBy, sortDir, onSort } = useTableSort('created_at', 'desc')
   const ordering = `${sortDir === 'desc' ? '-' : ''}${sortBy}`
   const { data, isLoading, isError } = useTickets({ ...filters, ordering })
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      // Export everything matching the current filters (not just the visible page).
+      const rest = { ...filters }
+      delete rest.page
+      const blob = await exportTickets({ ...rest, ordering })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'tickets.xlsx'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } finally {
+      setExporting(false)
+    }
+  }
 
   function handleSort(key) {
     onSort(key)
@@ -31,12 +53,23 @@ export default function TicketsListPage() {
       />
       <div className="mb-4 flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{t('nav.tickets')}</h1>
-        <Link to="/tickets/new" className="shrink-0">
-          <Button className="whitespace-nowrap">
-            <PlusIcon className="h-4 w-4" />
-            {t('tickets.create')}
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={handleExport}
+            loading={exporting}
+            disabled={!data || data.count === 0}
+            className="whitespace-nowrap"
+          >
+            {t('tickets.exportExcel')}
           </Button>
-        </Link>
+          <Link to="/tickets/new">
+            <Button className="whitespace-nowrap">
+              <PlusIcon className="h-4 w-4" />
+              {t('tickets.create')}
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <TicketFilters filters={filters} onChange={setFilters} />

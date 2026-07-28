@@ -8,6 +8,7 @@ export default {
     // Sidebar navigation
     'nav.dashboard': 'Dashboard',
     'nav.tickets': 'Tickets',
+    'nav.account': 'My account',
     'nav.projects': 'Projects',
     'nav.customers': 'Customers',
     'nav.agents': 'Agents',
@@ -51,6 +52,8 @@ export default {
     'common.close': 'Close',
     'common.submit': 'Submit',
     'common.view': 'View',
+    'common.show': 'Show',
+    'common.hide': 'Hide',
     'common.search': 'Search',
     'common.loading': 'Loading',
     'common.actions': 'Actions',
@@ -61,6 +64,11 @@ export default {
     'common.yes': 'Yes',
     'common.no': 'No',
     'common.all': 'All',
+
+    // Attachment image previews
+    'attachments.openOriginal': 'Open original',
+    'attachments.previous': 'Previous image',
+    'attachments.next': 'Next image',
 
     // Generic fields
     'field.name': 'Name',
@@ -124,6 +132,7 @@ export default {
     // Sidebar navigation
     'nav.dashboard': 'لوحة التحكم',
     'nav.tickets': 'التذاكر',
+    'nav.account': 'حسابي',
     'nav.projects': 'المشاريع',
     'nav.customers': 'العملاء',
     'nav.agents': 'الوكلاء',
@@ -167,6 +176,8 @@ export default {
     'common.close': 'إغلاق',
     'common.submit': 'إرسال',
     'common.view': 'عرض',
+    'common.show': 'إظهار',
+    'common.hide': 'إخفاء',
     'common.search': 'بحث',
     'common.loading': 'جارٍ التحميل',
     'common.actions': 'إجراءات',
@@ -177,6 +188,11 @@ export default {
     'common.yes': 'نعم',
     'common.no': 'لا',
     'common.all': 'الكل',
+
+    // Attachment image previews
+    'attachments.openOriginal': 'فتح الأصل',
+    'attachments.previous': 'الصورة السابقة',
+    'attachments.next': 'الصورة التالية',
 
     // Generic fields
     'field.name': 'الاسم',

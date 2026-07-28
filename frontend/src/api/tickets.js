@@ -11,6 +11,25 @@ export async function fetchTicket(id) {
   return data
 }
 
+// Tickets whose start_date falls inside [from, to] (YYYY-MM-DD), for the calendar grid.
+// Unpaginated, so the whole visible month arrives in one response.
+export async function fetchTicketCalendar({ from, to, ...filters }) {
+  const params = Object.fromEntries(
+    Object.entries(filters).filter(([key, v]) => key !== 'page' && v !== '' && v != null)
+  )
+  const { data } = await client.get('/tickets/calendar/', { params: { ...params, from, to } })
+  return data
+}
+
+// Download the current filtered ticket list as an .xlsx file.
+export async function exportTickets(filters = {}) {
+  const params = Object.fromEntries(
+    Object.entries(filters).filter(([, v]) => v !== '' && v != null)
+  )
+  const { data } = await client.get('/tickets/export/', { params, responseType: 'blob' })
+  return data
+}
+
 export async function createTicket({
   subject,
   description,
@@ -70,6 +89,11 @@ export async function setTicketCollaborators(id, collaboratorIds) {
   const { data } = await client.patch(`/tickets/${id}/collaborators/`, {
     collaborators: collaboratorIds,
   })
+  return data
+}
+
+export async function setTicketArticles(id, articleIds) {
+  const { data } = await client.patch(`/tickets/${id}/articles/`, { articles: articleIds })
   return data
 }
 
@@ -154,6 +178,17 @@ export async function createGuestTicket({
   return data
 }
 
+// Customer-satisfaction rating for a closed ticket (public, gated by the emailed token).
+export async function fetchRatingTicket({ id, token }) {
+  const { data } = await client.get('/tickets/rate/', { params: { ticket: id, token } })
+  return data
+}
+
+export async function submitRating({ id, token, score, comment }) {
+  const { data } = await client.post('/tickets/rate/', { ticket: id, token, score, comment })
+  return data
+}
+
 export async function trackGuestTicket({ phone, reference }) {
   const { data } = await client.post('/tickets/guest/track/', { phone, reference })
   return data
@@ -161,6 +196,12 @@ export async function trackGuestTicket({ phone, reference }) {
 
 export async function replyGuestTicket({ phone, reference, body }) {
   const { data } = await client.post('/tickets/guest/reply/', { phone, reference, body })
+  return data
+}
+
+// Rate a closed guest ticket from the tracking page (verified by phone + reference).
+export async function rateGuestTicket({ phone, reference, score, comment }) {
+  const { data } = await client.post('/tickets/guest/rate/', { phone, reference, score, comment })
   return data
 }
 

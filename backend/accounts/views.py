@@ -1,6 +1,12 @@
 import json
+import secrets
+from io import BytesIO
 
-from django.db.models import Count, Q
+from PIL import Image, ImageOps, UnidentifiedImageError
+from django.core.files.base import ContentFile
+
+from django.db.models import Count, Prefetch, Q
+from django.shortcuts import get_object_or_404
 from django.db.models.deletion import ProtectedError
 from rest_framework import generics, status, viewsets
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -31,9 +37,38 @@ from .serializers import (
 )
 
 
+def customer_detail_queryset():
+    """Users annotated with ticket counts and their branches (each carrying a ticket_count),
+    licenses, and attachments prefetched. Shared by the staff customer list and a customer's
+    own self-profile endpoint so both render the same rich detail."""
+    branches = CustomerBranch.objects.annotate(
+        ticket_count=Count('tickets')
+    ).order_by('name', 'id')
+    return User.objects.annotate(
+        ticket_count=Count('tickets_created', distinct=True),
+        open_count=Count(
+            'tickets_created',
+            filter=Q(tickets_created__status__in=['open', 'in_progress']),
+            distinct=True,
+        ),
+    ).prefetch_related(
+        'licenses', Prefetch('branches', queryset=branches), 'customer_attachments'
+    )
+
+
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
+
+
+class MyProfileView(generics.RetrieveAPIView):
+    """A customer's own full account detail: profile fields, licenses, branches (with
+    per-branch ticket counts), attachments, and ticket totals."""
+    serializer_class = CustomerSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return customer_detail_queryset().get(pk=self.request.user.pk)
 
 
 class MeView(generics.RetrieveUpdateAPIView):
@@ -42,6 +77,84 @@ class MeView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+AVATAR_MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+AVATAR_OUTPUT_SIZE = 512
+
+
+def normalize_avatar(upload):
+    """Return (ContentFile, None) for a usable image, or (None, error message).
+
+    Whatever is uploaded is normalized here — EXIF rotation applied, centre-cropped to a
+    square, resized, re-encoded as JPEG — so the stored file is small and predictable no
+    matter what the browser handed us. Re-encoding also means the bytes we serve are ones
+    Pillow produced, not an arbitrary file someone named `.jpg`."""
+    if upload is None:
+        return None, 'No file was uploaded.'
+    if upload.size > AVATAR_MAX_UPLOAD_BYTES:
+        return None, 'Image must be 5 MB or smaller.'
+    try:
+        image = Image.open(upload)
+        image = ImageOps.exif_transpose(image)
+        image = image.convert('RGB')
+        image = ImageOps.fit(
+            image, (AVATAR_OUTPUT_SIZE, AVATAR_OUTPUT_SIZE), Image.LANCZOS, centering=(0.5, 0.5)
+        )
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
+        return None, 'That file is not a readable image.'
+    buffer = BytesIO()
+    image.save(buffer, format='JPEG', quality=88, optimize=True)
+    return ContentFile(buffer.getvalue()), None
+
+
+def set_avatar(user, content):
+    """Replace the user's picture, deleting the old file instead of orphaning it. The random
+    filename suffix keeps a replacement from being served from cache."""
+    user.avatar.delete(save=False)
+    user.avatar.save(f'user_{user.pk}_{secrets.token_hex(4)}.jpg', content, save=True)
+
+
+class MyAvatarView(APIView):
+    """Upload (POST) or remove (DELETE) the signed-in user's own profile picture."""
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        content, error = normalize_avatar(request.FILES.get('avatar'))
+        if error:
+            return Response({'avatar': error}, status=status.HTTP_400_BAD_REQUEST)
+        set_avatar(request.user, content)
+        return Response(MeSerializer(request.user, context={'request': request}).data)
+
+    def delete(self, request):
+        user = request.user
+        if user.avatar:
+            user.avatar.delete(save=True)
+        return Response(MeSerializer(user, context={'request': request}).data)
+
+
+class UserAvatarView(APIView):
+    """Admin-managed profile picture for any user — how an admin sets an agent's or a
+    customer's picture on their behalf. Same normalization as the self-serve endpoint."""
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, pk):
+        user = get_object_or_404(User, pk=pk)
+        content, error = normalize_avatar(request.FILES.get('avatar'))
+        if error:
+            return Response({'avatar': error}, status=status.HTTP_400_BAD_REQUEST)
+        set_avatar(user, content)
+        return Response(AdminUserSerializer(user, context={'request': request}).data)
+
+    def delete(self, request, pk):
+        user = get_object_or_404(User, pk=pk)
+        if user.avatar:
+            user.avatar.delete(save=True)
+        return Response(AdminUserSerializer(user, context={'request': request}).data)
 
 
 class ChangePasswordView(APIView):
@@ -94,12 +207,9 @@ class CustomerViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
-        return User.objects.filter(role=User.Role.CUSTOMER).annotate(
-            ticket_count=Count('tickets_created'),
-            open_count=Count(
-                'tickets_created', filter=Q(tickets_created__status__in=['open', 'in_progress'])
-            ),
-        ).prefetch_related('licenses', 'branches', 'customer_attachments').order_by('full_name')
+        # Each branch carries its own ticket count so the profile page can show, per branch,
+        # how many tickets are attached to it.
+        return customer_detail_queryset().filter(role=User.Role.CUSTOMER).order_by('full_name')
 
     def get_serializer_class(self):
         if self.action in ('create', 'update', 'partial_update'):

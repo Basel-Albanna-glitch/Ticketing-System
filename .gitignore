@@ -22,3 +22,8 @@ frontend/.env
 
 # Docker
 postgres_data/
+# Local DB backups (e.g. db.sqlite3.bak)
+*.sqlite3.bak
+
+# Stale vite-plugin-pwa dev output
+frontend/dev-dist/

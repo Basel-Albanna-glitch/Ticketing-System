@@ -15,8 +15,30 @@ export async function updateAgent(id, payload) {
   return data
 }
 
+// Admin-only: set or clear another user's profile picture (agents and customers alike).
+export async function uploadUserAvatar(id, file) {
+  const form = new FormData()
+  form.append('avatar', file)
+  const { data } = await client.post(`/users/${id}/avatar/`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return data
+}
+
+export async function deleteUserAvatar(id) {
+  const { data } = await client.delete(`/users/${id}/avatar/`)
+  return data
+}
+
 export async function fetchCustomers() {
   const { data } = await client.get('/users/customers/')
+  return data
+}
+
+// The logged-in customer's own full account detail (profile fields, licenses, branches with
+// per-branch ticket counts, attachments, and ticket totals).
+export async function fetchMyProfile() {
+  const { data } = await client.get('/auth/me/profile/')
   return data
 }
 

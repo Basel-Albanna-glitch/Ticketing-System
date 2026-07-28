@@ -39,6 +39,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
+    # Square JPEG written by the avatar endpoint, which normalizes whatever was uploaded.
+    # The filename carries a random suffix so a replacement is never served from cache.
+    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
 
     # Customer profile details (only meaningful for role=customer).
     address = models.TextField(blank=True)
@@ -123,6 +126,8 @@ class NotificationPreference(models.Model):
     )
     email_on_new_comment = models.BooleanField(default=True)
     email_on_status_change = models.BooleanField(default=True)
+    # Agents only: emailed when a ticket is handed to them.
+    email_on_assignment = models.BooleanField(default=True)
 
     def __str__(self):
         return f'Notification preferences for {self.user.username}'

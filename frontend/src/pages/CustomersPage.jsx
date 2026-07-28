@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import Avatar from '../components/ui/Avatar'
 import Badge from '../components/ui/Badge'
 import Breadcrumbs from '../components/ui/Breadcrumbs'
@@ -36,8 +36,18 @@ export default function CustomersPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
   const { sortBy, sortDir, onSort } = useTableSort('full_name')
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const canManage = user?.role === 'admin'
+
+  // Open the "add customer" modal when arriving from a Quick Action (/customers?new=1).
+  useEffect(() => {
+    if (searchParams.get('new') && canManage) {
+      setModalOpen(true)
+      searchParams.delete('new')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [searchParams, canManage, setSearchParams])
   const columns = COLUMNS.map((col) =>
     typeof col === 'string' ? col : { ...col, label: t(col.label) }
   )
@@ -103,7 +113,7 @@ export default function CustomersPage() {
               <td className="px-4 py-2 text-gray-500 dark:text-gray-400">@{customer.username}</td>
               <td className="px-4 py-2">
                 <div className="flex items-center gap-2.5">
-                  <Avatar name={customer.full_name} />
+                  <Avatar name={customer.full_name} src={customer.avatar} />
                   <span className="font-medium text-gray-900 dark:text-gray-100">{customer.full_name}</span>
                 </div>
               </td>

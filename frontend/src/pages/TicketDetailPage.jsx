@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import ActivityTimeline from '../components/tickets/ActivityTimeline'
 import AttachmentList from '../components/tickets/AttachmentList'
 import CommentThread from '../components/tickets/CommentThread'
@@ -17,6 +17,7 @@ import Textarea from '../components/ui/Textarea'
 import SectionHeader from '../components/ui/SectionHeader'
 import {
   BadgeIcon,
+  BookIcon,
   CalendarIcon,
   ChatIcon,
   CheckCircleIcon,
@@ -25,6 +26,7 @@ import {
   LockIcon,
   PaperClipIcon,
   SettingsIcon,
+  StarIcon,
   TicketIcon,
   TrashIcon,
   UserIcon,
@@ -36,6 +38,7 @@ import { useCustomers } from '../hooks/useCustomers'
 import {
   useAssignTicket,
   useDeleteTicket,
+  useSetTicketArticles,
   useSetTicketCollaborators,
   useSetTicketCustomer,
   useSetTicketDeadline,
@@ -43,6 +46,7 @@ import {
   useTicketActivity,
   useUpdateTicketStatus,
 } from '../hooks/useTicket'
+import { useArticles } from '../hooks/useArticles'
 import { useTicketSettings } from '../hooks/useTicketSettings'
 import { useI18n } from '../i18n/useI18n'
 
@@ -61,12 +65,24 @@ function toDateTimeLocal(iso) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-// Small labelled group inside the Actions card.
-function ActionGroup({ label, children }) {
+// Small labelled group inside the Actions card. `tone="danger"` sets the destructive group
+// apart, so deleting a ticket doesn't look like just another dropdown.
+function ActionGroup({ label, tone = 'default', children }) {
+  const danger = tone === 'danger'
   return (
-    <div className="flex flex-col gap-2 border-t border-gray-100 pt-4 first:border-0 first:pt-0 dark:border-white/10">
+    <div
+      className={`flex flex-col gap-2 border-t pt-4 first:border-0 first:pt-0 ${
+        danger
+          ? 'mt-2 border-red-200/70 dark:border-red-500/20'
+          : 'border-gray-100 dark:border-white/10'
+      }`}
+    >
       {label && (
-        <span className="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+        <span
+          className={`text-xs font-medium uppercase tracking-wide ${
+            danger ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'
+          }`}
+        >
           {label}
         </span>
       )}
@@ -116,6 +132,8 @@ export default function TicketDetailPage() {
   const assignTicket = useAssignTicket(id)
   const setDeadline = useSetTicketDeadline(id)
   const setCollaborators = useSetTicketCollaborators(id)
+  const setArticles = useSetTicketArticles(id)
+  const { data: allArticles } = useArticles()
   const setTicketCustomer = useSetTicketCustomer(id)
   const deleteTicket = useDeleteTicket(id)
   const [status, setStatus] = useState('')
@@ -126,8 +144,11 @@ export default function TicketDetailPage() {
   const [customerBranchId, setCustomerBranchId] = useState('')
   const [reassignId, setReassignId] = useState('')
   const [collaboratorId, setCollaboratorId] = useState('')
+  const [articleToAdd, setArticleToAdd] = useState('')
   const [deadline, setDeadlineInput] = useState('')
   const [editOpen, setEditOpen] = useState(false)
+  // The activity log is reference material, not something you read on arrival.
+  const [showActivity, setShowActivity] = useState(false)
 
   // Auto-dismiss the action confirmation after a few seconds.
   useEffect(() => {
@@ -343,6 +364,29 @@ export default function TicketDetailPage() {
     (a) => a.id !== ticket.assigned_agent?.id && !collaboratorIds.includes(a.id)
   )
 
+  // Related knowledge-base articles.
+  const linkedArticles = ticket.articles || []
+  const articleIds = linkedArticles.map((a) => a.id)
+  const availableArticles = (allArticles || []).filter((a) => !articleIds.includes(a.id))
+  const canManageArticles = isAdmin || user?.role === 'agent'
+
+  function handleAddArticle(value) {
+    const aid = Number(value)
+    if (aid && !articleIds.includes(aid)) {
+      setArticles.mutate([...articleIds, aid], {
+        onSuccess: () => showNotice(t('tickets.noticeArticleLinked')),
+      })
+    }
+    setArticleToAdd('')
+  }
+
+  function handleRemoveArticle(removeId) {
+    setArticles.mutate(
+      articleIds.filter((x) => x !== removeId),
+      { onSuccess: () => showNotice(t('tickets.noticeArticleUnlinked')) }
+    )
+  }
+
   return (
     <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
       <Breadcrumbs
@@ -441,13 +485,25 @@ export default function TicketDetailPage() {
             </div>
           </Card>
 
-          <Card>
-            <SectionHeader icon={PaperClipIcon} title={t('field.attachments')} />
-            <AttachmentList attachments={ticket.attachments} />
-          </Card>
+          {ticket.attachments?.length > 0 && (
+            <Card>
+              <SectionHeader
+                icon={PaperClipIcon}
+                title={`${t('field.attachments')} (${ticket.attachments.length})`}
+              />
+              <AttachmentList attachments={ticket.attachments} />
+            </Card>
+          )}
 
           <Card>
-            <SectionHeader icon={ChatIcon} title={t('tickets.comments')} />
+            <SectionHeader
+              icon={ChatIcon}
+              title={
+                ticket.comments?.length
+                  ? `${t('tickets.comments')} (${ticket.comments.length})`
+                  : t('tickets.comments')
+              }
+            />
             <CommentThread ticketId={ticket.id} comments={ticket.comments} canReply={canReply} />
           </Card>
         </div>
@@ -579,6 +635,55 @@ export default function TicketDetailPage() {
                   <span className="text-gray-400 dark:text-gray-500">{t('tickets.none')}</span>
                 )}
               </DetailRow>
+
+              {ticket.rating != null && (
+                <DetailRow icon={StarIcon} label={t('rate.rating')}>
+                  <span className="flex items-center gap-1 text-amber-400">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <StarIcon key={n} filled={n <= ticket.rating} className="h-4 w-4" />
+                    ))}
+                    <span className="ms-1 text-sm text-gray-600 dark:text-gray-300">
+                      {ticket.rating}/5
+                    </span>
+                  </span>
+                  {ticket.rating_comment && (
+                    <span className="mt-1 block whitespace-pre-wrap text-sm text-gray-600 dark:text-gray-300">
+                      “{ticket.rating_comment}”
+                    </span>
+                  )}
+                </DetailRow>
+              )}
+
+              {canManageArticles && (
+                <DetailRow icon={BookIcon} label={t('tickets.relatedArticles')}>
+                  {linkedArticles.length ? (
+                    <div className="flex flex-col gap-1.5">
+                      {linkedArticles.map((a) => (
+                        <span key={a.id} className="flex items-center gap-1.5">
+                          <Link
+                            to={`/kb/${a.id}`}
+                            className="text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                          >
+                            {a.title}
+                          </Link>
+                          {canManageArticles && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveArticle(a.id)}
+                              className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                              aria-label={`${t('common.remove')} ${a.title}`}
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-gray-400 dark:text-gray-500">{t('tickets.none')}</span>
+                  )}
+                </DetailRow>
+              )}
             </dl>
           </Card>
 
@@ -643,16 +748,15 @@ export default function TicketDetailPage() {
 
                 {canAssign && (
                   <ActionGroup label={t('tickets.assignAgent')}>
-                    <Select value={agentId} onChange={(e) => setAgentId(e.target.value)}>
-                      <option value="" disabled>
-                        {t('tickets.assignToAgent')}
-                      </option>
-                      {agents?.map((agent) => (
-                        <option key={agent.id} value={agent.id}>
-                          {agent.full_name}
-                        </option>
-                      ))}
-                    </Select>
+                    <SearchableSelect
+                      value={agentId}
+                      onChange={setAgentId}
+                      placeholder={t('tickets.assignToAgent')}
+                      options={(agents || []).map((agent) => ({
+                        value: agent.id,
+                        label: agent.full_name,
+                      }))}
+                    />
                     <Button onClick={handleAssign} loading={assignTicket.isPending} disabled={!agentId}>
                       {t('tickets.assign')}
                     </Button>
@@ -661,19 +765,15 @@ export default function TicketDetailPage() {
 
                 {canAssign && (
                   <ActionGroup label={t('tickets.collaborators')}>
-                    <Select
+                    <SearchableSelect
                       value={collaboratorId}
-                      onChange={(e) => setCollaboratorId(e.target.value)}
-                    >
-                      <option value="" disabled>
-                        {t('tickets.addCollaboratingAgent')}
-                      </option>
-                      {availableCollaborators.map((agent) => (
-                        <option key={agent.id} value={agent.id}>
-                          {agent.full_name}
-                        </option>
-                      ))}
-                    </Select>
+                      onChange={setCollaboratorId}
+                      placeholder={t('tickets.addCollaboratingAgent')}
+                      options={availableCollaborators.map((agent) => ({
+                        value: agent.id,
+                        label: agent.full_name,
+                      }))}
+                    />
                     <Button
                       onClick={handleAddCollaborator}
                       loading={setCollaborators.isPending}
@@ -681,6 +781,17 @@ export default function TicketDetailPage() {
                     >
                       {t('tickets.addCollaborator')}
                     </Button>
+                  </ActionGroup>
+                )}
+
+                {canManageArticles && availableArticles.length > 0 && (
+                  <ActionGroup label={t('tickets.relatedArticles')}>
+                    <SearchableSelect
+                      value={articleToAdd}
+                      onChange={handleAddArticle}
+                      placeholder={t('tickets.linkArticle')}
+                      options={availableArticles.map((a) => ({ value: a.id, label: a.title }))}
+                    />
                   </ActionGroup>
                 )}
 
@@ -702,18 +813,14 @@ export default function TicketDetailPage() {
 
                 {canReassign && (
                   <ActionGroup label={t('tickets.reassign')}>
-                    <Select value={reassignId} onChange={(e) => setReassignId(e.target.value)}>
-                      <option value="" disabled>
-                        {t('tickets.reassignToAnother')}
-                      </option>
-                      {agents
-                        ?.filter((agent) => agent.id !== user?.id)
-                        .map((agent) => (
-                          <option key={agent.id} value={agent.id}>
-                            {agent.full_name}
-                          </option>
-                        ))}
-                    </Select>
+                    <SearchableSelect
+                      value={reassignId}
+                      onChange={setReassignId}
+                      placeholder={t('tickets.reassignToAnother')}
+                      options={(agents || [])
+                        .filter((agent) => agent.id !== user?.id)
+                        .map((agent) => ({ value: agent.id, label: agent.full_name }))}
+                    />
                     <Button
                       onClick={handleReassign}
                       loading={assignTicket.isPending}
@@ -797,7 +904,7 @@ export default function TicketDetailPage() {
                 )}
 
                 {canDelete && (
-                  <ActionGroup label={t('tickets.dangerZone')}>
+                  <ActionGroup label={t('tickets.dangerZone')} tone="danger">
                     <Button
                       variant="danger"
                       onClick={handleDelete}
@@ -814,8 +921,25 @@ export default function TicketDetailPage() {
           )}
 
           <Card>
-            <SectionHeader icon={ClockIcon} title={t('tickets.activityHistory')} />
-            <ActivityTimeline activities={activities} />
+            <SectionHeader
+              icon={ClockIcon}
+              title={
+                activities?.length
+                  ? `${t('tickets.activityHistory')} (${activities.length})`
+                  : t('tickets.activityHistory')
+              }
+              className={showActivity ? undefined : 'mb-0 border-b-0 pb-0'}
+              action={
+                <button
+                  type="button"
+                  onClick={() => setShowActivity((v) => !v)}
+                  className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                >
+                  {showActivity ? t('common.hide') : t('common.show')}
+                </button>
+              }
+            />
+            {showActivity && <ActivityTimeline activities={activities} />}
           </Card>
         </div>
       </div>

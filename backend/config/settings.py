@@ -224,3 +224,6 @@ WHATSAPP_TEMPLATE_LANG = os.environ.get('WHATSAPP_TEMPLATE_LANG', 'en')
 # If a guest enters a local number starting with 0, replace the leading 0 with this
 # country code (digits only, e.g. 962 for Jordan). Blank = send numbers as entered.
 WHATSAPP_DEFAULT_COUNTRY_CODE = os.environ.get('WHATSAPP_DEFAULT_COUNTRY_CODE', '')
+# Staff phone number(s) to WhatsApp when a NEW ticket is opened (comma-separated).
+# Reuses the same approved template. Blank = no new-ticket WhatsApp alerts.
+WHATSAPP_NOTIFY_NUMBERS = os.environ.get('WHATSAPP_NOTIFY_NUMBERS', '')

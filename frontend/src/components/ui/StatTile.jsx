@@ -15,9 +15,13 @@ const COLORS = {
     surface: 'from-emerald-50 to-white ring-emerald-200/60 dark:from-emerald-500/10 dark:to-transparent dark:ring-emerald-400/15',
     chip: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300',
   },
+  purple: {
+    surface: 'from-purple-50 to-white ring-purple-200/60 dark:from-purple-500/10 dark:to-transparent dark:ring-purple-400/15',
+    chip: 'bg-purple-100 text-purple-600 dark:bg-purple-500/15 dark:text-purple-300',
+  },
 }
 
-export default function StatTile({ label, value, icon: IconComponent, color = 'indigo' }) {
+export default function StatTile({ label, value, hint, icon: IconComponent, color = 'indigo' }) {
   const c = COLORS[color] || COLORS.indigo
   return (
     <div
@@ -33,6 +37,7 @@ export default function StatTile({ label, value, icon: IconComponent, color = 'i
         <span className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
           {value}
         </span>
+        {hint && <span className="text-xs text-gray-400 dark:text-gray-500">{hint}</span>}
       </div>
     </div>
   )

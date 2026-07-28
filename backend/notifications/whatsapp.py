@@ -25,6 +25,23 @@ def to_international(phone):
     return digits
 
 
+def notify_staff_new_ticket(ticket):
+    """WhatsApp the configured staff number(s) that a new ticket was opened.
+
+    No-op unless WhatsApp is configured and WHATSAPP_NOTIFY_NUMBERS is set. Reuses the
+    approved status template, whose 3 body variables become: ticket id, subject, status.
+    """
+    numbers = [n.strip() for n in (settings.WHATSAPP_NOTIFY_NUMBERS or '').split(',') if n.strip()]
+    if not numbers or not is_configured():
+        return
+    who = ticket.customer.full_name if ticket.customer_id else (ticket.guest_name or 'a guest')
+    for number in numbers:
+        send_whatsapp_template(
+            number,
+            [str(ticket.id), f'{ticket.subject} (from {who})', 'New ticket — Unassigned'],
+        )
+
+
 def send_whatsapp_template(to_phone, body_params, template_name=None, lang=None):
     """Send a WhatsApp *template* message via the Meta Cloud API.
 

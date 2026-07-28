@@ -1,10 +1,16 @@
+import secrets
+
 from accounts.models import CustomerBranch, User
 from accounts.permissions import IsAdmin, IsAdminOrAgent
 from django.conf import settings
 from django.core.mail import send_mail
+from django.http import HttpResponse
+from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
 from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics, status, viewsets
 from rest_framework.decorators import action
@@ -14,6 +20,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import (
+    Article,
+    ArticleAttachment,
     Attachment,
     Category,
     Comment,
@@ -25,6 +33,9 @@ from .models import (
 from .filters import TicketFilterSet
 from .permissions import CanDeleteTicket, CanEditTicket, CanViewTicket
 from .serializers import (
+    ArticleAttachmentSerializer,
+    ArticleListSerializer,
+    ArticleSerializer,
     CategorySerializer,
     CommentSerializer,
     GuestCommentSerializer,
@@ -32,7 +43,9 @@ from .serializers import (
     GuestTicketPublicSerializer,
     PublicCategorySerializer,
     TicketActivitySerializer,
+    TicketArticlesSerializer,
     TicketAssignSerializer,
+    TicketCalendarSerializer,
     TicketCollaboratorsSerializer,
     TicketCreateSerializer,
     TicketDeadlineSerializer,
@@ -44,7 +57,12 @@ from .serializers import (
 from .services import log_activity
 from notifications.emails import email_users
 from notifications.models import notify
-from notifications.whatsapp import send_whatsapp_template
+from notifications.whatsapp import notify_staff_new_ticket, send_whatsapp_template
+
+
+# Upper bound on rows returned by the calendar endpoint — a month of tickets is far below
+# this; the cap only guards against a caller asking for a multi-year window.
+CALENDAR_MAX_TICKETS = 1000
 
 
 def get_scoped_tickets(user):
@@ -55,6 +73,17 @@ def get_scoped_tickets(user):
     if user.role in (User.Role.ADMIN, User.Role.AGENT):
         return base.all()
     return base.filter(customer=user)
+
+
+def _ticket_participants(ticket, exclude=None):
+    """The ticket's customer, assigned agent, and collaborators — de-duplicated, skipping
+    `exclude` (normally whoever triggered the event) and anyone missing."""
+    people, seen = [], {exclude.id} if exclude else set()
+    for user in [ticket.customer, ticket.assigned_agent, *ticket.collaborators.all()]:
+        if user and user.id not in seen:
+            seen.add(user.id)
+            people.append(user)
+    return people
 
 
 def create_attachments(ticket, files, uploaded_by, comment=None):
@@ -98,6 +127,78 @@ class CategoryViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return super().destroy(request, *args, **kwargs)
+
+
+class ArticleViewSet(viewsets.ModelViewSet):
+    """Knowledge-base articles. Published articles are public (readable by anyone incl.
+    guests); drafts are visible to staff. Creating/editing/deleting is admin-only."""
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['category', 'is_published']
+    search_fields = ['title', 'body']
+    ordering_fields = ['title', 'updated_at']
+    ordering = ['title']
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = Article.objects.select_related('category').prefetch_related('attachments')
+        user = self.request.user
+        is_staff = user.is_authenticated and user.role in (User.Role.ADMIN, User.Role.AGENT)
+        if not is_staff:
+            qs = qs.filter(is_published=True)
+        return qs
+
+    def get_serializer_class(self):
+        return ArticleListSerializer if self.action == 'list' else ArticleSerializer
+
+    def get_permissions(self):
+        # Reading is public. Managing (create/update/delete) is admin-only unless the
+        # "manage knowledge base" permission has been granted to agents in settings.
+        if self.action in ('list', 'retrieve'):
+            return [AllowAny()]
+        if TicketSettings.get_solo().allow_agent_manage_kb:
+            return [IsAuthenticated(), IsAdminOrAgent()]
+        return [IsAuthenticated(), IsAdmin()]
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user if self.request.user.is_authenticated else None)
+
+    @action(detail=True, methods=['post'], url_path='attachments',
+            parser_classes=[MultiPartParser, FormParser])
+    def add_attachments(self, request, pk=None):
+        """Attach one or more files to an article. Kept off create/update so those stay
+        JSON — the form uploads files in a second step once the article has an id."""
+        article = self.get_object()
+        files = request.FILES.getlist('attachments')
+        if not files:
+            return Response({'attachments': 'No files were uploaded.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        for f in files:
+            ArticleAttachment.objects.create(
+                article=article,
+                uploaded_by=request.user if request.user.is_authenticated else None,
+                file=f,
+                original_filename=f.name,
+                content_type=f.content_type or '',
+                size=f.size,
+            )
+        # Query afresh: the list on `article` was prefetched before these files existed.
+        return Response(
+            ArticleAttachmentSerializer(
+                ArticleAttachment.objects.filter(article=article), many=True
+            ).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=['delete'],
+            url_path=r'attachments/(?P<attachment_id>[^/.]+)')
+    def remove_attachment(self, request, pk=None, attachment_id=None):
+        article = self.get_object()
+        attachment = article.attachments.filter(pk=attachment_id).first()
+        if attachment is None:
+            return Response({'detail': 'Attachment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        attachment.file.delete(save=False)
+        attachment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class TicketViewSet(viewsets.ModelViewSet):
@@ -144,6 +245,9 @@ class TicketViewSet(viewsets.ModelViewSet):
         # Managing collaborators is admin-only.
         if self.action == 'set_collaborators':
             return [IsAuthenticated(), IsAdmin()]
+        # Attaching related help articles: any staff member.
+        if self.action == 'set_articles':
+            return [IsAuthenticated(), IsAdminOrAgent(), CanViewTicket()]
         return [IsAuthenticated()]
 
     def _closed_lock_response(self, ticket):
@@ -243,6 +347,8 @@ class TicketViewSet(viewsets.ModelViewSet):
                 f'New ticket {ticket.reference} from {customer.full_name}: {ticket.subject}',
                 ticket=ticket,
             )
+        # WhatsApp the configured staff number(s) that a new ticket is open (no-op unless set).
+        notify_staff_new_ticket(ticket)
         output = TicketDetailSerializer(ticket, context=self.get_serializer_context())
         return Response(output.data, status=status.HTTP_201_CREATED)
 
@@ -274,10 +380,28 @@ class TicketViewSet(viewsets.ModelViewSet):
         ticket.status = new_status
         # Keep the hold reason only while on hold; clear it otherwise.
         ticket.hold_reason = hold_reason if new_status == Ticket.Status.ON_HOLD else ''
+        # Maintain the completion timestamps. resolved_at marks when the ticket was first
+        # resolved and must survive a later close so it still counts toward resolution-time
+        # reporting; a direct close (never resolved) also stamps resolved_at. Reopening the
+        # ticket (moving it back to an active status) clears both.
+        now = timezone.now()
         if new_status == Ticket.Status.RESOLVED:
-            ticket.resolved_at = timezone.now()
-        elif ticket.resolved_at is not None:
+            if ticket.resolved_at is None:
+                ticket.resolved_at = now
+            ticket.closed_at = None
+        elif new_status == Ticket.Status.CLOSED:
+            if ticket.resolved_at is None:
+                ticket.resolved_at = now
+            ticket.closed_at = now
+        else:
             ticket.resolved_at = None
+            ticket.closed_at = None
+
+        # On the first close, mint a token so we can email the customer a rating link.
+        # Skip if they've already rated (e.g. reopened then closed again).
+        newly_closed = new_status == Ticket.Status.CLOSED and old_status != Ticket.Status.CLOSED
+        if newly_closed and not ticket.rating_submitted_at and not ticket.rating_token:
+            ticket.rating_token = secrets.token_urlsafe(32)
         ticket.save()
 
         description = f'Status changed from {old_status} to {new_status}'
@@ -306,11 +430,7 @@ class TicketViewSet(viewsets.ModelViewSet):
             else ''
         )
 
-        recipients, seen = [], {request.user.id}
-        for u in [ticket.customer, ticket.assigned_agent, *ticket.collaborators.all()]:
-            if u and u.id not in seen:
-                seen.add(u.id)
-                recipients.append(u)
+        recipients = _ticket_participants(ticket, exclude=request.user)
         if recipients:
             notify(recipients, f'Ticket {ticket.reference} status changed to {new_label}', ticket=ticket)
             body = (
@@ -333,6 +453,25 @@ class TicketViewSet(viewsets.ModelViewSet):
         # unless WhatsApp is configured.
         if ticket.guest_phone:
             send_whatsapp_template(ticket.guest_phone, [str(ticket.id), ticket.subject, new_label])
+
+        # Ask the customer to rate the experience now that the ticket is closed. Emails a
+        # tokenised link the recipient uses to submit a 1–5 rating without logging in.
+        if newly_closed and ticket.rating_token:
+            rate_email = ticket.customer.email if ticket.customer_id else ticket.guest_email
+            if rate_email:
+                link = f'{settings.FRONTEND_URL}/rate/{ticket.id}?token={ticket.rating_token}'
+                rate_body = (
+                    f'Ticket {ticket.reference}: {ticket.subject}\n\n'
+                    'Your ticket has been closed. How did we do? We\'d love your feedback — '
+                    f'please rate your experience:\n\n{link}\n\nThank you.'
+                )
+                send_mail(
+                    f'[Ticket {ticket.reference}] How did we do?',
+                    rate_body,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [rate_email],
+                    fail_silently=True,
+                )
 
         return Response(TicketDetailSerializer(ticket, context=self.get_serializer_context()).data)
 
@@ -416,7 +555,13 @@ class TicketViewSet(viewsets.ModelViewSet):
                 )
         ticket.customer = customer
         ticket.branch = branch
-        ticket.save(update_fields=['customer', 'branch'])
+        update_fields = ['customer', 'branch']
+        # If the guest never left an email, adopt the linked customer's email so the ticket
+        # still has a contact address for notifications.
+        if not ticket.guest_email and customer.email:
+            ticket.guest_email = customer.email
+            update_fields.append('guest_email')
+        ticket.save(update_fields=update_fields)
         detail = f'Linked to customer {customer.full_name}'
         if branch:
             detail += f' (branch: {branch.name})'
@@ -509,6 +654,14 @@ class TicketViewSet(viewsets.ModelViewSet):
                 f'Ticket {ticket.reference} was assigned to you by {request.user.full_name}',
                 ticket=ticket,
             )
+            email_users(
+                [ticket.assigned_agent],
+                f'Ticket {ticket.reference} was assigned to you',
+                f'Ticket {ticket.reference}: {ticket.subject}\n\n'
+                f'{request.user.full_name} assigned this ticket to you.\n\n'
+                f'View the ticket: {settings.FRONTEND_URL}/tickets/{ticket.id}',
+                'email_on_assignment',
+            )
         return Response(TicketDetailSerializer(ticket, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=['patch'], url_path='collaborators')
@@ -522,6 +675,15 @@ class TicketViewSet(viewsets.ModelViewSet):
             ticket, request.user, TicketActivity.ActivityType.ASSIGNED,
             f'Collaborating agents set to: {names}',
         )
+        return Response(TicketDetailSerializer(ticket, context=self.get_serializer_context()).data)
+
+    @action(detail=True, methods=['patch'], url_path='articles')
+    def set_articles(self, request, pk=None):
+        """Attach/detach related knowledge-base articles (staff only)."""
+        ticket = self.get_object()
+        serializer = TicketArticlesSerializer(ticket, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        ticket = serializer.save()
         return Response(TicketDetailSerializer(ticket, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=['get', 'post'], url_path='comments')
@@ -562,6 +724,25 @@ class TicketViewSet(viewsets.ModelViewSet):
                     ticket, request.user, TicketActivity.ActivityType.ATTACHMENT_ADDED,
                     f'Added {len(files)} attachment(s)',
                 )
+            # Everyone on the ticket except whoever just wrote it.
+            recipients = _ticket_participants(ticket, exclude=request.user)
+            if recipients:
+                notify(
+                    recipients,
+                    f'{request.user.full_name} commented on ticket {ticket.reference}',
+                    ticket=ticket,
+                )
+                email_body = (
+                    f'Ticket {ticket.reference}: {ticket.subject}\n\n'
+                    f'{request.user.full_name} wrote:\n{body}\n\n'
+                    f'View the ticket: {settings.FRONTEND_URL}/tickets/{ticket.id}'
+                )
+                email_users(
+                    recipients,
+                    f'New comment on ticket {ticket.reference}',
+                    email_body,
+                    'email_on_new_comment',
+                )
         return Response(
             CommentSerializer(comment, context=self.get_serializer_context()).data,
             status=status.HTTP_201_CREATED,
@@ -572,6 +753,77 @@ class TicketViewSet(viewsets.ModelViewSet):
         ticket = self.get_object()
         activities = ticket.activities.select_related('actor')
         return Response(TicketActivitySerializer(activities, many=True).data)
+
+    @action(detail=False, methods=['get'], url_path='calendar', pagination_class=None)
+    def calendar(self, request):
+        """Tickets whose start_date falls in [from, to], for the calendar month view.
+
+        Unpaginated on purpose — a calendar needs every ticket in the window, not the first
+        page — so the window is required and the result is capped. The usual filters
+        (status, priority, agent, …) still apply through filter_queryset."""
+        start = parse_date(request.query_params.get('from') or '')
+        end = parse_date(request.query_params.get('to') or '')
+        if start is None or end is None:
+            return Response(
+                {'detail': 'Both `from` and `to` are required (YYYY-MM-DD).'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        queryset = (
+            self.filter_queryset(self.get_queryset())
+            .filter(start_date__gte=start, start_date__lte=end)
+            .select_related('assigned_agent')
+            .order_by('start_date', 'id')[:CALENDAR_MAX_TICKETS]
+        )
+        return Response(TicketCalendarSerializer(queryset, many=True).data)
+
+    @action(detail=False, methods=['get'], url_path='export')
+    def export(self, request):
+        """Download the current (filtered, scoped) ticket list as an .xlsx file."""
+        queryset = self.filter_queryset(self.get_queryset()).select_related(
+            'customer', 'assigned_agent', 'category'
+        )
+        status_labels = dict(Ticket.Status.choices)
+        priority_labels = dict(Ticket.Priority.choices)
+
+        def naive(dt):
+            # openpyxl can't write timezone-aware datetimes — convert to local naive.
+            return timezone.localtime(dt).replace(tzinfo=None) if dt else None
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Tickets'
+        headers = [
+            'Reference', 'ID', 'Subject', 'Customer', 'Category', 'Priority', 'Status',
+            'Assigned agent', 'Created', 'Start date', 'Due', 'Resolved', 'Closed', 'Rating',
+        ]
+        ws.append(headers)
+        for tk in queryset:
+            customer = tk.customer.full_name if tk.customer_id else (tk.guest_name or 'Guest')
+            ws.append([
+                tk.reference,
+                tk.id,
+                tk.subject,
+                customer,
+                tk.category.name if tk.category_id else '',
+                priority_labels.get(tk.priority, tk.priority),
+                status_labels.get(tk.status, tk.status),
+                tk.assigned_agent.full_name if tk.assigned_agent_id else '',
+                naive(tk.created_at),
+                tk.start_date,
+                naive(tk.due_at),
+                naive(tk.resolved_at),
+                naive(tk.closed_at),
+                tk.rating,
+            ])
+        for i, header in enumerate(headers, start=1):
+            ws.column_dimensions[get_column_letter(i)].width = max(12, len(header) + 2)
+
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="tickets.xlsx"'
+        wb.save(response)
+        return response
 
 
 class TicketSettingsView(generics.RetrieveUpdateAPIView):
@@ -686,6 +938,8 @@ class GuestTicketCreateView(generics.CreateAPIView):
                 f'New guest ticket {ticket.reference} from {ticket.guest_name}: {ticket.subject}',
                 ticket=ticket,
             )
+        # WhatsApp the configured staff number(s) that a new ticket is open (no-op unless set).
+        notify_staff_new_ticket(ticket)
         return Response(
             {'id': ticket.id, 'reference': ticket.reference, 'subject': ticket.subject, 'status': ticket.status},
             status=status.HTTP_201_CREATED,
@@ -735,3 +989,105 @@ class GuestTicketReplyView(APIView):
             GuestCommentSerializer(comment, context={'request': request}).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+def _parse_score(request):
+    """Return an int 1–5 from request.data['score'], or None if invalid."""
+    try:
+        score = int(request.data.get('score'))
+    except (TypeError, ValueError):
+        return None
+    return score if 1 <= score <= 5 else None
+
+
+def _apply_rating(ticket, score, comment):
+    """Store a rating on the ticket, log it, and notify staff."""
+    ticket.rating = score
+    ticket.rating_comment = (comment or '').strip()
+    ticket.rating_submitted_at = timezone.now()
+    ticket.save(update_fields=['rating', 'rating_comment', 'rating_submitted_at'])
+    log_activity(
+        ticket, None, TicketActivity.ActivityType.RATED,
+        f'Customer rated the ticket {score}/5', metadata={'score': score},
+    )
+    if ticket.assigned_agent_id:
+        staff = User.objects.filter(pk=ticket.assigned_agent_id)
+    else:
+        staff = User.objects.filter(role__in=[User.Role.ADMIN, User.Role.AGENT])
+    notify(staff, f'Ticket {ticket.reference} was rated {score}/5', ticket=ticket)
+
+
+class TicketRatingView(APIView):
+    """Public customer-satisfaction rating for a closed ticket, gated by the token emailed
+    when the ticket was closed (works for both registered customers and guests)."""
+    permission_classes = [AllowAny]
+
+    def _resolve(self, request):
+        """Return the ticket if the (ticket id, token) pair is valid, else None."""
+        raw_id = request.query_params.get('ticket') or request.data.get('ticket')
+        token = request.query_params.get('token') or request.data.get('token')
+        if not raw_id or not token:
+            return None
+        try:
+            ticket = Ticket.objects.filter(id=int(raw_id)).first()
+        except (TypeError, ValueError):
+            return None
+        if ticket is None or not ticket.rating_token:
+            return None
+        if not secrets.compare_digest(str(token), ticket.rating_token):
+            return None
+        return ticket
+
+    def get(self, request):
+        ticket = self._resolve(request)
+        if ticket is None:
+            return Response({'detail': 'This rating link is invalid or expired.'},
+                            status=status.HTTP_404_NOT_FOUND)
+        return Response({
+            'reference': ticket.reference,
+            'subject': ticket.subject,
+            'rated': ticket.rating_submitted_at is not None,
+            'rating': ticket.rating,
+            'comment': ticket.rating_comment,
+        })
+
+    def post(self, request):
+        ticket = self._resolve(request)
+        if ticket is None:
+            return Response({'detail': 'This rating link is invalid or expired.'},
+                            status=status.HTTP_404_NOT_FOUND)
+        if ticket.rating_submitted_at is not None:
+            return Response({'detail': 'This ticket has already been rated.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        score = _parse_score(request)
+        if score is None:
+            return Response({'score': 'Choose a rating from 1 to 5.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        _apply_rating(ticket, score, request.data.get('comment'))
+        return Response({'detail': 'Thank you for your feedback.', 'rating': score})
+
+
+class GuestTicketRateView(APIView):
+    """Let a guest rate their closed ticket straight from the tracking page (verified by
+    reference + phone, so no emailed token is needed)."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        ticket = _find_guest_ticket(request.data.get('reference'), request.data.get('phone'))
+        if ticket is None:
+            return Response(
+                {'detail': 'No ticket found for that reference number and phone.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if ticket.status != Ticket.Status.CLOSED:
+            return Response({'detail': 'Only closed tickets can be rated.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if ticket.rating_submitted_at is not None:
+            return Response({'detail': 'This ticket has already been rated.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        score = _parse_score(request)
+        if score is None:
+            return Response({'score': 'Choose a rating from 1 to 5.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        _apply_rating(ticket, score, request.data.get('comment'))
+        return Response({'detail': 'Thank you for your feedback.', 'rating': score})

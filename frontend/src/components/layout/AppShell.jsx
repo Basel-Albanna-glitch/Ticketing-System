@@ -41,7 +41,7 @@ export default function AppShell() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar onToggleSidebar={toggleSidebar} />
+        <Topbar onToggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
         <main className="flex flex-1 flex-col p-4 sm:p-6">
           <Outlet />
         </main>

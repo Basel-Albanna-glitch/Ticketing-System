@@ -5,6 +5,7 @@ import {
   fetchActivity,
   fetchTicket,
   postComment,
+  setTicketArticles,
   setTicketCollaborators,
   setTicketCustomer,
   setTicketDeadline,
@@ -84,6 +85,14 @@ export function useSetTicketCollaborators(id) {
   const invalidate = useInvalidateTicket(id)
   return useMutation({
     mutationFn: (ids) => setTicketCollaborators(id, ids),
+    onSuccess: invalidate,
+  })
+}
+
+export function useSetTicketArticles(id) {
+  const invalidate = useInvalidateTicket(id)
+  return useMutation({
+    mutationFn: (ids) => setTicketArticles(id, ids),
     onSuccess: invalidate,
   })
 }
