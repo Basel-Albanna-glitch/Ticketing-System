@@ -2,4 +2,16 @@
 __pycache__
 *.pyc
 .env
+# Local databases. The .bak/.prewipe copies hold real ticket and customer data —
+# without this they would be baked into the published image layer.
 db.sqlite3
+*.sqlite3
+*.sqlite3.bak
+*.bak
+# Dev uploads. Production mounts the media volume over this path anyway.
+media/
+staticfiles/
+# Service-account keys are mounted at runtime, never copied in.
+secrets/
+*service-account*.json
+firebase-*.json
