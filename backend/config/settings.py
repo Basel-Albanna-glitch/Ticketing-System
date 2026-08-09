@@ -203,9 +203,15 @@ SIMPLE_JWT = {
 # CORS
 # https://github.com/adamchainz/django-cors-headers
 
-CORS_ALLOWED_ORIGINS = os.environ.get(
-    'CORS_ALLOWED_ORIGINS', 'http://localhost:5173'
-).split(',')
+# Empty entries are dropped: ''.split(',') yields [''], and django-cors-headers
+# rejects that at startup (E013). Setting the variable to blank is how a
+# same-origin deployment, where the SPA is served by the same host as the API,
+# says "no cross-origin callers".
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173').split(',')
+    if origin.strip()
+]
 
 
 # Email
