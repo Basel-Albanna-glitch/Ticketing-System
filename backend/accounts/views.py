@@ -184,7 +184,12 @@ class AgentViewSet(viewsets.ModelViewSet):
     pagination_class = None
 
     def get_queryset(self):
-        return User.objects.filter(role=User.Role.AGENT).annotate(
+        # Assignment dropdowns pass ?include_admins=1 so an admin can take work on
+        # themselves. The agent-management page omits it and still lists agents only.
+        roles = [User.Role.AGENT]
+        if self.request.query_params.get('include_admins') in ('1', 'true', 'True'):
+            roles.append(User.Role.ADMIN)
+        return User.objects.filter(role__in=roles).annotate(
             assigned_count=Count('tickets_assigned'),
             resolved_count=Count(
                 'tickets_assigned', filter=Q(tickets_assigned__status='resolved')
@@ -217,13 +222,18 @@ class CustomerViewSet(viewsets.ModelViewSet):
         return CustomerSerializer
 
     def get_permissions(self):
-        # Creating and deleting customers is always admin-only.
-        if self.action in ('create', 'destroy'):
-            return [IsAuthenticated(), IsAdmin()]
-        # Editing may be opened up to agents via the "edit customers" permission.
-        if self.action in ('update', 'partial_update'):
-            from tickets.models import TicketSettings
+        from tickets.models import TicketSettings
 
+        # Deleting a customer is always admin-only: an accidental create is easy
+        # to undo, a delete takes their tickets and history with it.
+        if self.action == 'destroy':
+            return [IsAuthenticated(), IsAdmin()]
+        # Creating and editing may each be opened up to agents in settings.
+        if self.action == 'create':
+            if TicketSettings.get_solo().allow_agent_create_customers:
+                return [IsAuthenticated(), IsAdminOrAgent()]
+            return [IsAuthenticated(), IsAdmin()]
+        if self.action in ('update', 'partial_update'):
             if TicketSettings.get_solo().allow_agent_edit_customers:
                 return [IsAuthenticated(), IsAdminOrAgent()]
             return [IsAuthenticated(), IsAdmin()]

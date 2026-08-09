@@ -14,13 +14,14 @@ import projects from './locales/projects'
 import guest from './locales/guest'
 import kb from './locales/kb'
 import calendar from './locales/calendar'
+import todo from './locales/todo'
 
 export const LANGUAGES = {
   en: { label: 'English', dir: 'ltr' },
   ar: { label: 'العربية', dir: 'rtl' },
 }
 
-const MODULES = [common, register, dashboard, tickets, customers, agents, settings, reports, projects, guest, kb, calendar]
+const MODULES = [common, register, dashboard, tickets, customers, agents, settings, reports, projects, guest, kb, calendar, todo]
 
 function mergeLang(lang) {
   return Object.assign({}, ...MODULES.map((m) => m[lang] || {}))

@@ -10,6 +10,9 @@ import { BadgeIcon, BoardIcon, ChevronRightIcon, PaperClipIcon, TicketIcon, User
 import TicketTable from '../tickets/TicketTable'
 import { useTickets } from '../../hooks/useTickets'
 import { isImageAttachment } from '../../utils/attachments'
+import { licenseStatus } from '../../utils/licenses'
+import { usePagedRows } from '../../utils/tablePage'
+import CustomerProjects from './CustomerProjects'
 import { useI18n } from '../../i18n/useI18n'
 
 function Detail({ label, value, full }) {
@@ -41,6 +44,25 @@ function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// Where a licence stands against its end date. The colours match the reminder stages the
+// backend emails on, so a row goes amber in the same week the first warning is sent.
+function LicenseStatusBadge({ endDate }) {
+  const { t } = useI18n()
+  const status = licenseStatus(endDate)
+  if (!status) return <span className="text-gray-400 dark:text-gray-500">—</span>
+
+  const label =
+    status.state === 'expired'
+      ? t('customers.licenseExpired')
+      : status.state === 'today'
+        ? t('customers.licenseExpiresToday')
+        : status.state === 'active'
+          ? t('customers.licenseActive')
+          : `${status.days} ${t('customers.licenseDaysLeft')}`
+
+  return <Badge color={status.color}>{label}</Badge>
 }
 
 // Tickets attached to a single branch, loaded on demand when the branch row is expanded.
@@ -87,6 +109,8 @@ export default function CustomerProfileDetails({ customer, customerId }) {
   const [page, setPage] = useState(1)
   const [previewIndex, setPreviewIndex] = useState(null)
   const { data: tickets, isLoading: isLoadingTickets } = useTickets({ customer: customerId, page })
+  const { pageRows: licenseRows, ...licensePager } = usePagedRows(customer?.licenses)
+  const { pageRows: branchRows, ...branchPager } = usePagedRows(customer?.branches)
 
   // Only the image attachments are previewable, and the viewer pages through them.
   const previewImages = (customer?.attachments || []).filter(isImageAttachment)
@@ -157,29 +181,48 @@ export default function CustomerProfileDetails({ customer, customerId }) {
       <div>
         <SectionTitle icon={BadgeIcon}>{t('customers.licenses')}</SectionTitle>
         {customer?.licenses?.length ? (
-          <Table columns={[t('customers.licenseName'), t('customers.startDate'), t('customers.endDate')]}>
-            {customer.licenses.map((lic) => (
+          <>
+          <Table
+            columns={[
+              t('customers.licenseName'),
+              t('customers.startDate'),
+              t('customers.endDate'),
+              t('field.status'),
+            ]}
+          >
+            {licenseRows.map((lic) => (
               <tr key={lic.id}>
                 <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">
                   {lic.name || '—'}
                 </td>
                 <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{lic.start_date || '—'}</td>
                 <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{lic.end_date || '—'}</td>
+                <td className="px-4 py-2">
+                  <LicenseStatusBadge endDate={lic.end_date} />
+                </td>
               </tr>
             ))}
           </Table>
+          <Pagination {...licensePager} onPageChange={licensePager.setPage} />
+          </>
         ) : (
           <EmptyState title={t('customers.noLicenses')} />
         )}
       </div>
 
       <div>
+        <SectionTitle icon={BoardIcon}>{t('customers.projects')}</SectionTitle>
+        <CustomerProjects customerId={customerId} branches={customer?.branches || []} />
+      </div>
+
+      <div>
         <SectionTitle icon={BoardIcon}>{t('customers.branches')}</SectionTitle>
         {customer?.branches?.length ? (
+          <>
           <Table
             columns={[t('customers.branchName'), t('field.address'), t('customers.branchTickets'), '']}
           >
-            {customer.branches.map((b) => {
+            {branchRows.map((b) => {
               const isOpen = expandedBranch === b.id
               const count = b.ticket_count ?? 0
               return (
@@ -218,6 +261,8 @@ export default function CustomerProfileDetails({ customer, customerId }) {
               )
             })}
           </Table>
+          <Pagination {...branchPager} onPageChange={branchPager.setPage} />
+          </>
         ) : (
           <EmptyState title={t('customers.noBranches')} />
         )}

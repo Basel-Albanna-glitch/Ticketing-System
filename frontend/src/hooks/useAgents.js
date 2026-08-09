@@ -1,11 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createAgent, fetchAgents, updateAgent } from '../api/users'
+import { createAgent, fetchAgent, fetchAgents, updateAgent } from '../api/users'
 
-export function useAgents({ enabled = true } = {}) {
+// `includeAdmins` is part of the key: the two lists differ, so they must not share a
+// cache entry. Pass it wherever work gets assigned, so admins can assign themselves.
+export function useAgents({ enabled = true, includeAdmins = false } = {}) {
   return useQuery({
-    queryKey: ['agents'],
-    queryFn: fetchAgents,
+    queryKey: ['agents', { includeAdmins }],
+    queryFn: () => fetchAgents({ includeAdmins }),
     enabled,
+  })
+}
+
+export function useAgent(id) {
+  return useQuery({
+    queryKey: ['agent', id],
+    queryFn: () => fetchAgent(id),
+    enabled: !!id,
   })
 }
 

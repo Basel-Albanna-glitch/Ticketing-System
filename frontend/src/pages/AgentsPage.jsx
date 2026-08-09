@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import Avatar from '../components/ui/Avatar'
 import AvatarUploader from '../components/ui/AvatarUploader'
 import Badge from '../components/ui/Badge'
@@ -9,6 +9,7 @@ import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
 import Input from '../components/ui/Input'
 import Modal from '../components/ui/Modal'
+import Pagination from '../components/ui/Pagination'
 import SearchBar from '../components/ui/SearchBar'
 import Spinner from '../components/ui/Spinner'
 import Table from '../components/ui/Table'
@@ -17,6 +18,7 @@ import { useAgents, useCreateAgent, useUpdateAgent } from '../hooks/useAgents'
 import { deleteUserAvatar, uploadUserAvatar } from '../api/users'
 import { useI18n } from '../i18n/useI18n'
 import { sortRows, useTableSort } from '../utils/tableSort'
+import { usePagedRows } from '../utils/tablePage'
 
 const COLUMNS = [
   { labelKey: 'field.username', sortKey: 'username', value: (a) => a.username },
@@ -54,6 +56,7 @@ export default function AgentsPage() {
   )
   const columns = COLUMNS.map((c) => (typeof c === 'string' ? c : { ...c, label: t(c.labelKey) }))
   const rows = sortRows(filtered, columns, sortBy, sortDir)
+  const { pageRows, ...pager } = usePagedRows(rows)
 
   function openCreate() {
     setForm(EMPTY_FORM)
@@ -155,15 +158,22 @@ export default function AgentsPage() {
       ) : rows.length === 0 ? (
         <EmptyState title={t('agents.emptyTitle')} />
       ) : (
+        <>
         <Table columns={columns} sortBy={sortBy} sortDir={sortDir} onSort={onSort}>
-          {rows.map((agent) => (
+          {pageRows.map((agent) => (
             <tr key={agent.id}>
               <td className="px-4 py-2 text-gray-500 dark:text-gray-400">@{agent.username}</td>
               <td className="px-4 py-2">
-                <div className="flex items-center gap-2.5">
+                <Link
+                  to={`/agents/${agent.id}`}
+                  className="flex items-center gap-2.5 transition-colors hover:text-indigo-600 dark:hover:text-indigo-400"
+                  title={t('agents.viewProfile')}
+                >
                   <Avatar name={agent.full_name} src={agent.avatar} />
-                  <span className="font-medium text-gray-900 dark:text-gray-100">{agent.full_name}</span>
-                </div>
+                  <span className="font-medium text-gray-900 hover:text-indigo-600 dark:text-gray-100 dark:hover:text-indigo-400">
+                    {agent.full_name}
+                  </span>
+                </Link>
               </td>
               <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{agent.email || '—'}</td>
               <td className="px-4 py-2 tabular-nums text-gray-600 dark:text-gray-300">{agent.assigned_count}</td>
@@ -194,6 +204,8 @@ export default function AgentsPage() {
             </tr>
           ))}
         </Table>
+        <Pagination {...pager} onPageChange={pager.setPage} />
+        </>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={form.id ? t('agents.editAgent') : t('agents.addAgent')}>

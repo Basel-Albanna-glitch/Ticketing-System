@@ -35,7 +35,7 @@ export default function TicketCreatePage() {
   const isAdmin = user?.role === 'admin'
   const { data: categories } = useCategories()
   const { data: customers } = useCustomers({ enabled: isStaff })
-  const { data: agents } = useAgents({ enabled: isAdmin })
+  const { data: agents } = useAgents({ enabled: isAdmin, includeAdmins: true })
   const [subject, setSubject] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')

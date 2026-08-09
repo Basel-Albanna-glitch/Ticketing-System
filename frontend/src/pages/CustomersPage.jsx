@@ -5,6 +5,7 @@ import Badge from '../components/ui/Badge'
 import Breadcrumbs from '../components/ui/Breadcrumbs'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
+import Pagination from '../components/ui/Pagination'
 import SearchBar from '../components/ui/SearchBar'
 import Select from '../components/ui/Select'
 import Spinner from '../components/ui/Spinner'
@@ -12,9 +13,11 @@ import Table from '../components/ui/Table'
 import { PlusIcon } from '../components/ui/icons'
 import CustomerFormModal from '../components/customers/CustomerFormModal'
 import { useAuth } from '../auth/useAuth'
+import { useTicketSettings } from '../hooks/useTicketSettings'
 import { useI18n } from '../i18n/useI18n'
 import { useCustomers, useUpdateCustomer } from '../hooks/useCustomers'
 import { sortRows, useTableSort } from '../utils/tableSort'
+import { usePagedRows } from '../utils/tablePage'
 
 const COLUMNS = [
   { label: 'field.username', sortKey: 'username', value: (c) => c.username },
@@ -38,16 +41,20 @@ export default function CustomersPage() {
   const { sortBy, sortDir, onSort } = useTableSort('full_name')
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const canManage = user?.role === 'admin'
+  const { data: ticketSettings } = useTicketSettings()
+  const isAdmin = user?.role === 'admin'
+  const canManage = isAdmin
+  // Adding is its own permission now; editing and deleting keep their own rules.
+  const canCreate = isAdmin || !!ticketSettings?.allow_agent_create_customers
 
   // Open the "add customer" modal when arriving from a Quick Action (/customers?new=1).
   useEffect(() => {
-    if (searchParams.get('new') && canManage) {
+    if (searchParams.get('new') && canCreate) {
       setModalOpen(true)
       searchParams.delete('new')
       setSearchParams(searchParams, { replace: true })
     }
-  }, [searchParams, canManage, setSearchParams])
+  }, [searchParams, canCreate, setSearchParams])
   const columns = COLUMNS.map((col) =>
     typeof col === 'string' ? col : { ...col, label: t(col.label) }
   )
@@ -65,6 +72,7 @@ export default function CustomersPage() {
     return matchesSearch && matchesStatus
   })
   const rows = sortRows(filtered, COLUMNS, sortBy, sortDir)
+  const { pageRows, ...pager } = usePagedRows(rows)
 
   function toggleActive(customer) {
     updateCustomer.mutate({ id: customer.id, is_active: !customer.is_active })
@@ -92,7 +100,7 @@ export default function CustomersPage() {
             <option value="active">{t('customers.active')}</option>
             <option value="inactive">{t('customers.inactive')}</option>
           </Select>
-          {canManage && (
+          {canCreate && (
             <Button onClick={() => setModalOpen(true)} className="whitespace-nowrap">
               <PlusIcon className="h-4 w-4" />
               {t('customers.addCustomer')}
@@ -107,8 +115,9 @@ export default function CustomersPage() {
       ) : rows.length === 0 ? (
         <EmptyState title={t('customers.noCustomersFound')} />
       ) : (
+        <>
         <Table columns={columns} sortBy={sortBy} sortDir={sortDir} onSort={onSort}>
-          {rows.map((customer) => (
+          {pageRows.map((customer) => (
             <tr key={customer.id}>
               <td className="px-4 py-2 text-gray-500 dark:text-gray-400">@{customer.username}</td>
               <td className="px-4 py-2">
@@ -143,6 +152,8 @@ export default function CustomersPage() {
             </tr>
           ))}
         </Table>
+        <Pagination {...pager} onPageChange={pager.setPage} />
+        </>
       )}
 
       <CustomerFormModal open={modalOpen} onClose={() => setModalOpen(false)} />

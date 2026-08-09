@@ -1,0 +1,67 @@
+name: hermes_tickets
+description: Hermes ticketing system — mobile app for customers and agents.
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Arabic translations for the built-in Material widgets (date picker, text
+  # selection menus) and the RTL directionality that comes with an ar locale.
+  # SDK package — no native code, so it cannot affect the Android build.
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  # HTTP client — chosen for its interceptor API, which is what makes the
+  # transparent JWT refresh in lib/core/api_client.dart possible.
+  dio: ^5.4.0
+  flutter_riverpod: ^2.5.1
+  # Tokens live in the Keychain / EncryptedSharedPreferences, never in plain prefs.
+  flutter_secure_storage: ^9.0.0
+  # Pinned to 0.20.x by flutter_localizations from the SDK; the DateFormat /
+  # NumberFormat APIs this app uses are unchanged from 0.19.
+  intl: ^0.20.2
+  # Attachment picking. image_picker (Flutter-team maintained) is used rather
+  # than file_picker: file_picker 11.0.2 pins Kotlin Gradle Plugin 1.8.22 and
+  # applies it itself, which conflicts with Flutter 3.44's built-in Kotlin —
+  # its Kotlin sources are silently skipped, so the plugin class does not exist
+  # at compile time and the build fails on GeneratedPluginRegistrant.
+  image_picker: ^1.1.2
+  # Used directly for basename() when building multipart uploads.
+  path: ^1.9.0
+  # System notifications (banner + sound + notification shade).
+  flutter_local_notifications: ^18.0.1
+  # Charts for the reports page. Pure Dart — no native code, so it cannot hit
+  # the Kotlin/AGP incompatibilities that plugins with an Android layer can.
+  fl_chart: ^0.69.0
+  # Push notifications. flutter_local_notifications above can only fire while the
+  # app is alive to poll; FCM is what delivers an alert to a killed app. The two
+  # work together — a push arriving in the foreground is drawn by the local
+  # plugin, on the same channel, so every alert looks identical.
+  firebase_core: ^4.13.0
+  firebase_messaging: ^16.5.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  # Generates the Android launcher icons at every density from one source image.
+  flutter_launcher_icons: ^0.14.1
+
+# Run `dart run flutter_launcher_icons` after changing the source image.
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/logo.jpeg"
+  # The logo sits on white, so the adaptive icon's background is white and the
+  # logo itself is the foreground — otherwise Android's circular mask would cut
+  # into a transparent edge.
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/logo.jpeg"
+  min_sdk_android: 21
+
+flutter:
+  uses-material-design: true

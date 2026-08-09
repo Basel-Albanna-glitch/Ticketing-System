@@ -49,6 +49,9 @@ export default {
     'settings.notifications.assignment.label': 'Email me when a ticket is assigned to me',
     'settings.notifications.assignment.hint':
       'Get an email when someone hands a ticket over to you.',
+    'settings.notifications.licenseExpiry.label': 'Email me before a license expires',
+    'settings.notifications.licenseExpiry.hint':
+      'Get an email 30 days, 7 days and 1 day before a license end date, and on the day itself.',
     'settings.notifications.emailGroup': 'Email',
     'settings.notifications.saved': 'Saved',
     'settings.notifications.inAppNote':
@@ -65,7 +68,23 @@ export default {
     'settings.permissions.saved': 'Permissions saved.',
     'settings.permissions.group.tickets': 'Tickets',
     'settings.permissions.group.customers': 'Customers',
+    'settings.permissions.createCustomers.label': 'Allow agents to add customers',
+    'settings.permissions.createCustomers.hint':
+      'Deleting a customer stays admin-only either way — an accidental add is easy to fix, a delete takes their tickets with it.',
     'settings.permissions.group.kb': 'Knowledge base',
+    'settings.permissions.group.projects': 'Projects',
+    'settings.permissions.assignProjects.label':
+      'Allow agents to change who projects and tasks are assigned to',
+    'settings.permissions.assignProjects.hint':
+      'When off, only admins can hand project or task work to someone else. Agents keep full access to the work itself.',
+    'settings.permissions.unassignProjects.label':
+      'Allow agents to take themselves off a project',
+    'settings.permissions.unassignProjects.hint':
+      'Agents can always pick up unclaimed work. When off, stepping back off it needs an admin, so a project is never quietly left unowned.',
+    'settings.permissions.assignTasks.label':
+      'Allow agents to assign tasks to themselves and other agents',
+    'settings.permissions.assignTasks.hint':
+      'Applies inside a project only. A team can divide tasks between themselves without also being able to hand the whole project to someone else.',
     'settings.permissions.selfAssign.label': 'Allow agents to assign tickets to themselves',
     'settings.permissions.selfAssign.hint':
       "When enabled, agents can see unassigned tickets and either claim one for themselves or release one they no longer want. They still can't assign a ticket to another agent or take one already claimed — that stays admin-only.",
@@ -173,6 +192,9 @@ export default {
     'settings.notifications.assignment.label': 'أرسل لي بريدًا إلكترونيًا عند إسناد تذكرة إليّ',
     'settings.notifications.assignment.hint':
       'استلم بريدًا إلكترونيًا عندما يُسند أحدهم تذكرة إليك.',
+    'settings.notifications.licenseExpiry.label': 'أرسل لي بريدًا إلكترونيًا قبل انتهاء الترخيص',
+    'settings.notifications.licenseExpiry.hint':
+      'استلم بريدًا إلكترونيًا قبل 30 يومًا و7 أيام ويوم واحد من تاريخ انتهاء الترخيص، وفي يوم الانتهاء نفسه.',
     'settings.notifications.emailGroup': 'البريد الإلكتروني',
     'settings.notifications.saved': 'تم الحفظ',
     'settings.notifications.inAppNote':
@@ -188,7 +210,23 @@ export default {
     'settings.permissions.saved': 'تم حفظ الصلاحيات.',
     'settings.permissions.group.tickets': 'التذاكر',
     'settings.permissions.group.customers': 'العملاء',
+    'settings.permissions.createCustomers.label': 'السماح للوكلاء بإضافة العملاء',
+    'settings.permissions.createCustomers.hint':
+      'يبقى حذف العميل للمدراء فقط في الحالتين — فالإضافة الخاطئة يسهل تصحيحها، أما الحذف فيأخذ معه تذاكر العميل.',
     'settings.permissions.group.kb': 'قاعدة المعرفة',
+    'settings.permissions.group.projects': 'المشاريع',
+    'settings.permissions.assignProjects.label':
+      'السماح للوكلاء بتغيير المُكلَّفين بالمشاريع والمهام',
+    'settings.permissions.assignProjects.hint':
+      'عند الإيقاف، يمكن للمدراء فقط إسناد العمل إلى شخص آخر، ويبقى للوكلاء وصول كامل إلى العمل نفسه.',
+    'settings.permissions.unassignProjects.label':
+      'السماح للوكلاء بإزالة أنفسهم من المشروع',
+    'settings.permissions.unassignProjects.hint':
+      'يمكن للوكلاء دائمًا استلام العمل غير المُسند. وعند الإيقاف، يحتاج التراجع عنه إلى مدير حتى لا يبقى المشروع بلا مسؤول.',
+    'settings.permissions.assignTasks.label':
+      'السماح للوكلاء بإسناد المهام لأنفسهم ولوكلاء آخرين',
+    'settings.permissions.assignTasks.hint':
+      'ينطبق داخل المشروع فقط، فيتمكن الفريق من توزيع المهام بينهم دون إمكانية إسناد المشروع كاملًا لشخص آخر.',
     'settings.permissions.selfAssign.label': 'السماح للوكلاء بتعيين التذاكر لأنفسهم',
     'settings.permissions.selfAssign.hint':
       'عند التفعيل، يمكن للوكلاء رؤية التذاكر غير المُعيَّنة وإما استلام واحدة لأنفسهم أو التخلّي عن واحدة لم يعودوا يريدونها. لا يزال لا يمكنهم تعيين تذكرة لوكيل آخر أو أخذ تذكرة مُستلَمة بالفعل — يبقى ذلك للمدير فقط.',

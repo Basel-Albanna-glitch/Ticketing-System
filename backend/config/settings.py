@@ -36,6 +36,22 @@ DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
+# Origins the Django admin's login form is allowed to POST from. Unlike
+# ALLOWED_HOSTS these need a scheme (e.g. http://203.0.113.10). Behind a proxy
+# Django compares against the forwarded origin, so the deployed host must appear
+# here or admin login fails with a CSRF error.
+CSRF_TRUSTED_ORIGINS = [
+    origin
+    for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
+    if origin
+]
+
+# nginx terminates the connection and forwards the original scheme. Without this
+# Django would build absolute URLs (password-reset links, DRF pagination) using
+# the proxy's scheme rather than the client's.
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 
 # Application definition
 
@@ -149,6 +165,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+# collectstatic target. In production nginx serves this directory directly (see
+# frontend/nginx.conf); it is unused by runserver in development.
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -170,7 +189,9 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
+    # Rows per page for every server-paginated list. Client-side paginated tables use the
+    # matching PAGE_SIZE in frontend/src/utils/tablePage.js — keep the two in step.
+    'PAGE_SIZE': 10,
 }
 
 SIMPLE_JWT = {
@@ -227,3 +248,14 @@ WHATSAPP_DEFAULT_COUNTRY_CODE = os.environ.get('WHATSAPP_DEFAULT_COUNTRY_CODE', 
 # Staff phone number(s) to WhatsApp when a NEW ticket is opened (comma-separated).
 # Reuses the same approved template. Blank = no new-ticket WhatsApp alerts.
 WHATSAPP_NOTIFY_NUMBERS = os.environ.get('WHATSAPP_NOTIFY_NUMBERS', '')
+
+
+# Firebase Cloud Messaging — push notifications for the mobile app.
+# The in-app alerts poll the API, which Android will not do while the app is killed;
+# push is what reaches a phone with the app closed.
+# FCM_SERVICE_ACCOUNT_FILE points at the JSON key from the Firebase console
+# (Project settings -> Service accounts -> Generate new private key). Keep it OUT of
+# git. Blank disables push entirely (a no-op), like WhatsApp without a token.
+FCM_SERVICE_ACCOUNT_FILE = os.environ.get('FCM_SERVICE_ACCOUNT_FILE', '')
+# Defaults to the project_id inside the key file; only set this to override it.
+FCM_PROJECT_ID = os.environ.get('FCM_PROJECT_ID', '')

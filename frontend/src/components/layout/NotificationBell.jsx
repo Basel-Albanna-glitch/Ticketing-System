@@ -7,6 +7,8 @@ import {
   useNotifications,
 } from '../../hooks/useNotifications'
 import { useI18n } from '../../i18n/useI18n'
+import { useAuth } from '../../auth/useAuth'
+import { playNewTicketBeep, unlockBeep } from '../../utils/beep'
 
 function timeAgo(iso) {
   const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
@@ -21,8 +23,10 @@ function timeAgo(iso) {
 export default function NotificationBell() {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
+  const seenIds = useRef(null)
   const navigate = useNavigate()
   const { t } = useI18n()
+  const { user } = useAuth()
   const { data } = useNotifications()
   const markRead = useMarkNotificationRead()
   const markAll = useMarkAllNotificationsRead()
@@ -38,10 +42,40 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [])
 
+  // Audio can't start before the page has seen a gesture, so arm it on the first one.
+  useEffect(() => {
+    const opts = { once: true }
+    document.addEventListener('pointerdown', unlockBeep, opts)
+    document.addEventListener('keydown', unlockBeep, opts)
+    return () => {
+      document.removeEventListener('pointerdown', unlockBeep, opts)
+      document.removeEventListener('keydown', unlockBeep, opts)
+    }
+  }, [])
+
+  // Beep when a new-ticket notification shows up in a poll. `null` means we haven't seen a
+  // response yet — that first batch is history, not an arrival, so it stays silent.
+  useEffect(() => {
+    const results = data?.results
+    if (!results) return
+    const previous = seenIds.current
+    seenIds.current = new Set(results.map((n) => n.id))
+    if (!previous) return
+    const arrived = results.some(
+      (n) => n.kind === 'new_ticket' && !n.is_read && !previous.has(n.id)
+    )
+    if (arrived) playNewTicketBeep()
+  }, [data])
+
   function handleClick(n) {
     if (!n.is_read) markRead.mutate(n.id)
     setOpen(false)
     if (n.ticket) navigate(`/tickets/${n.ticket}`)
+    // A customer-scoped notification (license expiry) goes to that customer's profile,
+    // but that page is staff-only — a customer reading their own alert gets their account.
+    else if (n.customer) {
+      navigate(user?.role === 'customer' ? '/account' : `/customers/${n.customer}`)
+    }
   }
 
   return (

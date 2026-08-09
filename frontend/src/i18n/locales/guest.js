@@ -26,6 +26,9 @@ export default {
     // Submit form fields
     'guest.field.yourName': 'Your name',
     'guest.field.company': 'Company name',
+    'guest.field.hasBranch': 'I am reporting this for a specific branch',
+    'guest.field.branchName': 'Branch name',
+    'guest.field.branchPlaceholder': 'e.g. Sweifieh',
     'guest.field.phonePlaceholder': 'e.g. +962 79 123 4567',
     'guest.field.emailOptional': 'Email (optional)',
     'guest.field.emailPlaceholder': 'Get status updates by email',
@@ -103,6 +106,9 @@ export default {
     // Submit form fields
     'guest.field.yourName': 'اسمك',
     'guest.field.company': 'اسم الشركة',
+    'guest.field.hasBranch': 'أبلّغ عن هذه المشكلة لفرع محدد',
+    'guest.field.branchName': 'اسم الفرع',
+    'guest.field.branchPlaceholder': 'مثال: الصويفية',
     'guest.field.phonePlaceholder': 'مثال: +962 79 123 4567',
     'guest.field.emailOptional': 'البريد الإلكتروني (اختياري)',
     'guest.field.emailPlaceholder': 'احصل على تحديثات الحالة عبر البريد الإلكتروني',

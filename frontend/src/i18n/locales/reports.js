@@ -34,13 +34,42 @@ export default {
     'reports.breakdown.byPriority': 'Tickets by priority',
     'reports.breakdown.byCategory': 'Tickets by category',
     'reports.breakdown.byRating': 'Satisfaction ratings',
+    'reports.delta.versus': 'compared with',
+    'reports.delta.flat': 'no change',
+    'reports.delivery.title': 'Project delivery',
+    'reports.delivery.description': 'Projects, tasks and the internal to-do list.',
+    'reports.delivery.projects': 'Projects',
+    'reports.delivery.tasks': 'Tasks',
+    'reports.delivery.unassigned': 'Unassigned',
+    'reports.delivery.openByPerson': 'Open tasks by person',
     'reports.noData': 'No data yet.',
+    'reports.searchPlaceholder': 'Search agents, customers, licenses…',
+    'reports.noMatches': 'Nothing matches that search.',
 
     // Agent performance
     'reports.agentPerformance': 'Agent performance',
     'reports.col.agent': 'Agent',
     'reports.col.assigned': 'Assigned',
     'reports.col.rating': 'Avg. rating',
+
+    // Customer activity
+    'reports.customerActivity': 'Customer activity',
+    'reports.customerActivityHint': 'Customers with tickets in this period, busiest first.',
+    'reports.col.customer': 'Customer',
+    'reports.col.tickets': 'Tickets',
+
+    // Licenses
+    'reports.licenses': 'Licenses',
+    'reports.licensesHint': 'All customer licenses as of today. Not affected by the date range.',
+    'reports.col.daysLeft': 'Days left',
+    'reports.licenseExpired': 'Expired',
+    'reports.licenseExpiring': 'Expiring in 30 days',
+    'reports.licenseActive': 'Active',
+    'reports.licenseState.expired': 'Expired',
+    'reports.licenseState.expiring': 'Expiring soon',
+    'reports.licenseState.active': 'Active',
+
+    'reports.export': 'Export to Excel',
   },
   ar: {
     'reports.title': 'التقارير',
@@ -77,12 +106,41 @@ export default {
     'reports.breakdown.byPriority': 'التذاكر حسب الأولوية',
     'reports.breakdown.byCategory': 'التذاكر حسب الفئة',
     'reports.breakdown.byRating': 'تقييمات الرضا',
+    'reports.delta.versus': 'مقارنةً بـ',
+    'reports.delta.flat': 'بلا تغيير',
+    'reports.delivery.title': 'إنجاز المشاريع',
+    'reports.delivery.description': 'المشاريع والمهام وقائمة المهام الداخلية.',
+    'reports.delivery.projects': 'المشاريع',
+    'reports.delivery.tasks': 'المهام',
+    'reports.delivery.unassigned': 'غير مُسندة',
+    'reports.delivery.openByPerson': 'المهام المفتوحة حسب الشخص',
     'reports.noData': 'لا توجد بيانات بعد.',
+    'reports.searchPlaceholder': 'ابحث في الوكلاء والعملاء والتراخيص…',
+    'reports.noMatches': 'لا نتائج مطابقة لهذا البحث.',
 
     // Agent performance
     'reports.agentPerformance': 'أداء الوكلاء',
     'reports.col.agent': 'الوكيل',
     'reports.col.assigned': 'المُسنَدة',
     'reports.col.rating': 'متوسط التقييم',
+
+    // Customer activity
+    'reports.customerActivity': 'نشاط العملاء',
+    'reports.customerActivityHint': 'العملاء الذين لديهم تذاكر في هذه الفترة، الأكثر نشاطًا أولًا.',
+    'reports.col.customer': 'العميل',
+    'reports.col.tickets': 'التذاكر',
+
+    // Licenses
+    'reports.licenses': 'التراخيص',
+    'reports.licensesHint': 'جميع تراخيص العملاء حتى اليوم. لا تتأثر بنطاق التاريخ.',
+    'reports.col.daysLeft': 'الأيام المتبقية',
+    'reports.licenseExpired': 'منتهية',
+    'reports.licenseExpiring': 'تنتهي خلال 30 يومًا',
+    'reports.licenseActive': 'سارية',
+    'reports.licenseState.expired': 'منتهي',
+    'reports.licenseState.expiring': 'ينتهي قريبًا',
+    'reports.licenseState.active': 'ساري',
+
+    'reports.export': 'تصدير إلى Excel',
   },
 }

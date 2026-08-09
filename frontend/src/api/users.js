@@ -1,7 +1,16 @@
 import client from './client'
 
-export async function fetchAgents() {
-  const { data } = await client.get('/users/agents/')
+// `includeAdmins` widens the list to admins as well, for assignment dropdowns where
+// an admin should be able to pick themselves. The agents admin page leaves it off.
+export async function fetchAgents({ includeAdmins = false } = {}) {
+  const { data } = await client.get('/users/agents/', {
+    params: includeAdmins ? { include_admins: 1 } : undefined,
+  })
+  return data
+}
+
+export async function fetchAgent(id) {
+  const { data } = await client.get(`/users/agents/${id}/`)
   return data
 }
 

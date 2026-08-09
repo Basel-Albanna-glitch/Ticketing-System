@@ -21,8 +21,8 @@ export default function TicketTable({ tickets, sortBy, sortDir, onSort }) {
     { label: t('field.createdAt'), sortKey: 'created_at' },
     { label: t('field.startDate'), sortKey: 'start_date' },
     ...(showAssignedAgent ? [{ label: t('field.assignedOn'), sortKey: 'assigned_at' }] : []),
+    { label: t('field.closedOn'), sortKey: 'closed_at' },
     { label: t('field.id'), sortKey: 'id' },
-    { label: t('field.reference') },
     { label: t('field.subject'), sortKey: 'subject' },
     t('field.customer'),
     t('tickets.parentCategory'),
@@ -49,11 +49,20 @@ export default function TicketTable({ tickets, sortBy, sortDir, onSort }) {
     <Table columns={columns} sortBy={sortBy} sortDir={sortDir} onSort={onSort}>
       {tickets.map((ticket) => {
         const { parent, child } = parentChild(ticket.category)
+        // Exactly the condition StatusBadge renders as "Unassigned": nobody has taken it on
+        // yet, so it's flagged red as the row still waiting for someone.
+        const isUnassigned = ticket.status === 'open' && !ticket.assigned_agent
         return (
           <tr
             key={ticket.id}
             onClick={() => navigate(`/tickets/${ticket.id}`)}
-            className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+            // The Table wrapper sets a hover colour with a more specific selector, so the
+            // red hover needs `!` to survive it.
+            className={`cursor-pointer ${
+              isUnassigned
+                ? 'bg-red-100 hover:bg-red-200! dark:bg-red-950/30 dark:hover:bg-red-950/50!'
+                : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+            }`}
           >
             <td className="px-4 py-2 text-gray-500 dark:text-gray-400">
               {new Date(ticket.created_at).toLocaleDateString()}
@@ -66,13 +75,19 @@ export default function TicketTable({ tickets, sortBy, sortDir, onSort }) {
                 {ticket.assigned_at ? new Date(ticket.assigned_at).toLocaleDateString() : '—'}
               </td>
             )}
+            <td className="whitespace-nowrap px-4 py-2 text-gray-500 dark:text-gray-400">
+              {ticket.closed_at ? new Date(ticket.closed_at).toLocaleDateString() : '—'}
+            </td>
             <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">
               #{ticket.id}
             </td>
-            <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">
-              {ticket.reference || `#${ticket.id}`}
+            <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">
+              {/* Long subjects would stretch the row far wider than every other column, so
+                  clip with an ellipsis and keep the full text in the tooltip. */}
+              <span className="block max-w-[14rem] truncate" title={ticket.subject}>
+                {ticket.subject}
+              </span>
             </td>
-            <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">{ticket.subject}</td>
             <td className="px-4 py-2 text-gray-600 dark:text-gray-300">
               {ticket.customer ? (
                 ticket.customer.full_name

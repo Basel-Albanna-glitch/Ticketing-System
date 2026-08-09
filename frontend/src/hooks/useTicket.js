@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  addTicketPhase,
   assignTicket,
   deleteTicket,
+  deleteTicketPhase,
   fetchActivity,
   fetchTicket,
   postComment,
@@ -39,6 +41,22 @@ function useInvalidateTicket(id) {
     queryClient.invalidateQueries({ queryKey: ['tickets'] })
     queryClient.invalidateQueries({ queryKey: ['dashboard'] })
   }
+}
+
+export function useAddTicketPhase(id) {
+  const invalidate = useInvalidateTicket(id)
+  return useMutation({
+    mutationFn: (body) => addTicketPhase(id, body),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteTicketPhase(id) {
+  const invalidate = useInvalidateTicket(id)
+  return useMutation({
+    mutationFn: (phaseId) => deleteTicketPhase(id, phaseId),
+    onSuccess: invalidate,
+  })
 }
 
 export function useUpdateTicketStatus(id) {

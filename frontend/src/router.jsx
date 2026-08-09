@@ -1,5 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import ProtectedRoute from './auth/ProtectedRoute'
+import AgentDetailPage from './pages/AgentDetailPage'
+import TodoPage from './pages/TodoPage'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './pages/LoginPage'
 import GuestTicketPage from './pages/GuestTicketPage'
@@ -51,6 +53,7 @@ const router = createBrowserRouter([
               { path: '/customers', element: <CustomersPage /> },
               { path: '/customers/:id', element: <CustomerProfilePage /> },
               { path: '/projects', element: <ProjectsListPage /> },
+              { path: '/todo', element: <TodoPage /> },
               { path: '/projects/:id', element: <ProjectBoardPage /> },
             ],
           },
@@ -58,6 +61,7 @@ const router = createBrowserRouter([
             element: <ProtectedRoute allowedRoles={['admin']} />,
             children: [
               { path: '/agents', element: <AgentsPage /> },
+              { path: '/agents/:id', element: <AgentDetailPage /> },
               { path: '/reports', element: <ReportsPage /> },
             ],
           },

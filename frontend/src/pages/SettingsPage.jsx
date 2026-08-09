@@ -25,6 +25,7 @@ import {
   UsersIcon,
 } from '../components/ui/icons'
 import Breadcrumbs from '../components/ui/Breadcrumbs'
+import Pagination from '../components/ui/Pagination'
 import SearchBar from '../components/ui/SearchBar'
 import SectionHeader from '../components/ui/SectionHeader'
 import Spinner from '../components/ui/Spinner'
@@ -65,6 +66,7 @@ import { useAllUsers, useUpdateUserRole } from '../hooks/useUsers'
 import { useTicketSettings, useUpdateTicketSettings } from '../hooks/useTicketSettings'
 import { buildCategoryTree, getSelfAndDescendantIds } from '../utils/categoryTree'
 import { sortRows, useTableSort } from '../utils/tableSort'
+import { usePagedRows } from '../utils/tablePage'
 import { useI18n } from '../i18n/useI18n'
 
 function ProfileSection() {
@@ -246,6 +248,13 @@ function NotificationSection() {
       label: t('settings.notifications.assignment.label'),
       hint: t('settings.notifications.assignment.hint'),
     },
+    // Only admins and customers are in the expiry mail; agents never are.
+    user?.role !== 'agent' && {
+      key: 'email_on_license_expiry',
+      icon: BadgeIcon,
+      label: t('settings.notifications.licenseExpiry.label'),
+      hint: t('settings.notifications.licenseExpiry.hint'),
+    },
   ].filter(Boolean)
 
   const allOff = rows.every((row) => !data[row.key])
@@ -314,6 +323,9 @@ function CategoriesSection() {
   const [error, setError] = useState('')
 
   const tree = buildCategoryTree(categories || [])
+  // The tree is already flattened to depth-tagged rows, so a page can start mid-branch —
+  // the indent still shows the level, and the parent is one page back.
+  const { pageRows: categoryRows, ...categoryPager } = usePagedRows(tree)
   // When editing, a category can't be parented to itself or any of its descendants.
   const excludedIds = editingId ? getSelfAndDescendantIds(categories || [], editingId) : new Set()
   const parentOptions = tree.filter((c) => !excludedIds.has(c.id))
@@ -389,7 +401,7 @@ function CategoriesSection() {
         description={t('settings.categories.description')}
       />
       <Table columns={[t('field.name'), t('field.priority'), t('field.description'), '']}>
-        {tree.map((category) => (
+        {categoryRows.map((category) => (
           <tr key={category.id}>
             <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">
               <span style={{ paddingInlineStart: `${category.depth * 1.25}rem` }} className="inline-flex items-center">
@@ -420,6 +432,7 @@ function CategoriesSection() {
           </tr>
         ))}
       </Table>
+      <Pagination {...categoryPager} onPageChange={categoryPager.setPage} />
 
       <form ref={formRef} onSubmit={handleSubmit} className="mt-6 flex max-w-sm flex-col gap-4">
         <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -471,6 +484,7 @@ function SoftwareTypesSection() {
   const createSoftwareType = useCreateSoftwareType()
   const updateSoftwareType = useUpdateSoftwareType()
   const deleteSoftwareType = useDeleteSoftwareType()
+  const { pageRows: softwareTypeRows, ...softwareTypePager } = usePagedRows(softwareTypes)
   const formRef = useRef(null)
   const [name, setName] = useState('')
   const [editingId, setEditingId] = useState(null)
@@ -522,8 +536,9 @@ function SoftwareTypesSection() {
         description={t('settings.softwareTypes.description')}
       />
       {softwareTypes?.length ? (
+        <>
         <Table columns={[t('field.name'), '']}>
-          {softwareTypes.map((softwareType) => (
+          {softwareTypeRows.map((softwareType) => (
             <tr key={softwareType.id}>
               <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">
                 {softwareType.name}
@@ -541,6 +556,8 @@ function SoftwareTypesSection() {
             </tr>
           ))}
         </Table>
+        <Pagination {...softwareTypePager} onPageChange={softwareTypePager.setPage} />
+        </>
       ) : (
         <p className="text-sm text-gray-500 dark:text-gray-400">{t('settings.softwareTypes.empty')}</p>
       )}
@@ -586,6 +603,7 @@ const PERMISSION_GROUPS = [
     icon: UsersIcon,
     titleKey: 'settings.permissions.group.customers',
     fields: [
+      { key: 'allow_agent_create_customers', i18n: 'createCustomers' },
       { key: 'allow_agent_edit_customers', i18n: 'editCustomers' },
       { key: 'allow_agent_link_customer', i18n: 'linkCustomer' },
     ],
@@ -594,6 +612,15 @@ const PERMISSION_GROUPS = [
     icon: BookIcon,
     titleKey: 'settings.permissions.group.kb',
     fields: [{ key: 'allow_agent_manage_kb', i18n: 'manageKb' }],
+  },
+  {
+    icon: BoardIcon,
+    titleKey: 'settings.permissions.group.projects',
+    fields: [
+      { key: 'allow_agent_assign_projects', i18n: 'assignProjects' },
+      { key: 'allow_agent_unassign_projects', i18n: 'unassignProjects' },
+      { key: 'allow_agent_assign_tasks', i18n: 'assignTasks' },
+    ],
   },
 ]
 
@@ -704,6 +731,7 @@ function UserRolesSection() {
     (u.email || '').toLowerCase().includes(q)
   )
   const rows = sortRows(filtered, columns, sortBy, sortDir)
+  const { pageRows, ...pager } = usePagedRows(rows)
 
   return (
     <Card>
@@ -714,7 +742,7 @@ function UserRolesSection() {
         action={<SearchBar value={search} onChange={setSearch} placeholder={t('settings.userRoles.searchPlaceholder')} />}
       />
       <Table columns={columns} sortBy={sortBy} sortDir={sortDir} onSort={onSort}>
-        {rows.map((u) => (
+        {pageRows.map((u) => (
           <tr key={u.id}>
             <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{u.username}</td>
             <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">{u.full_name}</td>
@@ -733,6 +761,7 @@ function UserRolesSection() {
           </tr>
         ))}
       </Table>
+      <Pagination {...pager} onPageChange={pager.setPage} />
     </Card>
   )
 }
@@ -744,6 +773,7 @@ function ArticlesSection() {
   const createArticle = useCreateArticle()
   const updateArticle = useUpdateArticle()
   const deleteArticle = useDeleteArticle()
+  const { pageRows: articleRows, ...articlePager } = usePagedRows(articles)
   const formRef = useRef(null)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -850,8 +880,9 @@ function ArticlesSection() {
         description={t('settings.kb.description')}
       />
       {articles?.length ? (
+        <>
         <Table columns={[t('field.title'), t('field.category'), t('field.status'), '']}>
-          {articles.map((a) => (
+          {articleRows.map((a) => (
             <tr key={a.id}>
               <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">{a.title}</td>
               <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{a.category?.name || '—'}</td>
@@ -873,6 +904,8 @@ function ArticlesSection() {
             </tr>
           ))}
         </Table>
+        <Pagination {...articlePager} onPageChange={articlePager.setPage} />
+        </>
       ) : (
         <p className="text-sm text-gray-500 dark:text-gray-400">{t('settings.kb.empty')}</p>
       )}

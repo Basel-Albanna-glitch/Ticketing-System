@@ -234,6 +234,14 @@ export function TrashIcon(props) {
   )
 }
 
+export function PencilIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M16.862 3.487a1.875 1.875 0 112.652 2.652L7.5 18.153l-3.75.75.75-3.75L16.862 3.487z" />
+    </Icon>
+  )
+}
+
 export function PaperClipIcon(props) {
   return (
     <Icon {...props}>

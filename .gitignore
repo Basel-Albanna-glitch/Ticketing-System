@@ -15,6 +15,13 @@ frontend/dist/
 backend/.env
 frontend/.env
 
+# Firebase service-account key for push notifications. This holds a real private
+# key that can send messages to every install of the app — it must never be
+# committed. (mobile/android/app/google-services.json is NOT secret by contrast:
+# it ships inside every APK, so committing that one is fine.)
+*service-account*.json
+backend/firebase-*.json
+
 # Editor / OS
 .idea/
 .vscode/
@@ -22,8 +29,13 @@ frontend/.env
 
 # Docker
 postgres_data/
-# Local DB backups (e.g. db.sqlite3.bak)
+# Local DB backups. These hold real ticket and customer data. The datestamped
+# names (db.sqlite3.20260730-094436.bak) fall between *.sqlite3 and *.sqlite3.bak,
+# so both of those patterns miss them — match the db.sqlite3 prefix instead.
 *.sqlite3.bak
+db.sqlite3.*
 
 # Stale vite-plugin-pwa dev output
 frontend/dev-dist/
+.env.prod
+secrets/

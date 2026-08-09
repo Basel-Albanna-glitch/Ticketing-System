@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import ActivityTimeline from '../components/tickets/ActivityTimeline'
 import AttachmentList from '../components/tickets/AttachmentList'
 import CommentThread from '../components/tickets/CommentThread'
+import PhaseList from '../components/tickets/PhaseList'
 import EditTicketModal from '../components/tickets/EditTicketModal'
 import PriorityBadge from '../components/tickets/PriorityBadge'
 import StatusBadge from '../components/tickets/StatusBadge'
@@ -17,6 +18,7 @@ import Textarea from '../components/ui/Textarea'
 import SectionHeader from '../components/ui/SectionHeader'
 import {
   BadgeIcon,
+  BoardIcon,
   BookIcon,
   CalendarIcon,
   ChatIcon,
@@ -125,7 +127,7 @@ export default function TicketDetailPage() {
   const { user } = useAuth()
   const { data: ticket, isLoading, error } = useTicket(id)
   const { data: activities } = useTicketActivity(id)
-  const { data: agents } = useAgents()
+  const { data: agents } = useAgents({ includeAdmins: true })
   const { data: customers } = useCustomers({ enabled: user?.role !== 'customer' })
   const { data: ticketSettings } = useTicketSettings()
   const updateStatus = useUpdateTicketStatus(id)
@@ -217,6 +219,8 @@ export default function TicketDetailPage() {
   // Customers reply on their own tickets; admins, the assigned agent, and collaborators too.
   const canReply =
     (isAdmin || user?.role === 'customer' || isAssignedToMe || isCollaborator) && !closedLocked
+  // Phases record the staff-side work, so customers read them but never log them.
+  const canLogPhases = (isAdmin || isAssignedToMe || isCollaborator) && !closedLocked
   // Agents can claim an unassigned ticket, but can't unassign themselves once they take it.
   // A closed & locked ticket blocks these too — only an admin can change a closed ticket.
   const canSelfAssign =
@@ -305,9 +309,19 @@ export default function TicketDetailPage() {
     showNotice(`${t('tickets.assignedTo')} ${name}`)
   }
 
+  // Assignment decides who owns the ticket and who gets notified, and an agent can't undo
+  // taking one, so every assign action asks first.
+  const ticketLabel = ticket.reference || `#${ticket.id}`
+
   function handleAssign() {
     if (agentId) {
       const name = agentNameById(agentId)
+      if (
+        !window.confirm(
+          `${t('tickets.confirmAssignPrefix')}${ticketLabel}${t('tickets.confirmAssignMiddle')}${name}${t('tickets.confirmAssignSuffix')}`
+        )
+      )
+        return
       assignTicket.mutate(agentId, {
         onSuccess: () => {
           noticeAssignedTo(name)
@@ -317,8 +331,24 @@ export default function TicketDetailPage() {
     }
   }
 
+  function handleSelfAssign() {
+    if (
+      !window.confirm(
+        `${t('tickets.confirmSelfAssignPrefix')}${ticketLabel}${t('tickets.confirmSelfAssignSuffix')}`
+      )
+    )
+      return
+    assignTicket.mutate(user.id, { onSuccess: () => noticeAssignedTo(user.full_name) })
+  }
+
   function handleReassign() {
     if (reassignId) {
+      if (
+        !window.confirm(
+          `${t('tickets.confirmReassignPrefix')}${ticketLabel}${t('tickets.confirmReassignMiddle')}${agentNameById(reassignId)}${t('tickets.confirmReassignSuffix')}`
+        )
+      )
+        return
       // After handing off, this agent loses access to the ticket, so return to the list.
       assignTicket.mutate(reassignId, { onSuccess: () => navigate('/tickets') })
     }
@@ -367,7 +397,11 @@ export default function TicketDetailPage() {
   // Related knowledge-base articles.
   const linkedArticles = ticket.articles || []
   const articleIds = linkedArticles.map((a) => a.id)
-  const availableArticles = (allArticles || []).filter((a) => !articleIds.includes(a.id))
+  // Only offer articles filed under the ticket's own category — the help that actually
+  // relates to the issue. Already-linked articles keep showing regardless of category.
+  const availableArticles = (allArticles || []).filter(
+    (a) => !articleIds.includes(a.id) && a.category?.id === ticket.category?.id
+  )
   const canManageArticles = isAdmin || user?.role === 'agent'
 
   function handleAddArticle(value) {
@@ -482,6 +516,7 @@ export default function TicketDetailPage() {
                   </span>
                 </div>
               )}
+
             </div>
           </Card>
 
@@ -505,6 +540,41 @@ export default function TicketDetailPage() {
               }
             />
             <CommentThread ticketId={ticket.id} comments={ticket.comments} canReply={canReply} />
+          </Card>
+
+          <Card>
+            <SectionHeader
+              icon={BoardIcon}
+              title={
+                ticket.phases?.length
+                  ? `${t('tickets.phases')} (${ticket.phases.length})`
+                  : t('tickets.phases')
+              }
+              description={t('tickets.phasesDescription')}
+            />
+            <PhaseList ticketId={ticket.id} phases={ticket.phases} canAdd={canLogPhases} />
+          </Card>
+
+          <Card>
+            <SectionHeader
+              icon={ClockIcon}
+              title={
+                activities?.length
+                  ? `${t('tickets.activityHistory')} (${activities.length})`
+                  : t('tickets.activityHistory')
+              }
+              className={showActivity ? undefined : 'mb-0 border-b-0 pb-0'}
+              action={
+                <button
+                  type="button"
+                  onClick={() => setShowActivity((v) => !v)}
+                  className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                >
+                  {showActivity ? t('common.hide') : t('common.show')}
+                </button>
+              }
+            />
+            {showActivity && <ActivityTimeline activities={activities} />}
           </Card>
         </div>
 
@@ -540,6 +610,11 @@ export default function TicketDetailPage() {
                       <span>{ticket.guest_name || t('tickets.guest')}</span>
                       {ticket.guest_company && (
                         <span className="text-xs text-gray-500 dark:text-gray-400">🏢 {ticket.guest_company}</span>
+                      )}
+                      {/* Kept here even when a real branch is linked below: this is what the
+                          guest actually typed, which is worth seeing next to the rest. */}
+                      {ticket.guest_branch && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">🏬 {ticket.guest_branch}</span>
                       )}
                       {ticket.guest_phone && (
                         <span className="text-xs text-gray-500 dark:text-gray-400">📞 {ticket.guest_phone}</span>
@@ -798,11 +873,7 @@ export default function TicketDetailPage() {
                 {canSelfAssign && (
                   <ActionGroup label={t('tickets.assignment')}>
                     <Button
-                      onClick={() =>
-                        assignTicket.mutate(user.id, {
-                          onSuccess: () => noticeAssignedTo(user.full_name),
-                        })
-                      }
+                      onClick={handleSelfAssign}
                       loading={assignTicket.isPending}
                       className="w-full"
                     >
@@ -839,7 +910,11 @@ export default function TicketDetailPage() {
                           <option value="" disabled>
                             {t('tickets.updateStatus')}
                           </option>
-                          <option value="open">{t('status.open')}</option>
+                          {/* "Unassigned" is the state of a ticket nobody has taken yet, so
+                              it's not a status an assigned ticket can be moved back into. */}
+                          <option value="open" disabled={Boolean(ticket.assigned_agent)}>
+                            {t('status.open')}
+                          </option>
                           <option value="in_progress">{t('status.in_progress')}</option>
                           <option value="on_hold">{t('status.on_hold')}</option>
                           <option value="resolved">{t('status.resolved')}</option>
@@ -919,28 +994,6 @@ export default function TicketDetailPage() {
               </fieldset>
             </Card>
           )}
-
-          <Card>
-            <SectionHeader
-              icon={ClockIcon}
-              title={
-                activities?.length
-                  ? `${t('tickets.activityHistory')} (${activities.length})`
-                  : t('tickets.activityHistory')
-              }
-              className={showActivity ? undefined : 'mb-0 border-b-0 pb-0'}
-              action={
-                <button
-                  type="button"
-                  onClick={() => setShowActivity((v) => !v)}
-                  className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
-                >
-                  {showActivity ? t('common.hide') : t('common.show')}
-                </button>
-              }
-            />
-            {showActivity && <ActivityTimeline activities={activities} />}
-          </Card>
         </div>
       </div>
 

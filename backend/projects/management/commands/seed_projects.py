@@ -106,19 +106,25 @@ class Command(BaseCommand):
             projects_created += int(created)
 
             for index, (title, status, priority, start_offset, due_offset, task_body) in enumerate(tasks):
-                _, task_created = Task.objects.get_or_create(
+                task, task_created = Task.objects.get_or_create(
                     project=project,
                     title=title,
                     defaults={
                         'description': task_body,
                         'status': status,
                         'priority': priority,
-                        'assignee': staff[index % len(staff)] if staff else None,
                         'start_date': today + timedelta(days=start_offset),
                         'due_date': today + timedelta(days=due_offset),
                         'created_by': owner,
                     },
                 )
+                # M2M assignments only exist once the row does, so they are set after
+                # creation. Every third task gets a second assignee to show a shared one.
+                if task_created and staff:
+                    people = [staff[index % len(staff)]]
+                    if index % 3 == 0 and len(staff) > 1:
+                        people.append(staff[(index + 1) % len(staff)])
+                    task.assignees.set(people)
                 tasks_created += int(task_created)
 
         self.stdout.write(

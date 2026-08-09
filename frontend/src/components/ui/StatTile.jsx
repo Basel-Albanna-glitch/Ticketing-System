@@ -19,6 +19,10 @@ const COLORS = {
     surface: 'from-purple-50 to-white ring-purple-200/60 dark:from-purple-500/10 dark:to-transparent dark:ring-purple-400/15',
     chip: 'bg-purple-100 text-purple-600 dark:bg-purple-500/15 dark:text-purple-300',
   },
+  red: {
+    surface: 'from-red-50 to-white ring-red-200/60 dark:from-red-500/10 dark:to-transparent dark:ring-red-400/15',
+    chip: 'bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-300',
+  },
 }
 
 export default function StatTile({ label, value, hint, icon: IconComponent, color = 'indigo' }) {

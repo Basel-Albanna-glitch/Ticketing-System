@@ -15,6 +15,9 @@ export default {
 
     // Availability / status badges
     'agents.available': 'Available',
+    'agents.noProjects': 'Not on any project yet.',
+    'agents.noTickets': 'No tickets assigned.',
+    'agents.viewProfile': 'View profile',
     'agents.unavailable': 'Unavailable',
     'agents.active': 'Active',
     'agents.inactive': 'Inactive',
@@ -41,6 +44,9 @@ export default {
 
     // Availability / status badges
     'agents.available': 'متاح',
+    'agents.noProjects': 'ليس ضمن أي مشروع بعد.',
+    'agents.noTickets': 'لا توجد تذاكر مُسندة.',
+    'agents.viewProfile': 'عرض الملف',
     'agents.unavailable': 'غير متاح',
     'agents.active': 'نشط',
     'agents.inactive': 'غير نشط',

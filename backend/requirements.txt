@@ -1,8 +1,14 @@
 asgiref==3.12.1
+# RS256 signing for the FCM service-account assertion (notifications/push.py).
+# PyJWT below cannot sign RS256 without it.
+cryptography==50.0.0
 Django==6.0.7
 django-cors-headers==4.9.0
 django-filter==26.1
 djangorestframework==3.17.1
+# WSGI server for production (docker-compose.prod.yml). Development still uses
+# manage.py runserver, which does not need this.
+gunicorn==23.0.0
 djangorestframework_simplejwt==5.5.1
 openpyxl==3.1.5
 pillow==12.3.0

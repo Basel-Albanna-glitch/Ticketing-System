@@ -1,10 +1,36 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createProject, deleteProject, fetchProject, fetchProjects, updateProject } from '../api/projects'
+import {
+  claimProject,
+  createProject,
+  deleteProject,
+  fetchCustomerProjects,
+  fetchProject,
+  fetchProjectCalendar,
+  fetchProjects,
+  updateProject,
+} from '../api/projects'
 
-export function useProjects(page, search = '') {
+export function useCustomerProjects(customerId) {
   return useQuery({
-    queryKey: ['projects', page, search],
-    queryFn: () => fetchProjects(page, search),
+    queryKey: ['customer-projects', customerId],
+    queryFn: () => fetchCustomerProjects(customerId),
+    enabled: !!customerId,
+  })
+}
+
+export function useProjectCalendar({ from, to, enabled = true, ...filters }) {
+  return useQuery({
+    queryKey: ['project-calendar', from, to, filters],
+    queryFn: () => fetchProjectCalendar({ from, to, ...filters }),
+    enabled: enabled && Boolean(from && to),
+    placeholderData: (previousData) => previousData,
+  })
+}
+
+export function useProjects(page, search = '', status = '', extra = {}) {
+  return useQuery({
+    queryKey: ['projects', page, search, status, extra],
+    queryFn: () => fetchProjects(page, search, status, extra),
     placeholderData: (previousData) => previousData,
   })
 }
@@ -32,6 +58,17 @@ export function useUpdateProject(id) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       queryClient.invalidateQueries({ queryKey: ['project', id] })
+    },
+  })
+}
+
+export function useClaimProject() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: claimProject,
+    onSuccess: (project) => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      queryClient.invalidateQueries({ queryKey: ['project', String(project.id)] })
     },
   })
 }

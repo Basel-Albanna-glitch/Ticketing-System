@@ -21,6 +21,9 @@ class TicketSettings(models.Model):
     # When on, agents may edit customer records. Creating and deleting customers
     # always stays admin-only.
     allow_agent_edit_customers = models.BooleanField(default=False)
+    # When on, agents may create customer records too. Deleting a customer always
+    # stays admin-only — an accidental create is easy to fix, a delete is not.
+    allow_agent_create_customers = models.BooleanField(default=False)
     # When on, the agent a ticket is assigned to may delete it. When off, only admins can.
     allow_agent_delete = models.BooleanField(default=False)
     # When on, agents may link, change, or remove the customer on a guest ticket.
@@ -28,6 +31,18 @@ class TicketSettings(models.Model):
     # When on, agents may create, edit, and delete knowledge-base articles. When off,
     # managing the knowledge base stays admin-only.
     allow_agent_manage_kb = models.BooleanField(default=False)
+    # When on, agents may change who a project or one of its tasks is assigned to.
+    # When off, only admins can — an agent can still see and work the assignment,
+    # just not hand it to someone else.
+    allow_agent_assign_projects = models.BooleanField(default=False)
+    # When on, an agent may step off a project they are assigned to. When off,
+    # they can still take unclaimed work on — they just cannot drop it again
+    # without an admin, so work is never quietly abandoned.
+    allow_agent_unassign_projects = models.BooleanField(default=False)
+    # Task-level assignment, kept separate from the project-level switch: a team
+    # can be trusted to divide work between themselves inside a project without
+    # also being able to hand the whole project to someone else.
+    allow_agent_assign_tasks = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Ticket settings'
@@ -139,6 +154,10 @@ class Ticket(models.Model):
     )
     guest_name = models.CharField(max_length=150, blank=True)
     guest_company = models.CharField(max_length=200, blank=True)
+    # Branch the guest typed on the public form. Free text rather than the `branch` FK below,
+    # because that points at a CustomerBranch owned by a registered customer and a guest has
+    # none; staff can still set the real FK once the ticket is linked to a customer.
+    guest_branch = models.CharField(max_length=200, blank=True)
     guest_phone = models.CharField(max_length=30, blank=True)
     guest_email = models.EmailField(blank=True)
     assigned_agent = models.ForeignKey(
@@ -238,6 +257,27 @@ class Comment(models.Model):
 
     def __str__(self):
         return f'Comment by {self.author} on ticket #{self.ticket_id}'
+
+
+class TicketPhase(models.Model):
+    """A step of work an agent logs while handling a ticket — "swapped the fuser", "ran a
+    print test". A ticket can have any number, and they're always optional: staff add them
+    to show how the work progressed."""
+
+    ticket = models.ForeignKey(Ticket, related_name='phases', on_delete=models.CASCADE)
+    # Null if the author's account is later removed; the phase itself stays on the ticket.
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name='ticket_phases', on_delete=models.SET_NULL,
+        null=True, blank=True,
+    )
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f'Phase on ticket #{self.ticket_id}'
 
 
 def attachment_upload_path(instance, filename):

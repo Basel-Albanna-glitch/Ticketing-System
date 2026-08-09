@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "467001190264",
+    "project_id": "hermes-ticketing",
+    "storage_bucket": "hermes-ticketing.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:467001190264:android:a5db86fbb4914aa2e44a8d",
+        "android_client_info": {
+          "package_name": "com.hermes.hermesticketing"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBVMVVq3zVyyhIqdzWuZXR04O6L85aBmkg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

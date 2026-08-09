@@ -2,6 +2,7 @@ import re
 
 from accounts.models import CustomerBranch, User
 from accounts.serializers import CustomerBranchSerializer, UserSerializer
+from django.utils import timezone
 from rest_framework import serializers
 
 from .models import (
@@ -12,6 +13,7 @@ from .models import (
     Comment,
     Ticket,
     TicketActivity,
+    TicketPhase,
     TicketSettings,
 )
 
@@ -110,6 +112,16 @@ class CommentSerializer(serializers.ModelSerializer):
         return obj.guest_name or 'Guest'
 
 
+class TicketPhaseSerializer(serializers.ModelSerializer):
+    author = UserSerializer(read_only=True)
+    author_name = serializers.CharField(source='author.full_name', read_only=True, default='')
+
+    class Meta:
+        model = TicketPhase
+        fields = ['id', 'author', 'author_name', 'body', 'created_at']
+        read_only_fields = ['author']
+
+
 class TicketActivitySerializer(serializers.ModelSerializer):
     actor = UserSerializer(read_only=True)
 
@@ -129,9 +141,10 @@ class TicketListSerializer(serializers.ModelSerializer):
         model = Ticket
         fields = [
             'id', 'reference', 'subject', 'customer', 'branch',
-            'guest_name', 'guest_company', 'guest_phone', 'guest_email',
+            'guest_name', 'guest_company', 'guest_branch', 'guest_phone', 'guest_email',
             'category', 'priority', 'status',
             'assigned_agent', 'assigned_at', 'start_date', 'due_at', 'created_at',
+            'closed_at',
         ]
 
 
@@ -141,17 +154,37 @@ class TicketCalendarSerializer(serializers.ModelSerializer):
     assigned_agent_name = serializers.CharField(
         source='assigned_agent.full_name', read_only=True, default=''
     )
+    assigned_agent_avatar = serializers.SerializerMethodField()
+    closed_date = serializers.SerializerMethodField()
 
     class Meta:
         model = Ticket
         fields = [
             'id', 'reference', 'subject', 'priority', 'status',
-            'start_date', 'assigned_agent_name',
+            'start_date', 'closed_at', 'closed_date',
+            'assigned_agent_name', 'assigned_agent_avatar',
         ]
+
+    def get_assigned_agent_avatar(self, obj):
+        """Absolute URL of the agent's picture, or null — the chip falls back to initials."""
+        avatar = getattr(obj.assigned_agent, 'avatar', None)
+        if not avatar:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(avatar.url) if request else avatar.url
+
+    def get_closed_date(self, obj):
+        """The day the ticket was closed, or null while it's still open. The calendar shows a
+        closed ticket on both days — its start date and this one — so returning it as its own
+        field keeps the date arithmetic (and timezone) on the server."""
+        if obj.status == Ticket.Status.CLOSED and obj.closed_at:
+            return timezone.localtime(obj.closed_at).date().isoformat()
+        return None
 
 
 class TicketDetailSerializer(TicketListSerializer):
     comments = CommentSerializer(many=True, read_only=True)
+    phases = TicketPhaseSerializer(many=True, read_only=True)
     attachments = AttachmentSerializer(many=True, read_only=True)
     collaborators = UserSerializer(many=True, read_only=True)
     articles = ArticleListSerializer(many=True, read_only=True)
@@ -160,12 +193,20 @@ class TicketDetailSerializer(TicketListSerializer):
     category_id = serializers.PrimaryKeyRelatedField(
         source='category', queryset=Category.objects.all(), write_only=True, required=False
     )
+    # Writable counterpart to the read-only nested `branch`. A branch can otherwise only be
+    # set when a guest ticket is first linked to a customer, which left no way to correct a
+    # wrong choice. Send null to clear it.
+    branch_id = serializers.PrimaryKeyRelatedField(
+        source='branch', queryset=CustomerBranch.objects.all(),
+        write_only=True, required=False, allow_null=True,
+    )
 
     class Meta(TicketListSerializer.Meta):
         fields = TicketListSerializer.Meta.fields + [
             'description', 'updated_at', 'resolved_at', 'closed_at', 'assigned_at', 'hold_reason',
             'rating', 'rating_comment', 'rating_submitted_at',
-            'comments', 'attachments', 'collaborators', 'articles', 'category_id',
+            'comments', 'phases', 'attachments', 'collaborators', 'articles', 'category_id',
+            'branch_id',
         ]
 
     def validate_subject(self, value):
@@ -176,10 +217,28 @@ class TicketDetailSerializer(TicketListSerializer):
             )
         return value
 
+    def validate(self, attrs):
+        # A branch belongs to exactly one customer, so it must match the ticket's own
+        # customer — otherwise a ticket could be filed against a stranger's branch. The
+        # same rule the customer-linking action enforces.
+        if 'branch' in attrs:
+            branch = attrs['branch']
+            customer = attrs.get('customer') or getattr(self.instance, 'customer', None)
+            if branch is not None:
+                if customer is None:
+                    raise serializers.ValidationError(
+                        {'branch_id': 'Link a customer before choosing a branch.'}
+                    )
+                if branch.customer_id != customer.id:
+                    raise serializers.ValidationError(
+                        {'branch_id': 'Branch does not belong to this customer.'}
+                    )
+        return super().validate(attrs)
+
 
 class TicketCollaboratorsSerializer(serializers.ModelSerializer):
     collaborators = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=User.objects.filter(role=User.Role.AGENT)
+        many=True, queryset=User.objects.filter(role__in=[User.Role.AGENT, User.Role.ADMIN])
     )
 
     class Meta:
@@ -204,7 +263,8 @@ class TicketCreateSerializer(serializers.ModelSerializer):
     )
     assigned_agent_id = serializers.PrimaryKeyRelatedField(
         source='assigned_agent',
-        queryset=User.objects.filter(role=User.Role.AGENT),
+        # Admins can be assigned too, so they can pick up a ticket themselves.
+        queryset=User.objects.filter(role__in=[User.Role.AGENT, User.Role.ADMIN]),
         required=False,
         allow_null=True,
         write_only=True,
@@ -263,8 +323,8 @@ class TicketAssignSerializer(serializers.ModelSerializer):
         fields = ['assigned_agent']
 
     def validate_assigned_agent(self, value):
-        if value is not None and value.role != User.Role.AGENT:
-            raise serializers.ValidationError('assigned_agent must be a user with role=agent.')
+        if value is not None and value.role not in (User.Role.AGENT, User.Role.ADMIN):
+            raise serializers.ValidationError('assigned_agent must be a user with role=agent or role=admin.')
         return value
 
 
@@ -274,7 +334,9 @@ class TicketSettingsSerializer(serializers.ModelSerializer):
         fields = [
             'allow_agent_self_assign', 'allow_agent_reassign', 'allow_agent_edit_after_close',
             'allow_agent_edit_customers', 'allow_agent_delete', 'allow_agent_link_customer',
-            'allow_agent_manage_kb',
+            'allow_agent_manage_kb', 'allow_agent_assign_projects',
+            'allow_agent_unassign_projects', 'allow_agent_assign_tasks',
+            'allow_agent_create_customers',
         ]
 
 
@@ -289,6 +351,7 @@ class PublicCategorySerializer(serializers.ModelSerializer):
 class GuestTicketCreateSerializer(serializers.ModelSerializer):
     guest_name = serializers.CharField(max_length=150)
     guest_company = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    guest_branch = serializers.CharField(max_length=200, required=False, allow_blank=True)
     guest_phone = serializers.CharField(max_length=30)
     guest_email = serializers.EmailField(required=False, allow_blank=True)
 
@@ -296,7 +359,7 @@ class GuestTicketCreateSerializer(serializers.ModelSerializer):
         model = Ticket
         fields = [
             'id', 'subject', 'description', 'category', 'priority',
-            'guest_name', 'guest_company', 'guest_phone', 'guest_email',
+            'guest_name', 'guest_company', 'guest_branch', 'guest_phone', 'guest_email',
         ]
 
     def validate_subject(self, value):
@@ -350,6 +413,9 @@ class GuestTicketPublicSerializer(serializers.ModelSerializer):
             'priority', 'priority_display', 'category', 'guest_name',
             'is_assigned', 'assigned_agent_name', 'rating', 'rating_submitted_at',
             'created_at', 'updated_at', 'comments', 'attachments',
+            # Shown on the tracker so a guest can see why their ticket is waiting, the same
+            # way a signed-in customer sees it on the ticket page.
+            'hold_reason',
         ]
 
     def get_is_assigned(self, obj):

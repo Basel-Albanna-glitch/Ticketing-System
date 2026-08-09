@@ -3,7 +3,6 @@ import secrets
 from accounts.models import CustomerBranch, User
 from accounts.permissions import IsAdmin, IsAdminOrAgent
 from django.conf import settings
-from django.core.mail import send_mail
 from django.http import HttpResponse
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
@@ -27,6 +26,7 @@ from .models import (
     Comment,
     Ticket,
     TicketActivity,
+    TicketPhase,
     TicketSettings,
     normalize_phone,
 )
@@ -51,12 +51,14 @@ from .serializers import (
     TicketDeadlineSerializer,
     TicketDetailSerializer,
     TicketListSerializer,
+    TicketPhaseSerializer,
     TicketSettingsSerializer,
     TicketStatusUpdateSerializer,
 )
 from .services import log_activity
-from notifications.emails import email_users
-from notifications.models import notify
+from notifications.background import run_in_background
+from notifications.emails import email_users, send_mail_async
+from notifications.models import Notification, notify
 from notifications.whatsapp import notify_staff_new_ticket, send_whatsapp_template
 
 
@@ -205,7 +207,10 @@ class TicketViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = TicketFilterSet
-    ordering_fields = ['id', 'subject', 'priority', 'status', 'created_at', 'start_date', 'due_at', 'assigned_at']
+    ordering_fields = [
+        'id', 'subject', 'priority', 'status', 'created_at', 'start_date', 'due_at',
+        'assigned_at', 'closed_at',
+    ]
     ordering = ['-created_at']
 
     @property
@@ -316,7 +321,12 @@ class TicketViewSet(viewsets.ModelViewSet):
                     ids.append(int(value))
                 except (TypeError, ValueError):
                     continue
-            agents_by_id = {a.id: a for a in User.objects.filter(id__in=ids, role=User.Role.AGENT)}
+            agents_by_id = {
+                a.id: a
+                for a in User.objects.filter(
+                    id__in=ids, role__in=[User.Role.AGENT, User.Role.ADMIN]
+                )
+            }
             ordered = [agents_by_id[i] for i in ids if i in agents_by_id]
             if ordered:
                 assigned_agent = ordered[0]
@@ -346,9 +356,10 @@ class TicketViewSet(viewsets.ModelViewSet):
                 staff,
                 f'New ticket {ticket.reference} from {customer.full_name}: {ticket.subject}',
                 ticket=ticket,
+                kind=Notification.Kind.NEW_TICKET,
             )
         # WhatsApp the configured staff number(s) that a new ticket is open (no-op unless set).
-        notify_staff_new_ticket(ticket)
+        run_in_background(notify_staff_new_ticket, ticket)
         output = TicketDetailSerializer(ticket, context=self.get_serializer_context())
         return Response(output.data, status=status.HTTP_201_CREATED)
 
@@ -445,14 +456,18 @@ class TicketViewSet(viewsets.ModelViewSet):
                 f'\n\nTrack your ticket at {settings.FRONTEND_URL}/guest/track using '
                 f'reference number {ticket.id} and your phone number.'
             )
-            send_mail(subject, guest_body, settings.DEFAULT_FROM_EMAIL, [ticket.guest_email],
-                      fail_silently=True)
+            send_mail_async(subject, guest_body, ticket.guest_email)
 
         # Guest tickets: also notify the guest on WhatsApp (Meta Cloud API) using the
         # approved template's 3 body variables: ticket id, subject, new status. No-op
-        # unless WhatsApp is configured.
+        # unless WhatsApp is configured. Backgrounded like the emails — it is an
+        # outbound HTTP call and the response does not depend on it.
         if ticket.guest_phone:
-            send_whatsapp_template(ticket.guest_phone, [str(ticket.id), ticket.subject, new_label])
+            run_in_background(
+                send_whatsapp_template,
+                ticket.guest_phone,
+                [str(ticket.id), ticket.subject, new_label],
+            )
 
         # Ask the customer to rate the experience now that the ticket is closed. Emails a
         # tokenised link the recipient uses to submit a 1–5 rating without logging in.
@@ -465,12 +480,10 @@ class TicketViewSet(viewsets.ModelViewSet):
                     'Your ticket has been closed. How did we do? We\'d love your feedback — '
                     f'please rate your experience:\n\n{link}\n\nThank you.'
                 )
-                send_mail(
+                send_mail_async(
                     f'[Ticket {ticket.reference}] How did we do?',
                     rate_body,
-                    settings.DEFAULT_FROM_EMAIL,
-                    [rate_email],
-                    fail_silently=True,
+                    rate_email,
                 )
 
         return Response(TicketDetailSerializer(ticket, context=self.get_serializer_context()).data)
@@ -748,6 +761,65 @@ class TicketViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    @action(detail=True, methods=['get', 'post'], url_path='phases')
+    def phases(self, request, pk=None):
+        """Work phases logged against the ticket. Staff-only to write — a customer sees them
+        on the ticket but doesn't log them."""
+        ticket = self.get_object()
+        if request.method == 'GET':
+            phases = ticket.phases.select_related('author')
+            return Response(
+                TicketPhaseSerializer(phases, many=True, context=self.get_serializer_context()).data
+            )
+
+        can_add = (
+            request.user.role == User.Role.ADMIN
+            or request.user == ticket.assigned_agent
+            or ticket.collaborators.filter(pk=request.user.pk).exists()
+        )
+        if not can_add:
+            return Response(
+                {'detail': 'Only the assigned agent can add phases to this ticket.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        locked = self._closed_lock_response(ticket)
+        if locked:
+            return locked
+
+        body = (request.data.get('body') or '').strip()
+        if not body:
+            return Response({'body': 'This field is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            phase = TicketPhase.objects.create(ticket=ticket, author=request.user, body=body)
+            log_activity(
+                ticket, request.user, TicketActivity.ActivityType.STATUS_CHANGED,
+                f'Phase logged: {body}',
+            )
+        return Response(
+            TicketPhaseSerializer(phase, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=['delete'], url_path=r'phases/(?P<phase_id>\d+)')
+    def delete_phase(self, request, pk=None, phase_id=None):
+        """Remove a phase. Its author or an admin, and never on a closed-locked ticket."""
+        ticket = self.get_object()
+        phase = ticket.phases.filter(pk=phase_id).first()
+        if phase is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        if not (request.user.role == User.Role.ADMIN or phase.author_id == request.user.pk):
+            return Response(
+                {'detail': 'You can only remove your own phases.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        locked = self._closed_lock_response(ticket)
+        if locked:
+            return locked
+        phase.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     @action(detail=True, methods=['get'], url_path='activity')
     def activity(self, request, pk=None):
         ticket = self.get_object()
@@ -756,7 +828,10 @@ class TicketViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='calendar', pagination_class=None)
     def calendar(self, request):
-        """Tickets whose start_date falls in [from, to], for the calendar month view.
+        """Tickets that belong somewhere in [from, to], for the calendar month view.
+
+        A closed ticket appears twice — on its start date and on its close date — so it's
+        fetched if either falls in the window.
 
         Unpaginated on purpose — a calendar needs every ticket in the window, not the first
         page — so the window is required and the result is capped. The usual filters
@@ -768,13 +843,31 @@ class TicketViewSet(viewsets.ModelViewSet):
                 {'detail': 'Both `from` and `to` are required (YYYY-MM-DD).'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        # Either date can place a ticket in this window: a ticket started in June and closed
+        # in July belongs to July's grid, and one started in July shows there even if it
+        # closes later.
+        in_window = Q(start_date__gte=start, start_date__lte=end)
+        closed_in_window = Q(
+            status=Ticket.Status.CLOSED, closed_at__date__gte=start, closed_at__date__lte=end
+        )
         queryset = (
             self.filter_queryset(self.get_queryset())
-            .filter(start_date__gte=start, start_date__lte=end)
+            .filter(in_window | closed_in_window)
             .select_related('assigned_agent')
-            .order_by('start_date', 'id')[:CALENDAR_MAX_TICKETS]
         )
-        return Response(TicketCalendarSerializer(queryset, many=True).data)
+        # The calendar answers "what is on my plate", so an agent sees their own
+        # work — assigned to them or collaborating on it. Admins see everything,
+        # and a customer's queryset is already limited to their own tickets.
+        if request.user.role == User.Role.AGENT:
+            queryset = queryset.filter(
+                Q(assigned_agent=request.user) | Q(collaborators=request.user)
+            ).distinct()
+        queryset = queryset.order_by('start_date', 'id')[:CALENDAR_MAX_TICKETS]
+        # Context carries the request, which the serializer needs to build absolute
+        # avatar URLs.
+        return Response(
+            TicketCalendarSerializer(queryset, many=True, context=self.get_serializer_context()).data
+        )
 
     @action(detail=False, methods=['get'], url_path='export')
     def export(self, request):
@@ -838,6 +931,22 @@ class TicketSettingsView(generics.RetrieveUpdateAPIView):
         return [IsAuthenticated()]
 
 
+# "Assigned" is not a stored status. A ticket handed to an agent but not yet started stays
+# in OPEN, which the UI shows as "Unassigned" while it has no agent and "Assigned" once it
+# does. The dashboard filter exposes those as two separate choices, so OPEN here means
+# strictly "nobody has taken it yet".
+DASHBOARD_ASSIGNED = 'assigned'
+
+
+def _dashboard_status_q(name):
+    """Q object for one dashboard status choice, splitting OPEN by whether it has an agent."""
+    if name == Ticket.Status.OPEN:
+        return Q(status=Ticket.Status.OPEN, assigned_agent__isnull=True)
+    if name == DASHBOARD_ASSIGNED:
+        return Q(status=Ticket.Status.OPEN, assigned_agent__isnull=False)
+    return Q(status=name)
+
+
 class DashboardView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
@@ -845,20 +954,27 @@ class DashboardView(generics.GenericAPIView):
         queryset = get_scoped_tickets(request.user)
         counts = queryset.aggregate(
             total=Count('id'),
-            open=Count('id', filter=Q(status=Ticket.Status.OPEN)),
+            open=Count('id', filter=_dashboard_status_q(Ticket.Status.OPEN)),
+            assigned=Count('id', filter=_dashboard_status_q(DASHBOARD_ASSIGNED)),
             in_progress=Count('id', filter=Q(status=Ticket.Status.IN_PROGRESS)),
             resolved=Count('id', filter=Q(status=Ticket.Status.RESOLVED)),
         )
 
-        valid_statuses = dict(Ticket.Status.choices)
+        valid_statuses = {*dict(Ticket.Status.choices), DASHBOARD_ASSIGNED}
         status_param = request.query_params.get('status')
         if status_param is not None:
             # Comma-separated list; empty string means "none selected".
             statuses = [s for s in status_param.split(',') if s in valid_statuses]
         else:
-            statuses = [Ticket.Status.OPEN, Ticket.Status.IN_PROGRESS]
+            statuses = [Ticket.Status.OPEN, DASHBOARD_ASSIGNED]
 
-        tickets_qs = queryset.filter(status__in=statuses) if statuses else queryset.none()
+        if statuses:
+            status_q = Q()
+            for name in statuses:
+                status_q |= _dashboard_status_q(name)
+            tickets_qs = queryset.filter(status_q)
+        else:
+            tickets_qs = queryset.none()
 
         # Optional created-date range filter (YYYY-MM-DD).
         date_from = request.query_params.get('date_from')
@@ -937,9 +1053,10 @@ class GuestTicketCreateView(generics.CreateAPIView):
                 staff,
                 f'New guest ticket {ticket.reference} from {ticket.guest_name}: {ticket.subject}',
                 ticket=ticket,
+                kind=Notification.Kind.NEW_TICKET,
             )
         # WhatsApp the configured staff number(s) that a new ticket is open (no-op unless set).
-        notify_staff_new_ticket(ticket)
+        run_in_background(notify_staff_new_ticket, ticket)
         return Response(
             {'id': ticket.id, 'reference': ticket.reference, 'subject': ticket.subject, 'status': ticket.status},
             status=status.HTTP_201_CREATED,

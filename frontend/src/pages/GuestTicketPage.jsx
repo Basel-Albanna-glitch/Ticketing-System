@@ -19,6 +19,8 @@ export default function GuestTicketPage() {
   const [form, setForm] = useState({
     guestName: '',
     guestCompany: '',
+    hasBranch: false,
+    guestBranch: '',
     guestPhone: '',
     guestEmail: '',
     category: '',
@@ -46,7 +48,12 @@ export default function GuestTicketPage() {
     setError('')
     setSubmitting(true)
     try {
-      const ticket = await createGuestTicket({ ...form, attachments: files })
+      // An unticked box must never submit a branch, even if one was typed and then hidden.
+      const ticket = await createGuestTicket({
+        ...form,
+        guestBranch: form.hasBranch ? form.guestBranch.trim() : '',
+        attachments: files,
+      })
       setCreated(ticket)
     } catch (err) {
       const data = err?.response?.data
@@ -84,7 +91,7 @@ export default function GuestTicketPage() {
                 variant="secondary"
                 onClick={() => {
                   setCreated(null)
-                  setForm({ guestName: '', guestCompany: '', guestPhone: '', guestEmail: '', category: '', priority: 'medium', subject: '', description: '' })
+                  setForm({ guestName: '', guestCompany: '', hasBranch: false, guestBranch: '', guestPhone: '', guestEmail: '', category: '', priority: 'medium', subject: '', description: '' })
                   setFiles([])
                 }}
               >
@@ -133,6 +140,33 @@ export default function GuestTicketPage() {
             value={form.guestCompany}
             onChange={(e) => set('guestCompany', e.target.value)}
           />
+          <div className="flex flex-col gap-3">
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-indigo-600"
+                checked={form.hasBranch}
+                onChange={(e) =>
+                  // Clearing on untick keeps the hidden value from lingering in state.
+                  setForm((f) => ({
+                    ...f,
+                    hasBranch: e.target.checked,
+                    guestBranch: e.target.checked ? f.guestBranch : '',
+                  }))
+                }
+              />
+              {t('guest.field.hasBranch')}
+            </label>
+            {form.hasBranch && (
+              <Input
+                label={t('guest.field.branchName')}
+                placeholder={t('guest.field.branchPlaceholder')}
+                value={form.guestBranch}
+                onChange={(e) => set('guestBranch', e.target.value)}
+                required
+              />
+            )}
+          </div>
           <Input
             label={t('guest.field.emailOptional')}
             type="email"

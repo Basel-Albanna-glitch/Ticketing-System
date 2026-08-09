@@ -38,8 +38,11 @@ const CUSTOMER_QUICK_ACTIONS = [
   { to: '/settings?section=profile', label: 'dashboard.qa.editProfile', icon: UserIcon },
 ]
 
+// "Unassigned" and "Assigned" are both the stored `open` status, split by whether the ticket
+// has an agent yet; the API understands `assigned` as that second half.
 const STATUS_OPTIONS = [
   { value: 'open', label: 'status.open' },
+  { value: 'assigned', label: 'status.assigned' },
   { value: 'in_progress', label: 'status.in_progress' },
   { value: 'on_hold', label: 'status.on_hold' },
   { value: 'resolved', label: 'status.resolved' },
@@ -49,6 +52,11 @@ const STATUS_OPTIONS = [
 function toISODate(d) {
   const pad = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function todayRange() {
+  const today = toISODate(new Date())
+  return { from: today, to: today }
 }
 
 // Monday -> Sunday of the current week.
@@ -62,6 +70,21 @@ function thisWeekRange() {
   return { from: toISODate(monday), to: toISODate(sunday) }
 }
 
+// 1st -> last day of the current month. Day 0 of next month is this month's last day.
+function thisMonthRange() {
+  const now = new Date()
+  const first = new Date(now.getFullYear(), now.getMonth(), 1)
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  return { from: toISODate(first), to: toISODate(last) }
+}
+
+// Ranges are computed on each render so they stay correct if the page is left open overnight.
+const DATE_PRESETS = [
+  { label: 'dashboard.today', range: todayRange },
+  { label: 'dashboard.thisWeek', range: thisWeekRange },
+  { label: 'dashboard.thisMonth', range: thisMonthRange },
+]
+
 export default function DashboardPage() {
   const { user } = useAuth()
   const { t } = useI18n()
@@ -71,8 +94,9 @@ export default function DashboardPage() {
       : user?.role === 'customer'
         ? CUSTOMER_QUICK_ACTIONS
         : null
-  // Default to showing only open + in-progress tickets, for the current week.
-  const [statuses, setStatuses] = useState(['open', 'in_progress'])
+  // Default to the tickets still waiting on someone — unassigned + assigned-not-started —
+  // for the current week.
+  const [statuses, setStatuses] = useState(['open', 'assigned'])
   const [dateFrom, setDateFrom] = useState(() => thisWeekRange().from)
   const [dateTo, setDateTo] = useState(() => thisWeekRange().to)
   const { data, isLoading } = useDashboard({ statuses, dateFrom, dateTo })
@@ -88,10 +112,14 @@ export default function DashboardPage() {
     setDateTo('')
   }
 
-  function setThisWeek() {
-    const week = thisWeekRange()
-    setDateFrom(week.from)
-    setDateTo(week.to)
+  function applyRange(range) {
+    setDateFrom(range.from)
+    setDateTo(range.to)
+  }
+
+  // Highlight the preset whose bounds the current dates match exactly.
+  function isActiveRange(range) {
+    return dateFrom === range.from && dateTo === range.to
   }
 
   return (
@@ -131,9 +159,10 @@ export default function DashboardPage() {
 
       {data && (
         <>
-          <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
             <StatTile label={t('dashboard.stat.total')} value={data.stats.total} icon={InboxIcon} color="indigo" />
             <StatTile label={t('status.open')} value={data.stats.open} icon={FolderOpenIcon} color="blue" />
+            <StatTile label={t('status.assigned')} value={data.stats.assigned} icon={BadgeIcon} color="purple" />
             <StatTile label={t('status.in_progress')} value={data.stats.in_progress} icon={ClockIcon} color="amber" />
             <StatTile label={t('status.resolved')} value={data.stats.resolved} icon={CheckCircleIcon} color="green" />
           </div>
@@ -182,9 +211,18 @@ export default function DashboardPage() {
                   className="rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15 dark:border-white/10 dark:bg-white/5 dark:text-gray-100"
                 />
               </label>
-              <Button variant="secondary" onClick={setThisWeek}>
-                {t('dashboard.thisWeek')}
-              </Button>
+              {DATE_PRESETS.map((preset) => {
+                const range = preset.range()
+                return (
+                  <Button
+                    key={preset.label}
+                    variant={isActiveRange(range) ? 'primary' : 'secondary'}
+                    onClick={() => applyRange(range)}
+                  >
+                    {t(preset.label)}
+                  </Button>
+                )
+              })}
               {(dateFrom || dateTo) && (
                 <Button variant="secondary" onClick={clearDates}>
                   {t('dashboard.clearDates')}

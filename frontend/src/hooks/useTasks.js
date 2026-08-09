@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createTask, deleteTask, fetchTasks, updateTask } from '../api/projects'
+import { createTask, deleteTask, fetchTasks, reorderTasks, updateTask } from '../api/projects'
 
 export function useTasks(projectId) {
   return useQuery({
@@ -30,6 +30,30 @@ export function useUpdateTask(projectId) {
   return useMutation({
     mutationFn: ({ id, ...payload }) => updateTask(id, payload),
     onSuccess: invalidate,
+  })
+}
+
+// Reordering is applied to the cache immediately: a dropped row that springs back to
+// its old spot while the request flies looks broken. On failure the snapshot is restored.
+export function useReorderTasks(projectId) {
+  const queryClient = useQueryClient()
+  const key = ['tasks', projectId]
+  return useMutation({
+    mutationFn: (ids) => reorderTasks(projectId, ids),
+    onMutate: async (ids) => {
+      await queryClient.cancelQueries({ queryKey: key })
+      const previous = queryClient.getQueryData(key)
+      queryClient.setQueryData(key, (old) => {
+        if (!old) return old
+        const byId = new Map(old.map((task) => [task.id, task]))
+        return ids.map((id) => byId.get(id)).filter(Boolean)
+      })
+      return { previous }
+    },
+    onError: (_err, _ids, context) => {
+      if (context?.previous) queryClient.setQueryData(key, context.previous)
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   })
 }
 

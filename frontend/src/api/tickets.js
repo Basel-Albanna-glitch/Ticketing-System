@@ -64,6 +64,16 @@ export async function updateTicketStatus(id, status, holdReason) {
   return data
 }
 
+// Work phases — the steps staff log while handling a ticket. Any number per ticket.
+export async function addTicketPhase(id, body) {
+  const { data } = await client.post(`/tickets/${id}/phases/`, { body })
+  return data
+}
+
+export async function deleteTicketPhase(id, phaseId) {
+  await client.delete(`/tickets/${id}/phases/${phaseId}/`)
+}
+
 // Edit a ticket's own details (subject, description, category, priority, start date).
 export async function updateTicket(id, payload) {
   const { data } = await client.patch(`/tickets/${id}/`, payload)
@@ -154,6 +164,7 @@ export async function fetchPublicCategories() {
 export async function createGuestTicket({
   guestName,
   guestCompany,
+  guestBranch,
   guestPhone,
   guestEmail,
   subject,
@@ -165,6 +176,7 @@ export async function createGuestTicket({
   const form = new FormData()
   form.append('guest_name', guestName)
   if (guestCompany) form.append('guest_company', guestCompany)
+  if (guestBranch) form.append('guest_branch', guestBranch)
   form.append('guest_phone', guestPhone)
   if (guestEmail) form.append('guest_email', guestEmail)
   form.append('subject', subject)

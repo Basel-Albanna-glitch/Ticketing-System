@@ -341,6 +341,17 @@ export default function GuestTrackPage() {
               {/* Where the ticket stands right now — the reason this page exists. */}
               <div className="border-t border-gray-100 px-5 py-5 dark:border-white/10">
                 <ProgressTrail status={ticket.status} />
+
+                {/* On hold is the one state the trail can't explain on its own — say why. */}
+                {ticket.status === 'on_hold' && ticket.hold_reason && (
+                  <div className="mt-4 flex items-start gap-2 rounded-xl border border-purple-200 bg-purple-50 px-3 py-2 text-sm text-purple-800 dark:border-purple-900/50 dark:bg-purple-900/20 dark:text-purple-200">
+                    <ClockIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span className="whitespace-pre-wrap">
+                      <span className="font-medium">{t('tickets.onHold')}</span> {ticket.hold_reason}
+                    </span>
+                  </div>
+                )}
+
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3 text-xs text-gray-500 dark:border-white/10 dark:text-gray-400">
                   <span className="inline-flex items-center gap-1.5">
                     <UserIcon className="h-3.5 w-3.5" />

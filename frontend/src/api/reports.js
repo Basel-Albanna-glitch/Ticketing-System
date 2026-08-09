@@ -17,3 +17,23 @@ export async function fetchAgentPerformance(range) {
   const { data } = await client.get('/reports/agent-performance/', { params: rangeParams(range) })
   return data
 }
+
+export async function fetchCustomerActivity(range) {
+  const { data } = await client.get('/reports/customers/', { params: rangeParams(range) })
+  return data
+}
+
+// Licenses are reported as of today, so this one takes no range.
+export async function fetchLicenseReport() {
+  const { data } = await client.get('/reports/licenses/')
+  return data
+}
+
+// Download the whole report for the range as a multi-sheet .xlsx file.
+export async function exportReport(range) {
+  const { data } = await client.get('/reports/export/', {
+    params: rangeParams(range),
+    responseType: 'blob',
+  })
+  return data
+}

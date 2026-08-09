@@ -57,7 +57,10 @@ class ChangePasswordSerializer(serializers.Serializer):
 class NotificationPreferenceSerializer(serializers.ModelSerializer):
     class Meta:
         model = NotificationPreference
-        fields = ['email_on_new_comment', 'email_on_status_change', 'email_on_assignment']
+        fields = [
+            'email_on_new_comment', 'email_on_status_change', 'email_on_assignment',
+            'email_on_license_expiry',
+        ]
 
 
 class AgentSerializer(serializers.ModelSerializer):
