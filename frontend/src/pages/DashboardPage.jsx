@@ -129,6 +129,25 @@ export default function DashboardPage() {
         <p className="mt-1 truncate text-gray-500 dark:text-gray-400">{t('dashboard.welcome')}{user?.full_name}.</p>
       </div>
 
+      {isLoading && !data && (
+        <div className="flex justify-center py-12">
+          <Spinner />
+        </div>
+      )}
+
+      {data && (
+        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
+          <StatTile label={t('dashboard.stat.total')} value={data.stats.total} icon={InboxIcon} color="indigo" />
+          <StatTile label={t('status.open')} value={data.stats.open} icon={FolderOpenIcon} color="blue" />
+          <StatTile label={t('status.assigned')} value={data.stats.assigned} icon={BadgeIcon} color="purple" />
+          <StatTile label={t('status.in_progress')} value={data.stats.in_progress} icon={ClockIcon} color="amber" />
+          <StatTile label={t('status.resolved')} value={data.stats.resolved} icon={CheckCircleIcon} color="green" />
+        </div>
+      )}
+
+      {/* Sits below the stat tiles: the counts are what you come to the
+          dashboard to read, the actions are what you do next. Kept outside the
+          `data` guard so they stay reachable while the stats are still loading. */}
       {quickActions && (
         <div className="mb-6">
           <h2 className="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -151,22 +170,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {isLoading && !data && (
-        <div className="flex justify-center py-12">
-          <Spinner />
-        </div>
-      )}
-
       {data && (
         <>
-          <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
-            <StatTile label={t('dashboard.stat.total')} value={data.stats.total} icon={InboxIcon} color="indigo" />
-            <StatTile label={t('status.open')} value={data.stats.open} icon={FolderOpenIcon} color="blue" />
-            <StatTile label={t('status.assigned')} value={data.stats.assigned} icon={BadgeIcon} color="purple" />
-            <StatTile label={t('status.in_progress')} value={data.stats.in_progress} icon={ClockIcon} color="amber" />
-            <StatTile label={t('status.resolved')} value={data.stats.resolved} icon={CheckCircleIcon} color="green" />
-          </div>
-
           <div className="mb-3 flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('dashboard.ticketsHeading')}</h2>
