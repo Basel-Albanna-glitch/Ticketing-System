@@ -127,8 +127,17 @@ export default function AgentsPage() {
         }
       }
       setModalOpen(false)
-    } catch {
-      setError(t('agents.saveError'))
+    } catch (err) {
+      // Show DRF's per-field validation messages (taken username, password under
+      // the minimum) rather than a generic failure that hides which field to fix.
+      const detail = err?.response?.data
+      const fieldErrors =
+        detail && typeof detail === 'object' && !Array.isArray(detail)
+          ? Object.entries(detail)
+              .map(([field, messages]) => `${field}: ${[].concat(messages).join(' ')}`)
+              .join(' · ')
+          : ''
+      setError(fieldErrors || t('agents.saveError'))
     }
   }
 
@@ -260,6 +269,7 @@ export default function AgentsPage() {
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             required={!form.id}
+            minLength={8}
           />
           <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
             <input

@@ -58,7 +58,10 @@ function formToState(customer) {
   }
 }
 
-export default function CustomerFormModal({ open, onClose, customer = null }) {
+// onCreated fires with the new customer's id after a successful create (never on
+// an edit), so a caller that opened this from another form — the ticket form's
+// quick-add, say — can select the customer it just made.
+export default function CustomerFormModal({ open, onClose, onCreated, customer = null }) {
   const { t } = useI18n()
   const { user } = useAuth()
   const queryClient = useQueryClient()
@@ -155,9 +158,21 @@ export default function CustomerFormModal({ open, onClose, customer = null }) {
           return
         }
       }
+      if (!isEdit) onCreated?.(targetId)
       onClose()
-    } catch {
-      setError(isEdit ? t('customers.errorSave') : t('customers.errorCreate'))
+    } catch (err) {
+      // DRF answers a failed validation with {field: [message, ...]}, which says
+      // exactly what to fix — a taken username, a password under the minimum.
+      // Falling back to the generic message swallowed that and left the form
+      // looking broken for what is usually a one-word correction.
+      const detail = err?.response?.data
+      const fieldErrors =
+        detail && typeof detail === 'object' && !Array.isArray(detail)
+          ? Object.entries(detail)
+              .map(([field, messages]) => `${field}: ${[].concat(messages).join(' ')}`)
+              .join(' · ')
+          : ''
+      setError(fieldErrors || (isEdit ? t('customers.errorSave') : t('customers.errorCreate')))
     }
   }
 
@@ -211,12 +226,16 @@ export default function CustomerFormModal({ open, onClose, customer = null }) {
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
           />
+          {/* minLength matches the serializer's min_length=8. Without it the
+              browser accepted a short password and the failure only surfaced as
+              a 400 after submitting the whole form. */}
           <Input
             label={isEdit ? `${t('customers.newPassword')} (${t('common.optional')})` : t('field.password')}
             type="password"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             required={!isEdit}
+            minLength={8}
           />
           <Input
             label={t('field.phone')}
