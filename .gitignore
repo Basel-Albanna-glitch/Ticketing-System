@@ -39,3 +39,6 @@ db.sqlite3.*
 frontend/dev-dist/
 .env.prod
 secrets/
+
+# Published APK builds, copied to the server rather than committed.
+downloads/

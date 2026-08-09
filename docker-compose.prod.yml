@@ -73,6 +73,9 @@ services:
     volumes:
       - media_data:/usr/share/nginx/media:ro
       - static_data:/usr/share/nginx/static:ro
+      # Sideloadable APK builds. A host directory, so publishing a new build is
+      # an scp rather than an image rebuild.
+      - ./downloads:/usr/share/nginx/downloads:ro
     depends_on:
       - backend
 
