@@ -129,6 +129,59 @@ export default function CustomerProfileDetails({ customer, customerId }) {
       </Card>
 
       <div>
+        <SectionTitle icon={BoardIcon}>{t('customers.branches')}</SectionTitle>
+        {customer?.branches?.length ? (
+          <>
+          <Table
+            columns={[t('customers.branchName'), t('field.address'), t('customers.branchTickets'), '']}
+          >
+            {branchRows.map((b) => {
+              const isOpen = expandedBranch === b.id
+              const count = b.ticket_count ?? 0
+              return (
+                <Fragment key={b.id}>
+                  <tr
+                    onClick={() => setExpandedBranch(isOpen ? null : b.id)}
+                    className="cursor-pointer"
+                    aria-expanded={isOpen}
+                  >
+                    <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">
+                      <span className="flex items-center gap-2">
+                        <ChevronRightIcon
+                          className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                        />
+                        {b.name || '—'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{b.address || '—'}</td>
+                    <td className="px-4 py-2">
+                      <Badge color={count > 0 ? 'purple' : 'gray'}>{count}</Badge>
+                    </td>
+                    <td className="px-4 py-2 text-end">
+                      <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400">
+                        {t('customers.viewBranchTickets')}
+                      </span>
+                    </td>
+                  </tr>
+                  {isOpen && (
+                    <tr>
+                      <td colSpan={4} className="bg-gray-50/60 px-4 py-4 dark:bg-white/5">
+                        <BranchTicketsPanel customerId={customerId} branchId={b.id} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              )
+            })}
+          </Table>
+          <Pagination {...branchPager} onPageChange={branchPager.setPage} />
+          </>
+        ) : (
+          <EmptyState title={t('customers.noBranches')} />
+        )}
+      </div>
+
+      <div>
         <SectionTitle icon={PaperClipIcon}>{t('field.attachments')}</SectionTitle>
         {customer?.attachments?.length ? (
           <Card>
@@ -213,59 +266,6 @@ export default function CustomerProfileDetails({ customer, customerId }) {
       <div>
         <SectionTitle icon={BoardIcon}>{t('customers.projects')}</SectionTitle>
         <CustomerProjects customerId={customerId} branches={customer?.branches || []} />
-      </div>
-
-      <div>
-        <SectionTitle icon={BoardIcon}>{t('customers.branches')}</SectionTitle>
-        {customer?.branches?.length ? (
-          <>
-          <Table
-            columns={[t('customers.branchName'), t('field.address'), t('customers.branchTickets'), '']}
-          >
-            {branchRows.map((b) => {
-              const isOpen = expandedBranch === b.id
-              const count = b.ticket_count ?? 0
-              return (
-                <Fragment key={b.id}>
-                  <tr
-                    onClick={() => setExpandedBranch(isOpen ? null : b.id)}
-                    className="cursor-pointer"
-                    aria-expanded={isOpen}
-                  >
-                    <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">
-                      <span className="flex items-center gap-2">
-                        <ChevronRightIcon
-                          className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-90' : ''}`}
-                        />
-                        {b.name || '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{b.address || '—'}</td>
-                    <td className="px-4 py-2">
-                      <Badge color={count > 0 ? 'purple' : 'gray'}>{count}</Badge>
-                    </td>
-                    <td className="px-4 py-2 text-end">
-                      <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400">
-                        {t('customers.viewBranchTickets')}
-                      </span>
-                    </td>
-                  </tr>
-                  {isOpen && (
-                    <tr>
-                      <td colSpan={4} className="bg-gray-50/60 px-4 py-4 dark:bg-white/5">
-                        <BranchTicketsPanel customerId={customerId} branchId={b.id} />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              )
-            })}
-          </Table>
-          <Pagination {...branchPager} onPageChange={branchPager.setPage} />
-          </>
-        ) : (
-          <EmptyState title={t('customers.noBranches')} />
-        )}
       </div>
 
       <div>
