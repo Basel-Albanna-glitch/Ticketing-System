@@ -98,9 +98,14 @@ class ClosedProjectTests(TestCase):
         self.assertIn('Outstanding', str(response.json()))
 
 
-class NewTaskRequirementsTests(TestCase):
-    """A task added from now on must say who and when. Existing tasks predate the
-    rule, so editing one must not demand details nobody recorded."""
+class MinimalTaskCreationTests(TestCase):
+    """A task needs only a project and a title.
+
+    An assignee and a due date were briefly required, which broke both clients:
+    the web board relies on unassigned tasks to represent unclaimed work, and the
+    mobile board creates standard steps from one-tap template chips that send a
+    title and nothing else. These pin the payloads those flows actually send.
+    """
 
     def setUp(self):
         self.client = APIClient()
@@ -114,25 +119,31 @@ class NewTaskRequirementsTests(TestCase):
         payload = {'project': self.project.pk, 'title': 'A task', **extra}
         return self.client.post('/api/tasks/', payload, format='json')
 
-    def test_assignee_is_required(self):
-        response = self.post(due_date='2026-09-01')
-        self.assertEqual(response.status_code, 400)
-        self.assertIn('assignee_ids', response.json())
+    def test_a_title_alone_is_enough(self):
+        self.assertEqual(self.post().status_code, 201)
 
-    def test_due_date_is_required(self):
-        response = self.post(assignee_ids=[self.admin.pk])
-        self.assertEqual(response.status_code, 400)
-        self.assertIn('due_date', response.json())
+    def test_the_mobile_template_chip_payload_is_accepted(self):
+        """Exactly what mobile/lib/data/misc_repository.dart createTask sends."""
+        response = self.client.post(
+            '/api/tasks/',
+            {
+                'project': self.project.pk,
+                'title': 'From phone',
+                'description': '',
+                'status': 'todo',
+                'priority': 'medium',
+                'assignee_ids': [],
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
 
-    def test_a_complete_task_is_accepted(self):
+    def test_a_fully_specified_task_is_still_accepted(self):
         response = self.post(assignee_ids=[self.admin.pk], due_date='2026-09-01')
         self.assertEqual(response.status_code, 201)
 
-    def test_an_older_incomplete_task_stays_editable(self):
-        legacy = Task.objects.create(
-            project=self.project, title='Legacy', created_by=self.admin
-        )
-        response = self.client.patch(
-            f'/api/tasks/{legacy.pk}/', {'title': 'Legacy renamed'}, format='json'
-        )
-        self.assertEqual(response.status_code, 200)
+    def test_date_order_is_still_enforced(self):
+        """Dropping the requirement must not drop the checks that remain."""
+        response = self.post(start_date='2026-09-10', due_date='2026-09-01')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('start_date', response.json())

@@ -87,18 +87,6 @@ export default function TaskFormModal({
       setError(t('projects.taskDateOrder'))
       return
     }
-    // Required when adding, not when editing — older tasks predate the rule and
-    // must stay saveable. `task` is absent exactly when this is a new one.
-    if (!task) {
-      if (form.assignee_ids.length === 0) {
-        setError(t('projects.taskAssigneeRequired'))
-        return
-      }
-      if (!form.due_date) {
-        setError(t('projects.taskDueDateRequired'))
-        return
-      }
-    }
     const payload = {
       title: form.title,
       description: form.description,

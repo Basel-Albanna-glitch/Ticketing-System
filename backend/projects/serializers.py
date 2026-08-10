@@ -234,20 +234,6 @@ class TaskSerializer(serializers.ModelSerializer):
                 {'project': 'This project is closed. Only admins can change it.'}
             )
 
-        # A new task has to say who is doing it and when it is due. Enforced on
-        # creation only: tasks made before this rule existed may well have
-        # neither, and applying it to edits would make those unsaveable until
-        # someone filled in details they may not know.
-        if self.instance is None:
-            if not attrs.get('assignees'):
-                raise serializers.ValidationError(
-                    {'assignee_ids': 'Choose who this task is for.'}
-                )
-            if not attrs.get('due_date'):
-                raise serializers.ValidationError(
-                    {'due_date': 'Give the task a due date.'}
-                )
-
         start_date = attrs.get('start_date', getattr(self.instance, 'start_date', None))
         due_date = attrs.get('due_date', getattr(self.instance, 'due_date', None))
         if start_date and due_date and start_date > due_date:
