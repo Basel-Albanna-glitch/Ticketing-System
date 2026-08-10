@@ -31,6 +31,10 @@ class NavItem {
   final List<String> roles;
   final Widget Function() build;
 
+  /// Permission this destination also needs, if any. Mirrors the `permission`
+  /// field on NAV_ITEMS in frontend/src/components/layout/Sidebar.jsx.
+  final String? permission;
+
   /// Optional shorter label key for the bottom tab, where space is tight
   /// ("Knowledge base" does not fit under an icon).
   final String? tabLabelKey;
@@ -41,6 +45,7 @@ class NavItem {
     required this.roles,
     required this.build,
     this.tabLabelKey,
+    this.permission,
   });
 
   String label(BuildContext context) => context.t(labelKey);
@@ -48,7 +53,14 @@ class NavItem {
   String shortLabel(BuildContext context) =>
       context.t(tabLabelKey ?? labelKey);
 
-  bool allows(AppUser? user) => user != null && roles.contains(user.role);
+  bool allows(AppUser? user) {
+    if (user == null || !roles.contains(user.role)) return false;
+    if (permission == null) return true;
+    // Section permissions narrow staff only. A customer holds none at all, so
+    // testing one here would hide their own Tickets tab — `roles` governs them.
+    if (user.isCustomer) return true;
+    return user.can(permission!);
+  }
 }
 
 final navItems = <NavItem>[
@@ -62,6 +74,7 @@ final navItems = <NavItem>[
     labelKey: 'nav.tickets',
     icon: Icons.confirmation_number_outlined,
     roles: const ['customer', 'agent', 'admin'],
+    permission: 'allow_agent_view_tickets',
     build: () => const TicketsPage(),
   ),
   NavItem(
@@ -81,6 +94,7 @@ final navItems = <NavItem>[
     labelKey: 'nav.projects',
     icon: Icons.view_kanban_outlined,
     roles: const ['agent', 'admin'],
+    permission: 'allow_agent_view_projects',
     build: () => const ProjectsPage(),
   ),
   NavItem(
@@ -93,6 +107,7 @@ final navItems = <NavItem>[
     labelKey: 'nav.customers',
     icon: Icons.people_outline,
     roles: const ['agent', 'admin'],
+    permission: 'allow_agent_view_customers',
     build: () => const CustomersPage(),
   ),
   NavItem(
@@ -104,7 +119,8 @@ final navItems = <NavItem>[
   NavItem(
     labelKey: 'nav.reports',
     icon: Icons.insights_outlined,
-    roles: const ['admin'],
+    roles: const ['agent', 'admin'],
+    permission: 'allow_agent_view_reports',
     build: () => const ReportsPage(),
   ),
   NavItem(

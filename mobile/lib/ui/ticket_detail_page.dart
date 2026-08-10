@@ -7,13 +7,11 @@ import '../i18n/i18n.dart';
 import '../i18n/labels.dart';
 import '../models/customer.dart';
 import '../models/ticket.dart';
-import '../models/project.dart';
 import '../models/user.dart';
 import '../state/permissions.dart';
 import '../state/providers.dart';
 import '../state/ticket_list_controller.dart';
 import 'kb_article_page.dart';
-import 'settings_page.dart';
 import 'theme.dart';
 import 'widgets/chips.dart';
 import 'widgets/pickers.dart';
@@ -489,23 +487,15 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
     final async = ref.watch(ticketDetailProvider(widget.ticketId));
     final user = ref.watch(authProvider).user;
     final isStaff = user?.isStaff ?? false;
-    // Permission switches are readable by any signed-in user precisely so the
-    // UI can reflect them; default to all-off until they load so nothing is
-    // offered optimistically.
-    final settings = ref.watch(ticketSettingsProvider).valueOrNull ??
-        const TicketSettings({});
-
     return Scaffold(
       appBar: AppBar(title: Text(context.t('ticket.title'))),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => ErrorView(message: describeError(e), onRetry: _reload),
         data: (ticket) {
-          final perms = TicketPermissions(
-            user: user,
-            ticket: ticket,
-            settings: settings,
-          );
+          // Permissions come resolved on the signed-in user, so there is no
+          // settings lookup here any more.
+          final perms = TicketPermissions(user: user, ticket: ticket);
           return Column(
           children: [
             Expanded(

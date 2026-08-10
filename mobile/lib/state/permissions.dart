@@ -1,4 +1,3 @@
-import '../models/project.dart';
 import '../models/ticket.dart';
 import '../models/user.dart';
 
@@ -8,15 +7,19 @@ import '../models/user.dart';
 /// backend/tickets/views.py, and this class exists only so the UI can hide or
 /// disable actions that would be refused. Nothing here is a security boundary;
 /// it stops the app from offering buttons that reliably fail.
+///
+/// Each flag is read from the user's own resolved permissions rather than from
+/// `isAdmin || settings[flag]`. The server folds in their role, the site-wide
+/// defaults and whether they are an admin, so asking it directly is the only
+/// way the app stays in step: a staff role can withhold something from an admin,
+/// and can grant an agent something the site-wide switch leaves off.
 class TicketPermissions {
   final AppUser? user;
   final Ticket ticket;
-  final TicketSettings settings;
 
   const TicketPermissions({
     required this.user,
     required this.ticket,
-    required this.settings,
   });
 
   bool get isAdmin => user?.isAdmin ?? false;
@@ -24,14 +27,15 @@ class TicketPermissions {
   bool get isStaff => user?.isStaff ?? false;
   bool get isMine => ticket.assignedAgent?.id == user?.id;
 
+  /// A permission as the server resolved it for this user.
+  bool can(String flag) => user?.can(flag) ?? false;
+
   /// A closed ticket is frozen for everyone except admins; agents are included
   /// only when "edit after close" is enabled, and customers never are
   /// (_closed_lock_response).
   bool get closedLock {
     if (!ticket.isClosed) return false;
-    if (isAdmin) return false;
-    if (isAgent && settings['allow_agent_edit_after_close']) return false;
-    return true;
+    return !can('allow_agent_edit_after_close');
   }
 
   /// Editing a ticket's own fields: admin, or the agent it is assigned to
@@ -54,8 +58,7 @@ class TicketPermissions {
   /// `canSelfAssign` requires `assigned_agent === null`.
   bool get canClaim {
     if (closedLock || ticket.isAssigned) return false;
-    if (isAdmin) return true;
-    return isAgent && settings['allow_agent_self_assign'];
+    return can('allow_agent_self_assign');
   }
 
   /// Handing the ticket to a different agent.
@@ -64,7 +67,7 @@ class TicketPermissions {
     if (isAdmin) return true;
     if (!isAgent) return false;
     // Agents may reassign only when permitted, and only a ticket of their own.
-    return settings['allow_agent_reassign'] && isMine;
+    return can('allow_agent_reassign') && isMine;
   }
 
   /// Only an admin may remove an assignment — agents cannot release a ticket
@@ -74,15 +77,14 @@ class TicketPermissions {
   /// Deleting: admin always; the assigned agent only when allowed.
   bool get canDelete {
     if (closedLock) return false;
-    if (isAdmin) return true;
-    return isAgent && settings['allow_agent_delete'] && isMine;
+    if (!can('allow_agent_delete')) return false;
+    return isAdmin || (isAgent && isMine);
   }
 
   /// Linking or unlinking the customer on a guest ticket.
   bool get canLinkCustomer {
     if (closedLock) return false;
-    if (isAdmin) return true;
-    return isAgent && settings['allow_agent_link_customer'];
+    return can('allow_agent_link_customer');
   }
 
   /// Managing collaborators is admin-only (IsAdmin on set_collaborators).
