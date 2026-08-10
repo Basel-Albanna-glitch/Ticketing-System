@@ -39,9 +39,19 @@ const router = createBrowserRouter([
         children: [
           { path: '/', element: <Navigate to="/dashboard" replace /> },
           { path: '/dashboard', element: <DashboardPage /> },
-          { path: '/tickets', element: <TicketsListPage /> },
-          { path: '/tickets/new', element: <TicketCreatePage /> },
-          { path: '/tickets/:id', element: <TicketDetailPage /> },
+          {
+            element: (
+              <ProtectedRoute
+                allowedRoles={['customer', 'agent', 'admin']}
+                requiredPermission="allow_agent_view_tickets"
+              />
+            ),
+            children: [
+              { path: '/tickets', element: <TicketsListPage /> },
+              { path: '/tickets/new', element: <TicketCreatePage /> },
+              { path: '/tickets/:id', element: <TicketDetailPage /> },
+            ],
+          },
           { path: '/calendar', element: <CalendarPage /> },
           { path: '/account', element: <MyAccountPage /> },
           { path: '/kb', element: <KbListPage /> },
@@ -49,11 +59,29 @@ const router = createBrowserRouter([
           { path: '/settings', element: <SettingsPage /> },
           {
             element: <ProtectedRoute allowedRoles={['admin', 'agent']} />,
+            children: [{ path: '/todo', element: <TodoPage /> }],
+          },
+          {
+            element: (
+              <ProtectedRoute
+                allowedRoles={['admin', 'agent']}
+                requiredPermission="allow_agent_view_customers"
+              />
+            ),
             children: [
               { path: '/customers', element: <CustomersPage /> },
               { path: '/customers/:id', element: <CustomerProfilePage /> },
+            ],
+          },
+          {
+            element: (
+              <ProtectedRoute
+                allowedRoles={['admin', 'agent']}
+                requiredPermission="allow_agent_view_projects"
+              />
+            ),
+            children: [
               { path: '/projects', element: <ProjectsListPage /> },
-              { path: '/todo', element: <TodoPage /> },
               { path: '/projects/:id', element: <ProjectBoardPage /> },
             ],
           },
@@ -62,8 +90,18 @@ const router = createBrowserRouter([
             children: [
               { path: '/agents', element: <AgentsPage /> },
               { path: '/agents/:id', element: <AgentDetailPage /> },
-              { path: '/reports', element: <ReportsPage /> },
             ],
+          },
+          {
+            // Reports follow the permission rather than the role, so an agent
+            // granted it gets in and an admin whose role withholds it does not.
+            element: (
+              <ProtectedRoute
+                allowedRoles={['agent', 'admin']}
+                requiredPermission="allow_agent_view_reports"
+              />
+            ),
+            children: [{ path: '/reports', element: <ReportsPage /> }],
           },
         ],
       },

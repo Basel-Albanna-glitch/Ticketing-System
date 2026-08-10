@@ -13,7 +13,7 @@ import Table from '../components/ui/Table'
 import { PlusIcon } from '../components/ui/icons'
 import CustomerFormModal from '../components/customers/CustomerFormModal'
 import { useAuth } from '../auth/useAuth'
-import { useTicketSettings } from '../hooks/useTicketSettings'
+import { usePermissions } from '../auth/usePermissions'
 import { useI18n } from '../i18n/useI18n'
 import { useCustomers, useUpdateCustomer } from '../hooks/useCustomers'
 import { sortRows, useTableSort } from '../utils/tableSort'
@@ -41,11 +41,11 @@ export default function CustomersPage() {
   const { sortBy, sortDir, onSort } = useTableSort('full_name')
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const { data: ticketSettings } = useTicketSettings()
+  const permissions = usePermissions()
   const isAdmin = user?.role === 'admin'
   const canManage = isAdmin
   // Adding is its own permission now; editing and deleting keep their own rules.
-  const canCreate = isAdmin || !!ticketSettings?.allow_agent_create_customers
+  const canCreate = !!permissions.allow_agent_create_customers
 
   // Open the "add customer" modal when arriving from a Quick Action (/customers?new=1).
   useEffect(() => {

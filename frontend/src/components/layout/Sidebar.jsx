@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
+import { usePermissions } from '../../auth/usePermissions'
 import { useI18n } from '../../i18n/useI18n'
 import Logo from '../ui/Logo'
 import {
@@ -19,15 +20,18 @@ import {
 
 const NAV_ITEMS = [
   { to: '/dashboard', labelKey: 'nav.dashboard', icon: DashboardIcon, roles: ['customer', 'agent', 'admin'] },
-  { to: '/tickets', labelKey: 'nav.tickets', icon: TicketIcon, roles: ['customer', 'agent', 'admin'] },
+  { to: '/tickets', labelKey: 'nav.tickets', icon: TicketIcon, roles: ['customer', 'agent', 'admin'], permission: 'allow_agent_view_tickets' },
   { to: '/calendar', labelKey: 'nav.calendar', icon: CalendarIcon, roles: ['customer', 'agent', 'admin'] },
   { to: '/kb', labelKey: 'nav.kb', icon: BookIcon, roles: ['customer', 'agent', 'admin'] },
   { to: '/account', labelKey: 'nav.account', icon: UserIcon, roles: ['customer'] },
-  { to: '/projects', labelKey: 'nav.projects', icon: BoardIcon, roles: ['agent', 'admin'] },
+  { to: '/projects', labelKey: 'nav.projects', icon: BoardIcon, roles: ['agent', 'admin'], permission: 'allow_agent_view_projects' },
   { to: '/todo', labelKey: 'nav.todo', icon: CheckCircleIcon, roles: ['agent', 'admin'] },
-  { to: '/customers', labelKey: 'nav.customers', icon: UsersIcon, roles: ['agent', 'admin'] },
+  { to: '/customers', labelKey: 'nav.customers', icon: UsersIcon, roles: ['agent', 'admin'], permission: 'allow_agent_view_customers' },
   { to: '/agents', labelKey: 'nav.agents', icon: BadgeIcon, roles: ['admin'] },
-  { to: '/reports', labelKey: 'nav.reports', icon: ReportsIcon, roles: ['admin'] },
+  // Visible to whoever holds the view-reports permission rather than to admins
+  // by role, so a role can grant it to an agent — or withhold it from a
+  // limited admin. `roles` still narrows it to staff.
+  { to: '/reports', labelKey: 'nav.reports', icon: ReportsIcon, roles: ['agent', 'admin'], permission: 'allow_agent_view_reports' },
 ]
 
 // Sits with Logout in the pinned bottom group rather than at the end of the nav list.
@@ -64,6 +68,7 @@ function NavItem({ item, open, onNavigate, t }) {
 
 export default function Sidebar({ open = true, onNavigate }) {
   const { user, logout } = useAuth()
+  const permissions = usePermissions()
   const { t } = useI18n()
   const navigate = useNavigate()
 
@@ -86,7 +91,16 @@ export default function Sidebar({ open = true, onNavigate }) {
         <div className="mb-5 px-2">
           <Logo />
         </div>
-        {NAV_ITEMS.filter((item) => item.roles.includes(user?.role)).map((item) => (
+        {NAV_ITEMS.filter(
+          (item) =>
+            item.roles.includes(user?.role) &&
+            // Section permissions narrow staff only. A customer holds no staff
+            // permissions at all, so testing them here would hide their own
+            // Tickets link — `roles` is what governs them.
+            (!item.permission ||
+              user?.role === 'customer' ||
+              permissions[item.permission])
+        ).map((item) => (
           <NavItem key={item.to} item={item} open={open} onNavigate={onNavigate} t={t} />
         ))}
 

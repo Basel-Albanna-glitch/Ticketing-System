@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 router = DefaultRouter()
+router.register('roles', views.StaffRoleViewSet, basename='staff-role')
 router.register('users/agents', views.AgentViewSet, basename='agent')
 router.register('users/customers', views.CustomerViewSet, basename='customer')
 router.register('software-types', views.SoftwareTypeViewSet, basename='software-type')

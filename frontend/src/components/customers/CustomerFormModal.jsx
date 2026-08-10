@@ -181,7 +181,13 @@ export default function CustomerFormModal({ open, onClose, onCreated, customer =
   const avatarTargetId = customer?.id || createdId
 
   return (
-    <Modal open={open} onClose={onClose} title={isEdit ? t('customers.editCustomer') : t('customers.addCustomer')} size="xl">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={isEdit ? t('customers.editCustomer') : t('customers.addCustomer')}
+      size="xl"
+      dismissOnBackdrop={false}
+    >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {canSetAvatar && (
           <AvatarUploader

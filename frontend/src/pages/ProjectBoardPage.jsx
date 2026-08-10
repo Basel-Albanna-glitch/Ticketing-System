@@ -23,7 +23,7 @@ import ProjectRemark from '../components/projects/ProjectRemark'
 import TaskList from '../components/projects/TaskList'
 import { isOverdue } from '../components/projects/TaskCard'
 import { useAuth } from '../auth/useAuth'
-import { useTicketSettings } from '../hooks/useTicketSettings'
+import { usePermissions } from '../auth/usePermissions'
 import {
   useClaimProject,
   useDeleteProject,
@@ -59,7 +59,7 @@ export default function ProjectBoardPage() {
   const deleteProject = useDeleteProject()
   const claimProject = useClaimProject()
   const updateProject = useUpdateProject(id)
-  const { data: ticketSettings } = useTicketSettings()
+  const permissions = usePermissions()
 
   if (isLoadingProject || isLoadingTasks) {
     return (
@@ -83,7 +83,7 @@ export default function ProjectBoardPage() {
   // Claiming is always offered; dropping the work needs the permission, so the
   // button disappears rather than failing when an agent is already on it.
   const canClaimToggle =
-    !isMine || isAdmin || !!ticketSettings?.allow_agent_unassign_projects
+    !isMine || !!permissions.allow_agent_unassign_projects
   const overrunsEnd = Boolean(
     project?.last_task_due && project?.end_date && project.last_task_due > project.end_date
   )

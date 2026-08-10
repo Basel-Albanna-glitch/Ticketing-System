@@ -35,6 +35,7 @@ import {
   UsersIcon,
 } from '../components/ui/icons'
 import { useAuth } from '../auth/useAuth'
+import { usePermissions } from '../auth/usePermissions'
 import { useAgents } from '../hooks/useAgents'
 import { useCustomers } from '../hooks/useCustomers'
 import {
@@ -49,7 +50,6 @@ import {
   useUpdateTicketStatus,
 } from '../hooks/useTicket'
 import { useArticles } from '../hooks/useArticles'
-import { useTicketSettings } from '../hooks/useTicketSettings'
 import { useI18n } from '../i18n/useI18n'
 
 // Local calendar date (YYYY-MM-DD) for the current day — for comparing against start_date.
@@ -129,7 +129,7 @@ export default function TicketDetailPage() {
   const { data: activities } = useTicketActivity(id)
   const { data: agents } = useAgents({ includeAdmins: true })
   const { data: customers } = useCustomers({ enabled: user?.role !== 'customer' })
-  const { data: ticketSettings } = useTicketSettings()
+  const permissions = usePermissions()
   const updateStatus = useUpdateTicketStatus(id)
   const assignTicket = useAssignTicket(id)
   const setDeadline = useSetTicketDeadline(id)
@@ -203,9 +203,7 @@ export default function TicketDetailPage() {
   // ticket only when an admin has enabled that permission; customers never can.
   // Admins can always reopen/edit.
   const closedLocked =
-    ticket.status === 'closed' &&
-    !isAdmin &&
-    !(user?.role === 'agent' && ticketSettings?.allow_agent_edit_after_close)
+    ticket.status === 'closed' && !permissions.allow_agent_edit_after_close
   // Admin, the assigned agent, or an added collaborator may edit; other agents are
   // read-only — and nobody but an admin may edit once the ticket is closed & locked.
   const canEdit = (isAdmin || isAssignedToMe || isCollaborator) && !closedLocked
@@ -213,7 +211,7 @@ export default function TicketDetailPage() {
   // Admins always; the assigned agent only when the delete permission is enabled — and,
   // like every other change, never once the ticket is closed & locked.
   const canDelete =
-    isAdmin || (isAssignedToMe && ticketSettings?.allow_agent_delete && !closedLocked)
+    (isAdmin || isAssignedToMe) && !!permissions.allow_agent_delete && !closedLocked
   // Watching agent = an agent who is neither assigned nor a collaborator (read-only view).
   const isWatchingAgent = user?.role === 'agent' && !isAssignedToMe && !isCollaborator
   // Customers reply on their own tickets; admins, the assigned agent, and collaborators too.
@@ -225,12 +223,12 @@ export default function TicketDetailPage() {
   // A closed & locked ticket blocks these too — only an admin can change a closed ticket.
   const canSelfAssign =
     user?.role === 'agent' &&
-    ticketSettings?.allow_agent_self_assign &&
+    permissions.allow_agent_self_assign &&
     ticket.assigned_agent === null &&
     !closedLocked
   const canReassign =
     user?.role === 'agent' &&
-    ticketSettings?.allow_agent_reassign &&
+    permissions.allow_agent_reassign &&
     isAssignedToMe &&
     !closedLocked
   // Guest-origin tickets carry contact details even after being linked to a customer.
@@ -240,8 +238,7 @@ export default function TicketDetailPage() {
   // Linking/changing a guest ticket's customer follows its own permission: admins always,
   // agents only when it's enabled — and never on a closed & locked ticket.
   const canManageTicketCustomer =
-    isAdmin ||
-    (user?.role === 'agent' && ticketSettings?.allow_agent_link_customer && !closedLocked)
+    !!permissions.allow_agent_link_customer && !closedLocked
   const canLinkCustomer = canManageTicketCustomer && isGuestOrigin && !ticket.customer
   const canUnlinkCustomer = canManageTicketCustomer && isGuestOrigin && Boolean(ticket.customer)
   const hasActions =

@@ -25,7 +25,7 @@ import { useI18n } from '../i18n/useI18n'
 // Dashboard shortcuts, per role.
 const ADMIN_QUICK_ACTIONS = [
   { to: '/tickets/new', label: 'dashboard.qa.createTicket', icon: PlusIcon },
-  { to: '/customers?new=1', label: 'dashboard.qa.addUser', icon: UsersIcon },
+  { to: '/customers?new=1', label: 'dashboard.qa.addCustomer', icon: UsersIcon },
   { to: '/agents?new=1', label: 'dashboard.qa.addAgent', icon: BadgeIcon },
   { to: '/settings?section=categories', label: 'dashboard.qa.manageCategories', icon: FolderOpenIcon },
   { to: '/reports', label: 'dashboard.qa.viewReports', icon: ReportsIcon },

@@ -56,7 +56,13 @@ export default function EditTicketModal({ open, onClose, ticket, id }) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={t('tickets.editDetails')} size="lg">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t('tickets.editDetails')}
+      size="lg"
+      dismissOnBackdrop={false}
+    >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <Input label={t('field.subject')} value={subject} onChange={(e) => setSubject(e.target.value)} required />
         <Textarea

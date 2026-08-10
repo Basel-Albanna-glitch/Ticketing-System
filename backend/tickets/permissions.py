@@ -33,18 +33,20 @@ class CanEditTicket(BasePermission):
 
 
 class CanDeleteTicket(BasePermission):
-    """Delete a ticket: always allowed for admins. The assigned agent may delete only when
-    the 'agents can delete tickets' permission is enabled in settings. Collaborators and
-    other agents can never delete. Deleting a ticket removes its comments, attachments and
-    activity along with it."""
+    """Delete a ticket: admins, and the assigned agent when the 'agents can delete
+    tickets' permission is granted. Collaborators and other agents never can.
+    Deleting a ticket removes its comments, attachments and activity with it.
+
+    Admins go through the same flag rather than being waved through, so a role
+    that withholds deletion actually withholds it from a limited admin too. An
+    admin with no role holds every flag, so this stays 'always' for them."""
 
     def has_object_permission(self, request, view, obj):
         user = request.user
         if not user or not user.is_authenticated:
             return False
-        if user.role == User.Role.ADMIN:
-            return True
-        if user.role == User.Role.AGENT and user == obj.assigned_agent:
-            from .models import TicketSettings
-            return TicketSettings.get_solo().allow_agent_delete
+        if user.role == User.Role.ADMIN or (
+            user.role == User.Role.AGENT and user == obj.assigned_agent
+        ):
+            return user.has_staff_permission('allow_agent_delete')
         return False

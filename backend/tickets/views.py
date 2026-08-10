@@ -1,7 +1,12 @@
 import secrets
 
 from accounts.models import CustomerBranch, User
-from accounts.permissions import IsAdmin, IsAdminOrAgent
+from accounts.permissions import (
+    CanViewSection,
+    HasStaffPermission,
+    IsAdmin,
+    IsAdminOrAgent,
+)
 from django.conf import settings
 from django.http import HttpResponse
 from openpyxl import Workbook
@@ -157,9 +162,7 @@ class ArticleViewSet(viewsets.ModelViewSet):
         # "manage knowledge base" permission has been granted to agents in settings.
         if self.action in ('list', 'retrieve'):
             return [AllowAny()]
-        if TicketSettings.get_solo().allow_agent_manage_kb:
-            return [IsAuthenticated(), IsAdminOrAgent()]
-        return [IsAuthenticated(), IsAdmin()]
+        return [IsAuthenticated(), HasStaffPermission('allow_agent_manage_kb')]
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user if self.request.user.is_authenticated else None)
@@ -232,6 +235,15 @@ class TicketViewSet(viewsets.ModelViewSet):
         return TicketDetailSerializer
 
     def get_permissions(self):
+        # Staff who cannot see the tickets section are refused every action on
+        # it; customers pass this and are then held to the per-object rules,
+        # which is what keeps them to their own tickets.
+        return [
+            CanViewSection('allow_agent_view_tickets'),
+            *self._action_permissions(),
+        ]
+
+    def _action_permissions(self):
         # Read/watch: any agent, admin, or the ticket's own customer.
         if self.action in ('retrieve', 'comments', 'activity'):
             return [IsAuthenticated(), CanViewTicket()]
@@ -263,9 +275,10 @@ class TicketViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if ticket.status != Ticket.Status.CLOSED:
             return None
-        if user.role == User.Role.ADMIN:
-            return None
-        if user.role == User.Role.AGENT and TicketSettings.get_solo().allow_agent_edit_after_close:
+        # Admins are held to the same flag rather than waved through: one with no
+        # role holds every permission and is unaffected, while a role that
+        # withholds this genuinely withholds it from a limited admin.
+        if user.has_staff_permission('allow_agent_edit_after_close'):
             return None
         return Response(
             {'detail': 'This ticket is closed. Ask an admin to reopen it or enable '
@@ -513,7 +526,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         if locked:
             return locked
         # Governed by the "link ticket customer" permission: admins always, agents when enabled.
-        if request.user.role == User.Role.AGENT and not TicketSettings.get_solo().allow_agent_link_customer:
+        if request.user.role == User.Role.AGENT and not request.user.has_staff_permission('allow_agent_link_customer'):
             return Response(
                 {'detail': 'You are not permitted to change a ticket\'s customer.'},
                 status=status.HTTP_403_FORBIDDEN,
@@ -591,7 +604,6 @@ class TicketViewSet(viewsets.ModelViewSet):
             return locked
 
         if request.user.role == User.Role.AGENT:
-            ticket_settings = TicketSettings.get_solo()
             target = request.data.get('assigned_agent')
             is_release = target in (None, '', 'null')
             is_self = target in (request.user.id, str(request.user.id))
@@ -605,7 +617,7 @@ class TicketViewSet(viewsets.ModelViewSet):
                 )
             elif is_self:
                 # Claiming for self — governed by the self-assign permission.
-                if not ticket_settings.allow_agent_self_assign:
+                if not request.user.has_staff_permission('allow_agent_self_assign'):
                     return Response(
                         {'detail': 'Agents are not permitted to assign tickets.'},
                         status=status.HTTP_403_FORBIDDEN,
@@ -618,7 +630,7 @@ class TicketViewSet(viewsets.ModelViewSet):
             else:
                 # Handing off to a different agent — governed by the reassign permission,
                 # and only allowed for the agent the ticket is currently assigned to.
-                if not ticket_settings.allow_agent_reassign:
+                if not request.user.has_staff_permission('allow_agent_reassign'):
                     return Response(
                         {'detail': 'Agents are not permitted to reassign tickets to others.'},
                         status=status.HTTP_403_FORBIDDEN,

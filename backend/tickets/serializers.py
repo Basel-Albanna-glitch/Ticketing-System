@@ -336,7 +336,7 @@ class TicketSettingsSerializer(serializers.ModelSerializer):
             'allow_agent_edit_customers', 'allow_agent_delete', 'allow_agent_link_customer',
             'allow_agent_manage_kb', 'allow_agent_assign_projects',
             'allow_agent_unassign_projects', 'allow_agent_assign_tasks',
-            'allow_agent_create_customers',
+            'allow_agent_create_customers', 'allow_agent_view_reports',
         ]
 
 

@@ -9,7 +9,7 @@ import Textarea from '../ui/Textarea'
 import { TrashIcon } from '../ui/icons'
 import { useAgents } from '../../hooks/useAgents'
 import { useAuth } from '../../auth/useAuth'
-import { useTicketSettings } from '../../hooks/useTicketSettings'
+import { usePermissions } from '../../auth/usePermissions'
 import { useCreateTask, useDeleteTask, useUpdateTask } from '../../hooks/useTasks'
 import { useI18n } from '../../i18n/useI18n'
 
@@ -43,11 +43,10 @@ export default function TaskFormModal({
   const { t } = useI18n()
   const { data: agents } = useAgents({ includeAdmins: true })
   const { user } = useAuth()
-  const { data: ticketSettings } = useTicketSettings()
+  const permissions = usePermissions()
   // Putting yourself on a task never needs permission; the switch only governs
   // involving other people, so the picker always shows and just narrows.
-  const isAdmin = user?.role === 'admin'
-  const canAssignOthers = isAdmin || !!ticketSettings?.allow_agent_assign_tasks
+  const canAssignOthers = !!permissions.allow_agent_assign_tasks
   const createTask = useCreateTask(projectId)
   const updateTask = useUpdateTask(projectId)
   const deleteTask = useDeleteTask(projectId)
@@ -77,6 +76,29 @@ export default function TaskFormModal({
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
+    // A title of only digits or punctuation titles nothing — the same rule the
+    // ticket subject and project name use. \p{L} keeps it true in any language.
+    if (!/\p{L}/u.test(form.title)) {
+      setError(t('projects.taskTitleMustContainText'))
+      return
+    }
+    // Mirrors the serializer, so the round trip is not needed to learn it.
+    if (form.start_date && form.due_date && form.start_date > form.due_date) {
+      setError(t('projects.taskDateOrder'))
+      return
+    }
+    // Required when adding, not when editing — older tasks predate the rule and
+    // must stay saveable. `task` is absent exactly when this is a new one.
+    if (!task) {
+      if (form.assignee_ids.length === 0) {
+        setError(t('projects.taskAssigneeRequired'))
+        return
+      }
+      if (!form.due_date) {
+        setError(t('projects.taskDueDateRequired'))
+        return
+      }
+    }
     const payload = {
       title: form.title,
       description: form.description,
@@ -95,9 +117,16 @@ export default function TaskFormModal({
       }
       onClose()
     } catch (err) {
-      const data = err?.response?.data
-      const message = data ? Object.values(data).flat().join(' ') : t('projects.saveTaskFailed')
-      setError(message)
+      // Keep the field names: "start_date: ..." says where to look, where the
+      // bare message alone left you hunting for which input it meant.
+      const detail = err?.response?.data
+      const fieldErrors =
+        detail && typeof detail === 'object' && !Array.isArray(detail)
+          ? Object.entries(detail)
+              .map(([field, messages]) => `${field}: ${[].concat(messages).join(' ')}`)
+              .join(' · ')
+          : ''
+      setError(fieldErrors || t('projects.saveTaskFailed'))
     }
   }
 
@@ -112,6 +141,7 @@ export default function TaskFormModal({
       open={open}
       onClose={onClose}
       title={canEdit ? (task ? t('projects.editTask') : t('projects.newTask')) : t('projects.viewTask')}
+      dismissOnBackdrop={false}
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {!canEdit && (
@@ -176,12 +206,14 @@ export default function TaskFormModal({
             label={t('projects.fromDate')}
             type="date"
             value={form.start_date}
+            max={form.due_date || undefined}
             onChange={(e) => setForm({ ...form, start_date: e.target.value })}
           />
           <Input
             label={t('projects.toDate')}
             type="date"
             value={form.due_date}
+            min={form.start_date || undefined}
             onChange={(e) => setForm({ ...form, due_date: e.target.value })}
           />
         </div>

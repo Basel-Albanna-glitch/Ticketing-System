@@ -13,7 +13,12 @@ export default function ProjectCard({ project, onEdit }) {
   function handleDelete(event) {
     event.stopPropagation()
     if (!window.confirm(`${t('projects.deleteProjectConfirm1')} "${project.name}" ${t('projects.deleteProjectConfirm2')}`)) return
-    deleteProject.mutate(project.id)
+    // A refusal has to be spoken: the button lives on a card with no error area,
+    // so without this the click would simply appear to do nothing.
+    deleteProject.mutate(project.id, {
+      onError: (err) =>
+        window.alert(err?.response?.data?.detail || t('projects.deleteFailed')),
+    })
   }
 
   // The card itself navigates to the board, so the action buttons must not bubble.
@@ -40,7 +45,9 @@ export default function ProjectCard({ project, onEdit }) {
           <PencilIcon className="h-4 w-4" />
         </button>
         )}
-        {project.can_edit !== false && (
+        {/* can_delete is separate from can_edit: a closed project stays editable
+            by an admin but can never be deleted until it is reopened. */}
+        {project.can_delete !== false && (
         <button
           type="button"
           onClick={handleDelete}

@@ -20,9 +20,16 @@ from .models import (
     CustomerLicense,
     NotificationPreference,
     SoftwareType,
+    StaffRole,
     User,
 )
-from .permissions import IsAdmin, IsAdminOrAgent
+from .permissions import (
+    CanViewSection,
+    HasStaffPermission,
+    IsAdmin,
+    IsAdminOrAgent,
+    IsFullAdmin,
+)
 from .serializers import (
     AdminUserSerializer,
     AgentCreateUpdateSerializer,
@@ -34,6 +41,7 @@ from .serializers import (
     NotificationPreferenceSerializer,
     RegisterSerializer,
     SoftwareTypeSerializer,
+    StaffRoleSerializer,
 )
 
 
@@ -180,14 +188,50 @@ class NotificationPreferenceView(generics.RetrieveUpdateAPIView):
         return obj
 
 
+class StaffRoleViewSet(viewsets.ModelViewSet):
+    """Named permission bundles. Managing them is always admin-only, and only for
+    an admin who has not themselves been restricted by a role — otherwise a
+    limited admin could simply grant themselves anything they were denied."""
+
+    serializer_class = StaffRoleSerializer
+    pagination_class = None
+
+    def get_permissions(self):
+        return [IsAuthenticated(), IsFullAdmin()]
+
+    def get_queryset(self):
+        return StaffRole.objects.annotate(user_count=Count('users')).order_by('name')
+
+    def destroy(self, request, *args, **kwargs):
+        role = self.get_object()
+        # Holders fall back to unrestricted access (admins) or the site-wide
+        # settings (agents), so deleting a role can only ever widen access. Say
+        # how many people that affects instead of doing it silently.
+        holders = role.users.count()
+        response = super().destroy(request, *args, **kwargs)
+        if holders:
+            return Response(
+                {'detail': f'Role deleted. {holders} user(s) reverted to default permissions.'},
+                status=status.HTTP_200_OK,
+            )
+        return response
+
+
 class AgentViewSet(viewsets.ModelViewSet):
     pagination_class = None
 
     def get_queryset(self):
         # Assignment dropdowns pass ?include_admins=1 so an admin can take work on
         # themselves. The agent-management page omits it and still lists agents only.
+        #
+        # That filter is about what the *list* shows. Detail routes always include
+        # admins: otherwise addressing one by id 404s, and an admin could never be
+        # given a role.
         roles = [User.Role.AGENT]
-        if self.request.query_params.get('include_admins') in ('1', 'true', 'True'):
+        if (
+            self.action != 'list'
+            or self.request.query_params.get('include_admins') in ('1', 'true', 'True')
+        ):
             roles.append(User.Role.ADMIN)
         return User.objects.filter(role__in=roles).annotate(
             assigned_count=Count('tickets_assigned'),
@@ -222,21 +266,22 @@ class CustomerViewSet(viewsets.ModelViewSet):
         return CustomerSerializer
 
     def get_permissions(self):
-        from tickets.models import TicketSettings
+        return [
+            CanViewSection('allow_agent_view_customers'),
+            *self._action_permissions(),
+        ]
 
+    def _action_permissions(self):
         # Deleting a customer is always admin-only: an accidental create is easy
         # to undo, a delete takes their tickets and history with it.
         if self.action == 'destroy':
             return [IsAuthenticated(), IsAdmin()]
-        # Creating and editing may each be opened up to agents in settings.
+        # Creating and editing may each be opened up by the caller's role, or by
+        # the site-wide settings for anyone without one.
         if self.action == 'create':
-            if TicketSettings.get_solo().allow_agent_create_customers:
-                return [IsAuthenticated(), IsAdminOrAgent()]
-            return [IsAuthenticated(), IsAdmin()]
+            return [IsAuthenticated(), HasStaffPermission('allow_agent_create_customers')]
         if self.action in ('update', 'partial_update'):
-            if TicketSettings.get_solo().allow_agent_edit_customers:
-                return [IsAuthenticated(), IsAdminOrAgent()]
-            return [IsAuthenticated(), IsAdmin()]
+            return [IsAuthenticated(), HasStaffPermission('allow_agent_edit_customers')]
         return [IsAuthenticated(), IsAdminOrAgent()]
 
     def destroy(self, request, *args, **kwargs):

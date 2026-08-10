@@ -13,6 +13,7 @@ export default {
     'settings.nav.categories': 'Categories',
     'settings.nav.softwareTypes': 'Software types',
     'settings.nav.userRoles': 'User roles',
+    'settings.nav.roles': 'Permission roles',
 
     // Profile section
     'settings.profile.title': 'Profile settings',
@@ -61,6 +62,25 @@ export default {
     'settings.notifications.noEmail':
       'Your account has no email address, so none of these can be sent. Add one under Profile settings.',
 
+    // Roles section
+    'settings.roles.title': 'Permission roles',
+    'settings.roles.subtitle':
+      'Named sets of permissions you can assign to staff. A role replaces the defaults above for whoever holds it; anyone without one falls back to those defaults.',
+    'settings.roles.addRole': 'Add role',
+    'settings.roles.editRole': 'Edit role',
+    'settings.roles.name': 'Role name',
+    'settings.roles.description': 'Description',
+    'settings.roles.permissionsHint':
+      'Everything this role allows. A role assigned to an admin restricts them to exactly these.',
+    'settings.roles.grantedCount': '{n} permission(s) granted',
+    'settings.roles.userCount': '{n} user(s)',
+    'settings.roles.noPermissions': 'No permissions granted',
+    'settings.roles.empty': 'No roles yet. Staff use the default permissions above.',
+    'settings.roles.errorSave': 'Could not save the role.',
+    'settings.roles.confirmDelete': 'Delete the role "{name}"?',
+    'settings.roles.confirmDeleteInUse':
+      'Delete the role "{name}"? {n} user(s) hold it and will revert to the default permissions.',
+
     // Permissions section
     'settings.permissions.title': 'Permissions',
     'settings.permissions.description':
@@ -71,6 +91,19 @@ export default {
     'settings.permissions.createCustomers.label': 'Allow agents to add customers',
     'settings.permissions.createCustomers.hint':
       'Deleting a customer stays admin-only either way — an accidental add is easy to fix, a delete takes their tickets with it.',
+    'settings.permissions.viewTickets.label': 'Allow agents to open the Tickets section',
+    'settings.permissions.viewTickets.hint':
+      'Turning this off hides Tickets entirely for them. Customers always keep access to their own tickets.',
+    'settings.permissions.viewCustomers.label': 'Allow agents to open the Customers section',
+    'settings.permissions.viewCustomers.hint':
+      'Turning this off hides Customers. Note the new-ticket form picks a customer, so an agent raising tickets will usually need this.',
+    'settings.permissions.viewProjects.label': 'Allow agents to open the Projects section',
+    'settings.permissions.viewProjects.hint':
+      'Covers projects and their tasks. The separate To-do list is unaffected.',
+    'settings.permissions.group.reports': 'Reports',
+    'settings.permissions.viewReports.label': 'Allow agents to view reports',
+    'settings.permissions.viewReports.hint':
+      'Reports aggregate across every customer and agent, which is a much wider view than the tickets an agent works day to day.',
     'settings.permissions.group.kb': 'Knowledge base',
     'settings.permissions.group.projects': 'Projects',
     'settings.permissions.assignProjects.label':
@@ -155,6 +188,7 @@ export default {
     'settings.nav.categories': 'الفئات',
     'settings.nav.softwareTypes': 'أنواع البرامج',
     'settings.nav.userRoles': 'أدوار المستخدمين',
+    'settings.nav.roles': 'أدوار الصلاحيات',
 
     // Profile section
     'settings.profile.title': 'إعدادات الملف الشخصي',
@@ -204,6 +238,25 @@ export default {
     'settings.notifications.noEmail':
       'لا يوجد بريد إلكتروني في حسابك، لذا لا يمكن إرسال أي منها. أضِف واحدًا من إعدادات الملف الشخصي.',
 
+    // Roles section
+    'settings.roles.title': 'أدوار الصلاحيات',
+    'settings.roles.subtitle':
+      'مجموعات صلاحيات مُسمّاة يمكنك إسنادها للموظفين. يحلّ الدور محلّ الإعدادات الافتراضية أعلاه لمن يحمله، ومن لا يحمل دوراً تُطبَّق عليه تلك الإعدادات.',
+    'settings.roles.addRole': 'إضافة دور',
+    'settings.roles.editRole': 'تعديل الدور',
+    'settings.roles.name': 'اسم الدور',
+    'settings.roles.description': 'الوصف',
+    'settings.roles.permissionsHint':
+      'كل ما يسمح به هذا الدور. الدور المُسنَد إلى مشرف يقصر صلاحياته على هذه تحديداً.',
+    'settings.roles.grantedCount': 'الصلاحيات الممنوحة: {n}',
+    'settings.roles.userCount': 'عدد المستخدمين: {n}',
+    'settings.roles.noPermissions': 'لا توجد صلاحيات ممنوحة',
+    'settings.roles.empty': 'لا توجد أدوار بعد. يستخدم الموظفون الصلاحيات الافتراضية أعلاه.',
+    'settings.roles.errorSave': 'تعذّر حفظ الدور.',
+    'settings.roles.confirmDelete': 'حذف الدور "{name}"؟',
+    'settings.roles.confirmDeleteInUse':
+      'حذف الدور "{name}"؟ يحمله {n} مستخدم/مستخدمين وسيعودون إلى الصلاحيات الافتراضية.',
+
     // Permissions section
     'settings.permissions.title': 'الصلاحيات',
     'settings.permissions.description': 'تحكّم فيما يُسمح للوكلاء فعله. المشرفون لديهم صلاحية كاملة دائماً.',
@@ -213,6 +266,19 @@ export default {
     'settings.permissions.createCustomers.label': 'السماح للوكلاء بإضافة العملاء',
     'settings.permissions.createCustomers.hint':
       'يبقى حذف العميل للمدراء فقط في الحالتين — فالإضافة الخاطئة يسهل تصحيحها، أما الحذف فيأخذ معه تذاكر العميل.',
+    'settings.permissions.viewTickets.label': 'السماح للوكلاء بفتح قسم التذاكر',
+    'settings.permissions.viewTickets.hint':
+      'إيقاف هذا يخفي التذاكر عنهم تماماً. يحتفظ العملاء دائماً بالوصول إلى تذاكرهم.',
+    'settings.permissions.viewCustomers.label': 'السماح للوكلاء بفتح قسم العملاء',
+    'settings.permissions.viewCustomers.hint':
+      'إيقاف هذا يخفي العملاء. لاحظ أن نموذج التذكرة الجديدة يتطلب اختيار عميل، لذا يحتاجه الوكيل الذي ينشئ التذاكر عادةً.',
+    'settings.permissions.viewProjects.label': 'السماح للوكلاء بفتح قسم المشاريع',
+    'settings.permissions.viewProjects.hint':
+      'يشمل المشاريع ومهامها. قائمة المهام المنفصلة غير متأثرة.',
+    'settings.permissions.group.reports': 'التقارير',
+    'settings.permissions.viewReports.label': 'السماح للوكلاء بعرض التقارير',
+    'settings.permissions.viewReports.hint':
+      'تجمع التقارير بيانات كل العملاء والوكلاء، وهي نظرة أوسع بكثير من التذاكر التي يعمل عليها الوكيل يومياً.',
     'settings.permissions.group.kb': 'قاعدة المعرفة',
     'settings.permissions.group.projects': 'المشاريع',
     'settings.permissions.assignProjects.label':

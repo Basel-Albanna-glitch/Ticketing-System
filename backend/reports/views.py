@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from accounts.models import CustomerLicense, User
-from accounts.permissions import IsAdmin
+from accounts.permissions import HasStaffPermission
 from django.db.models import Avg, Count, DurationField, ExpressionWrapper, F, Q
 from django.db.models.functions import TruncDate, TruncMonth, TruncWeek
 from django.http import HttpResponse
@@ -241,7 +241,7 @@ def delivery_payload(date_from, date_to):
 
 
 class ReportsSummaryView(APIView):
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, HasStaffPermission('allow_agent_view_reports')]
 
     def get(self, request):
         date_from, date_to = date_range(request)
@@ -379,7 +379,7 @@ def license_rows():
 
 
 class AgentPerformanceView(APIView):
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, HasStaffPermission('allow_agent_view_reports')]
 
     def get(self, request):
         date_from, date_to = date_range(request)
@@ -387,7 +387,7 @@ class AgentPerformanceView(APIView):
 
 
 class CustomerActivityView(APIView):
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, HasStaffPermission('allow_agent_view_reports')]
 
     def get(self, request):
         date_from, date_to = date_range(request)
@@ -395,7 +395,7 @@ class CustomerActivityView(APIView):
 
 
 class LicenseReportView(APIView):
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, HasStaffPermission('allow_agent_view_reports')]
 
     def get(self, request):
         rows = license_rows()
@@ -428,7 +428,7 @@ def _write_sheet(workbook, title, headers, rows, first):
 class ReportsExportView(APIView):
     """Download the whole report for the current range as a multi-sheet .xlsx."""
 
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, HasStaffPermission('allow_agent_view_reports')]
 
     def get(self, request):
         date_from, date_to = date_range(request)

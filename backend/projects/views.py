@@ -1,5 +1,5 @@
 from accounts.models import User
-from accounts.permissions import IsAdminOrAgent
+from accounts.permissions import CanViewSection, IsAdminOrAgent
 from django.db import transaction
 from django.db.models import Count, Max, Q
 from django.utils.dateparse import parse_date
@@ -9,7 +9,6 @@ from rest_framework.decorators import action
 from rest_framework.permissions import SAFE_METHODS, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 
-from tickets.models import TicketSettings
 
 from .models import Project, Task, TodoItem
 from .serializers import ProjectSerializer, TaskSerializer, TodoItemSerializer
@@ -67,7 +66,12 @@ class IsStaffOrReadOnlyCustomer(IsAdminOrAgent):
 
 class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
-    permission_classes = [IsAuthenticated, IsStaffOrReadOnlyCustomer, CanEditAssignedWork]
+    permission_classes = [
+        IsAuthenticated,
+        CanViewSection('allow_agent_view_projects'),
+        IsStaffOrReadOnlyCustomer,
+        CanEditAssignedWork,
+    ]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['status', 'customer', 'assignees', 'branch']
     search_fields = ['name', 'description']
@@ -96,6 +100,28 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
+    def destroy(self, request, *args, **kwargs):
+        """A closed project cannot be deleted.
+
+        Closing is how finished work is archived, and deleting takes its tasks and
+        history with it — so the two must not be one click apart. This is not a
+        dead end: an admin can reopen the project and then delete it, which makes
+        discarding a delivery record a deliberate two-step act rather than an
+        accident.
+        """
+        project = self.get_object()
+        if project.status == Project.Status.CLOSED:
+            return Response(
+                {
+                    'detail': (
+                        'This project is closed and cannot be deleted. Reopen it '
+                        'first if you really mean to remove it.'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=True, methods=['post'])
     def claim(self, request, pk=None):
         """Add or remove yourself from a project's assignees.
@@ -114,7 +140,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             # but dropping it can leave a project quietly unowned.
             if (
                 user.role == User.Role.AGENT
-                and not TicketSettings.get_solo().allow_agent_unassign_projects
+                and not user.has_staff_permission('allow_agent_unassign_projects')
             ):
                 return Response(
                     {'detail': 'Only admins may remove you from a project.'},
@@ -161,7 +187,12 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
 class TaskViewSet(viewsets.ModelViewSet):
     serializer_class = TaskSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrAgent, CanEditAssignedWork]
+    permission_classes = [
+        IsAuthenticated,
+        CanViewSection('allow_agent_view_projects'),
+        IsAdminOrAgent,
+        CanEditAssignedWork,
+    ]
     pagination_class = None
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['project', 'status', 'priority', 'assignees']

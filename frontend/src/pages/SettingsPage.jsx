@@ -32,6 +32,7 @@ import Spinner from '../components/ui/Spinner'
 import PriorityBadge from '../components/tickets/PriorityBadge'
 import CategoryCascader from '../components/tickets/CategoryCascader'
 import { useAuth } from '../auth/useAuth'
+import { usePermissions } from '../auth/usePermissions'
 import {
   useChangePassword,
   useNotificationPreferences,
@@ -68,6 +69,8 @@ import { buildCategoryTree, getSelfAndDescendantIds } from '../utils/categoryTre
 import { sortRows, useTableSort } from '../utils/tableSort'
 import { usePagedRows } from '../utils/tablePage'
 import { useI18n } from '../i18n/useI18n'
+import { PERMISSION_FIELDS, PERMISSION_GROUPS } from '../constants/permissions'
+import RolesSection from '../components/settings/RolesSection'
 
 function ProfileSection() {
   const { t } = useI18n()
@@ -586,45 +589,6 @@ function SoftwareTypesSection() {
   )
 }
 
-// Agent permission toggles, grouped by area. `i18n` maps to the
-// settings.permissions.<i18n>.label / .hint translation keys.
-const PERMISSION_GROUPS = [
-  {
-    icon: TicketIcon,
-    titleKey: 'settings.permissions.group.tickets',
-    fields: [
-      { key: 'allow_agent_self_assign', i18n: 'selfAssign' },
-      { key: 'allow_agent_reassign', i18n: 'reassign' },
-      { key: 'allow_agent_edit_after_close', i18n: 'editAfterClose' },
-      { key: 'allow_agent_delete', i18n: 'deleteTicket' },
-    ],
-  },
-  {
-    icon: UsersIcon,
-    titleKey: 'settings.permissions.group.customers',
-    fields: [
-      { key: 'allow_agent_create_customers', i18n: 'createCustomers' },
-      { key: 'allow_agent_edit_customers', i18n: 'editCustomers' },
-      { key: 'allow_agent_link_customer', i18n: 'linkCustomer' },
-    ],
-  },
-  {
-    icon: BookIcon,
-    titleKey: 'settings.permissions.group.kb',
-    fields: [{ key: 'allow_agent_manage_kb', i18n: 'manageKb' }],
-  },
-  {
-    icon: BoardIcon,
-    titleKey: 'settings.permissions.group.projects',
-    fields: [
-      { key: 'allow_agent_assign_projects', i18n: 'assignProjects' },
-      { key: 'allow_agent_unassign_projects', i18n: 'unassignProjects' },
-      { key: 'allow_agent_assign_tasks', i18n: 'assignTasks' },
-    ],
-  },
-]
-
-const PERMISSION_FIELDS = PERMISSION_GROUPS.flatMap((g) => g.fields)
 
 function PermissionsSection() {
   const { t } = useI18n()
@@ -982,17 +946,21 @@ function ArticlesSection() {
 export default function SettingsPage() {
   const { t } = useI18n()
   const { user } = useAuth()
-  const { data: ticketSettings } = useTicketSettings()
+  const permissions = usePermissions()
   const [searchParams] = useSearchParams()
   const isAdmin = user?.role === 'admin'
+  // Editing roles is restricted to an admin who has not themselves been
+  // narrowed by one, matching IsFullAdmin on the API.
+  const isFullAdmin = Boolean(user?.is_full_admin)
   // Agents can manage the knowledge base when an admin has granted the permission.
-  const canManageKb = isAdmin || (user?.role === 'agent' && ticketSettings?.allow_agent_manage_kb)
+  const canManageKb = !!permissions.allow_agent_manage_kb
 
   const sections = [
     { id: 'profile', label: t('settings.nav.profile'), icon: UserIcon, Component: ProfileSection },
     { id: 'security', label: t('settings.nav.security'), icon: LockIcon, Component: PasswordSection },
     { id: 'notifications', label: t('settings.nav.notifications'), icon: BellIcon, Component: NotificationSection },
     isAdmin && { id: 'permissions', label: t('settings.nav.permissions'), icon: BadgeIcon, Component: PermissionsSection },
+    isFullAdmin && { id: 'roles', label: t('settings.nav.roles'), icon: LockIcon, Component: RolesSection },
     isAdmin && { id: 'categories', label: t('settings.nav.categories'), icon: FolderOpenIcon, Component: CategoriesSection },
     canManageKb && { id: 'kb', label: t('settings.nav.kb'), icon: BookIcon, Component: ArticlesSection },
     isAdmin && { id: 'software-types', label: t('settings.nav.softwareTypes'), icon: BoardIcon, Component: SoftwareTypesSection },

@@ -14,10 +14,10 @@ import PriorityBadge from '../components/tickets/PriorityBadge'
 import CategoryCascader from '../components/tickets/CategoryCascader'
 import CustomerFormModal from '../components/customers/CustomerFormModal'
 import { useAuth } from '../auth/useAuth'
+import { usePermissions } from '../auth/usePermissions'
 import { useAgents } from '../hooks/useAgents'
 import { useCategories } from '../hooks/useCategories'
 import { useCustomers } from '../hooks/useCustomers'
-import { useTicketSettings } from '../hooks/useTicketSettings'
 import { createTicket } from '../api/tickets'
 import { useI18n } from '../i18n/useI18n'
 
@@ -38,11 +38,11 @@ export default function TicketCreatePage() {
   const { data: categories } = useCategories()
   const { data: customers } = useCustomers({ enabled: isStaff })
   const { data: agents } = useAgents({ enabled: isAdmin, includeAdmins: true })
-  const { data: ticketSettings } = useTicketSettings()
+  const permissions = usePermissions()
   // Mirrors the backend rule in accounts/views.py: creating a customer is
   // admin-only unless settings open it up to agents. Offering the shortcut to
   // anyone else would just produce a 403 after they filled the whole form.
-  const canCreateCustomers = isAdmin || !!ticketSettings?.allow_agent_create_customers
+  const canCreateCustomers = !!permissions.allow_agent_create_customers
   const [customerModalOpen, setCustomerModalOpen] = useState(false)
   const [subject, setSubject] = useState('')
   const [description, setDescription] = useState('')

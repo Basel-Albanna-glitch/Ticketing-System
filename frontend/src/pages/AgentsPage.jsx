@@ -11,10 +11,13 @@ import Input from '../components/ui/Input'
 import Modal from '../components/ui/Modal'
 import Pagination from '../components/ui/Pagination'
 import SearchBar from '../components/ui/SearchBar'
+import Select from '../components/ui/Select'
 import Spinner from '../components/ui/Spinner'
 import Table from '../components/ui/Table'
 import { PlusIcon } from '../components/ui/icons'
 import { useAgents, useCreateAgent, useUpdateAgent } from '../hooks/useAgents'
+import { useRoles } from '../hooks/useRoles'
+import { useAuth } from '../auth/useAuth'
 import { deleteUserAvatar, uploadUserAvatar } from '../api/users'
 import { useI18n } from '../i18n/useI18n'
 import { sortRows, useTableSort } from '../utils/tableSort'
@@ -24,6 +27,7 @@ const COLUMNS = [
   { labelKey: 'field.username', sortKey: 'username', value: (a) => a.username },
   { labelKey: 'field.name', sortKey: 'full_name', value: (a) => a.full_name },
   { labelKey: 'field.email', sortKey: 'email', value: (a) => a.email || '' },
+  { labelKey: 'settings.roles.title', sortKey: 'staff_role_name', value: (a) => a.staff_role_name || '' },
   { labelKey: 'agents.assigned', sortKey: 'assigned_count', value: (a) => a.assigned_count },
   { labelKey: 'agents.resolved', sortKey: 'resolved_count', value: (a) => a.resolved_count },
   { labelKey: 'agents.availability', sortKey: 'is_available', value: (a) => (a.is_available ? 1 : 0) },
@@ -31,11 +35,19 @@ const COLUMNS = [
   '',
 ]
 
-const EMPTY_FORM = { id: null, username: '', full_name: '', email: '', password: '', is_available: true, avatar: null }
+const EMPTY_FORM = {
+  id: null, username: '', full_name: '', email: '', password: '',
+  is_available: true, avatar: null, staff_role: '',
+}
 
 export default function AgentsPage() {
   const { t } = useI18n()
   const { data: agents, isLoading } = useAgents()
+  const { user } = useAuth()
+  // Roles are only listable by an admin who holds none themselves, so don't
+  // request them for anyone else — the endpoint would 403.
+  const isFullAdmin = Boolean(user?.is_full_admin)
+  const { data: roles } = useRoles({ enabled: isFullAdmin })
   const createAgent = useCreateAgent()
   const updateAgent = useUpdateAgent()
   const [modalOpen, setModalOpen] = useState(false)
@@ -85,6 +97,7 @@ export default function AgentsPage() {
       password: '',
       is_available: agent.is_available,
       avatar: agent.avatar,
+      staff_role: agent.staff_role ?? '',
     })
     setPendingAvatar(null)
     setError('')
@@ -100,7 +113,13 @@ export default function AgentsPage() {
     setError('')
     try {
       if (form.id) {
-        const payload = { id: form.id, full_name: form.full_name, email: form.email, is_available: form.is_available }
+        const payload = {
+          id: form.id,
+          full_name: form.full_name,
+          email: form.email,
+          is_available: form.is_available,
+          staff_role: form.staff_role || null,
+        }
         if (form.password) payload.password = form.password
         await updateAgent.mutateAsync(payload)
       } else {
@@ -111,6 +130,7 @@ export default function AgentsPage() {
           password: form.password,
           role: 'agent',
           is_available: form.is_available,
+          staff_role: form.staff_role || null,
         })
         if (pendingAvatar) {
           try {
@@ -185,6 +205,13 @@ export default function AgentsPage() {
                 </Link>
               </td>
               <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{agent.email || '—'}</td>
+              <td className="px-4 py-2">
+                {agent.staff_role_name ? (
+                  <Badge color="purple">{agent.staff_role_name}</Badge>
+                ) : (
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{t('agents.noRole')}</span>
+                )}
+              </td>
               <td className="px-4 py-2 tabular-nums text-gray-600 dark:text-gray-300">{agent.assigned_count}</td>
               <td className="px-4 py-2 tabular-nums text-gray-600 dark:text-gray-300">{agent.resolved_count}</td>
               <td className="px-4 py-2">
@@ -217,7 +244,12 @@ export default function AgentsPage() {
         </>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={form.id ? t('agents.editAgent') : t('agents.addAgent')}>
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={form.id ? t('agents.editAgent') : t('agents.addAgent')}
+        dismissOnBackdrop={false}
+      >
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {/* An existing agent uploads immediately; a new one has no id yet, so the file is
               held and uploaded right after the account is created. */}
@@ -271,6 +303,22 @@ export default function AgentsPage() {
             required={!form.id}
             minLength={8}
           />
+          {/* Only offered to an admin who may manage roles; for anyone else the
+              field would be read-only noise, and the API would reject the write. */}
+          {isFullAdmin && (
+            <Select
+              label={t('settings.roles.title')}
+              value={form.staff_role}
+              onChange={(e) => setForm({ ...form, staff_role: e.target.value })}
+            >
+              <option value="">{t('agents.noRole')}</option>
+              {(roles || []).map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </Select>
+          )}
           <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
             <input
               type="checkbox"

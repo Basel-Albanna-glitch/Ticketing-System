@@ -66,6 +66,9 @@ export default function TodoPage() {
   const createTodo = useCreateTodo()
   const updateTodo = useUpdateTodo()
   const deleteTodo = useDeleteTodo()
+  // Which row is mid-delete, so only that button shows a spinner rather than
+  // every one of them reacting to the shared mutation state.
+  const deletingId = deleteTodo.isPending ? deleteTodo.variables : null
   const reorder = useReorderTodos(filters)
 
   const [modalOpen, setModalOpen] = useState(false)
@@ -128,7 +131,12 @@ export default function TodoPage() {
 
   function handleDelete(item) {
     if (!window.confirm(`${t('todo.deleteConfirm')} "${item.title}"?`)) return
-    deleteTodo.mutate(item.id)
+    // A row has no error area of its own, so a refusal would otherwise look like
+    // the click did nothing at all.
+    deleteTodo.mutate(item.id, {
+      onError: (err) =>
+        window.alert(err?.response?.data?.detail || t('todo.deleteFailed')),
+    })
   }
 
   function handleDrop(targetId) {
@@ -275,10 +283,12 @@ export default function TodoPage() {
                   <button
                     type="button"
                     onClick={() => handleDelete(item)}
+                    disabled={deletingId === item.id}
+                    title={t('common.delete')}
                     aria-label={`${t('common.delete')} ${item.title}`}
-                    className="shrink-0 rounded-lg p-1 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-gray-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
                   >
-                    <TrashIcon className="h-4 w-4" />
+                    {deletingId === item.id ? <Spinner /> : <TrashIcon className="h-4 w-4" />}
                   </button>
                 </div>
               )
@@ -291,6 +301,7 @@ export default function TodoPage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         title={t(editing ? 'todo.editItem' : 'todo.newItem')}
+        dismissOnBackdrop={false}
       >
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <Input

@@ -20,6 +20,7 @@ export default {
     'todo.emptyHint': 'Add an internal job the team needs to pick up.',
     'todo.saveFailed': 'Failed to save the to-do.',
     'todo.deleteConfirm': 'Delete',
+    'todo.deleteFailed': 'Could not delete this item.',
   },
   ar: {
     'todo.subtitle': 'مهام داخلية يتشاركها جميع الموظفين.',
@@ -41,5 +42,6 @@ export default {
     'todo.emptyHint': 'أضف مهمة داخلية ليتولّاها الفريق.',
     'todo.saveFailed': 'تعذّر حفظ المهمة.',
     'todo.deleteConfirm': 'حذف',
+    'todo.deleteFailed': 'تعذّر حذف هذا العنصر.',
   },
 }

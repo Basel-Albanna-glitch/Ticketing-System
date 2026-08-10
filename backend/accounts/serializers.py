@@ -1,13 +1,33 @@
 from rest_framework import serializers
 
+from core.models import PERMISSION_FLAGS
+
 from .models import (
     CustomerAttachment,
     CustomerBranch,
     CustomerLicense,
     NotificationPreference,
     SoftwareType,
+    StaffRole,
     User,
 )
+
+
+class OptionalBooleanField(serializers.BooleanField):
+    """A boolean where "not sent" means not sent, rather than False.
+
+    DRF treats any multipart request as an HTML form, and in an HTML form an
+    unchecked box is simply omitted — so a missing boolean is read as False. The
+    customer form posts multipart because it can carry attachments, and it never
+    sends is_active at all, which quietly created every new customer deactivated
+    in spite of the model defaulting to active.
+
+    Returning `empty` instead leaves the field out of validated_data, so the
+    model default stands; a value that *is* sent still wins, which keeps the
+    activate/deactivate toggle working.
+    """
+
+    default_empty_html = serializers.empty
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -37,10 +57,28 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class MeSerializer(serializers.ModelSerializer):
+    # What the signed-in user may actually do, already resolved from their role
+    # (or the site-wide defaults). The client gates its UI on this rather than
+    # re-deriving the rules, so the two cannot disagree about who may do what.
+    # Only served here, for one user — putting it on a list serializer would cost
+    # a settings lookup per row.
+    permissions = serializers.SerializerMethodField()
+    staff_role_name = serializers.CharField(source='staff_role.name', read_only=True, default=None)
+    is_full_admin = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'full_name', 'email', 'role', 'is_available', 'avatar', 'date_joined']
-        read_only_fields = ['id', 'username', 'role', 'avatar', 'date_joined']
+        fields = [
+            'id', 'username', 'full_name', 'email', 'role', 'is_available', 'avatar',
+            'date_joined', 'staff_role', 'staff_role_name', 'is_full_admin', 'permissions',
+        ]
+        read_only_fields = [
+            'id', 'username', 'role', 'avatar', 'date_joined', 'staff_role',
+            'staff_role_name', 'is_full_admin', 'permissions',
+        ]
+
+    def get_permissions(self, obj):
+        return obj.permission_map()
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -63,15 +101,31 @@ class NotificationPreferenceSerializer(serializers.ModelSerializer):
         ]
 
 
+class StaffRoleSerializer(serializers.ModelSerializer):
+    user_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = StaffRole
+        fields = ['id', 'name', 'description', 'user_count', *PERMISSION_FLAGS]
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('Name cannot be blank.')
+        return value
+
+
 class AgentSerializer(serializers.ModelSerializer):
     assigned_count = serializers.IntegerField(read_only=True)
     resolved_count = serializers.IntegerField(read_only=True)
+    staff_role_name = serializers.CharField(source='staff_role.name', read_only=True, default=None)
 
     class Meta:
         model = User
         fields = [
-            'id', 'username', 'full_name', 'email', 'is_available', 'is_active',
+            'id', 'username', 'full_name', 'email', 'role', 'is_available', 'is_active',
             'assigned_count', 'resolved_count', 'avatar', 'date_joined',
+            'staff_role', 'staff_role_name',
         ]
 
 
@@ -81,12 +135,39 @@ class AgentCreateUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'full_name', 'email', 'role', 'is_available', 'is_active', 'password']
+        fields = [
+            'id', 'username', 'full_name', 'email', 'role', 'is_available', 'is_active',
+            'password', 'staff_role',
+        ]
 
     def validate_role(self, value):
         if value not in (User.Role.AGENT, User.Role.ADMIN):
             raise serializers.ValidationError('role must be agent or admin.')
         return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = self.instance
+        if instance is None:
+            return attrs
+        # Giving the last unrestricted admin a role, or demoting them to agent,
+        # would leave nobody able to manage roles or hand permissions back — the
+        # system would be permanently locked into whatever it was set to.
+        role = attrs.get('role', instance.role)
+        staff_role = attrs.get('staff_role', instance.staff_role)
+        would_stay_full_admin = role == User.Role.ADMIN and staff_role is None
+        if instance.is_full_admin and not would_stay_full_admin:
+            others = User.objects.filter(
+                role=User.Role.ADMIN, staff_role__isnull=True, is_active=True
+            ).exclude(pk=instance.pk)
+            if not others.exists():
+                raise serializers.ValidationError({
+                    'staff_role': (
+                        'This is the last admin without a role. Restricting them would '
+                        'leave nobody able to manage permissions.'
+                    )
+                })
+        return attrs
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
@@ -160,6 +241,8 @@ class CustomerSerializer(serializers.ModelSerializer):
 class CustomerCreateUpdateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False, min_length=8)
     email = serializers.EmailField(required=False, allow_blank=True)
+    # Multipart posts must not be read as "unchecked" — see OptionalBooleanField.
+    is_active = OptionalBooleanField(required=False)
 
     class Meta:
         model = User

@@ -1,6 +1,5 @@
 from accounts.models import CustomerBranch, User
 from accounts.serializers import CustomerBranchSerializer, UserSerializer
-from tickets.models import TicketSettings
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -50,11 +49,8 @@ def _assignment_allowed(request, kind, instance=None, requested=None):
         if touched <= {user.id}:
             return True
 
-    settings = TicketSettings.get_solo()
-    return (
-        settings.allow_agent_assign_tasks
-        if kind == 'task'
-        else settings.allow_agent_assign_projects
+    return user.has_staff_permission(
+        'allow_agent_assign_tasks' if kind == 'task' else 'allow_agent_assign_projects'
     )
 
 
@@ -85,6 +81,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     # browser so the calendar filter and the chip can never disagree by a day.
     created_date = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
+    can_delete = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
@@ -93,10 +90,18 @@ class ProjectSerializer(serializers.ModelSerializer):
             'assignees', 'assignee_ids', 'branch', 'branch_id', 'remark',
             'start_date', 'end_date',
             'created_by', 'task_count', 'done_task_count', 'last_task_due',
-            'created_at', 'created_date', 'updated_at', 'can_edit',
+            'created_at', 'created_date', 'updated_at', 'can_edit', 'can_delete',
         ]
 
     def get_can_edit(self, obj):
+        return _can_edit(self.context.get('request'), obj)
+
+    def get_can_delete(self, obj):
+        """Mirror of ProjectViewSet.destroy, so the UI never offers a delete that
+        is certain to fail. A closed project is off limits to everyone, admins
+        included — it has to be reopened first."""
+        if obj.status == Project.Status.CLOSED:
+            return False
         return _can_edit(self.context.get('request'), obj)
 
     def get_created_date(self, obj):
@@ -228,6 +233,20 @@ class TaskSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {'project': 'This project is closed. Only admins can change it.'}
             )
+
+        # A new task has to say who is doing it and when it is due. Enforced on
+        # creation only: tasks made before this rule existed may well have
+        # neither, and applying it to edits would make those unsaveable until
+        # someone filled in details they may not know.
+        if self.instance is None:
+            if not attrs.get('assignees'):
+                raise serializers.ValidationError(
+                    {'assignee_ids': 'Choose who this task is for.'}
+                )
+            if not attrs.get('due_date'):
+                raise serializers.ValidationError(
+                    {'due_date': 'Give the task a due date.'}
+                )
 
         start_date = attrs.get('start_date', getattr(self.instance, 'start_date', None))
         due_date = attrs.get('due_date', getattr(self.instance, 'due_date', None))

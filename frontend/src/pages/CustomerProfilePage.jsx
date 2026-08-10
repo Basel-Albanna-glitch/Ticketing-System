@@ -9,9 +9,9 @@ import Spinner from '../components/ui/Spinner'
 import CustomerFormModal from '../components/customers/CustomerFormModal'
 import CustomerProfileDetails from '../components/customers/CustomerProfileDetails'
 import { useAuth } from '../auth/useAuth'
+import { usePermissions } from '../auth/usePermissions'
 import { useI18n } from '../i18n/useI18n'
 import { useCustomers, useDeleteCustomer } from '../hooks/useCustomers'
-import { useTicketSettings } from '../hooks/useTicketSettings'
 
 export default function CustomerProfilePage() {
   const { t } = useI18n()
@@ -21,13 +21,13 @@ export default function CustomerProfilePage() {
   const { data: customers, isLoading: isLoadingCustomers } = useCustomers()
   const customer = customers?.find((c) => String(c.id) === id)
   const deleteCustomer = useDeleteCustomer()
-  const { data: ticketSettings } = useTicketSettings()
+  const permissions = usePermissions()
   const [editOpen, setEditOpen] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
   const isAdmin = user?.role === 'admin'
   const canEdit =
-    isAdmin || (user?.role === 'agent' && ticketSettings?.allow_agent_edit_customers)
+    !!permissions.allow_agent_edit_customers
   const canDelete = isAdmin
 
   function handleDelete() {

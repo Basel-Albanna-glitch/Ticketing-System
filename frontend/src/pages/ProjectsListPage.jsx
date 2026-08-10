@@ -15,9 +15,9 @@ import Textarea from '../components/ui/Textarea'
 import ProjectCard from '../components/projects/ProjectCard'
 import { PlusIcon } from '../components/ui/icons'
 import { useAuth } from '../auth/useAuth'
+import { usePermissions } from '../auth/usePermissions'
 import { useAgents } from '../hooks/useAgents'
 import { useCustomers } from '../hooks/useCustomers'
-import { useTicketSettings } from '../hooks/useTicketSettings'
 import { useCreateProject, useProjects, useUpdateProject } from '../hooks/useProjects'
 import { useI18n } from '../i18n/useI18n'
 
@@ -38,11 +38,11 @@ export default function ProjectsListPage() {
   const isAdmin = user?.role === 'admin'
   const { data: customers } = useCustomers()
   const { data: agents } = useAgents({ includeAdmins: true })
-  const { data: ticketSettings } = useTicketSettings()
+  const permissions = usePermissions()
   // Putting yourself on a project never needs permission; the switch governs
   // involving other people, so the picker narrows rather than disappearing.
-  const canAssignOthers = isAdmin || !!ticketSettings?.allow_agent_assign_projects
-  const canCreateCustomers = isAdmin || !!ticketSettings?.allow_agent_create_customers
+  const canAssignOthers = !!permissions.allow_agent_assign_projects
+  const canCreateCustomers = !!permissions.allow_agent_create_customers
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState('open')
@@ -109,6 +109,17 @@ export default function ProjectsListPage() {
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
+    // A name of only digits or punctuation names nothing — same rule the ticket
+    // subject uses, and \p{L} keeps it true for every language, not just Latin.
+    if (!/\p{L}/u.test(name)) {
+      setError(t('projects.nameMustContainText'))
+      return
+    }
+    // Mirrors the serializer's check so the round trip is not needed to learn it.
+    if (startDate && endDate && startDate > endDate) {
+      setError(t('projects.dateOrder'))
+      return
+    }
     // An empty pick means "no customer", which the API takes as an explicit null.
     const payload = {
       name,
@@ -141,8 +152,19 @@ export default function ProjectsListPage() {
       setStartDate('')
       setEndDate('')
       setRemark('')
-    } catch {
-      setError(t(editing ? 'projects.updateFailed' : 'projects.createFailed'))
+    } catch (err) {
+      // The serializer explains exactly what is wrong — a date order, an
+      // assignee who may not be assigned, the tasks blocking a close. Replacing
+      // that with a generic failure left the form looking broken for something
+      // the message would have answered outright.
+      const detail = err?.response?.data
+      const fieldErrors =
+        detail && typeof detail === 'object' && !Array.isArray(detail)
+          ? Object.entries(detail)
+              .map(([field, messages]) => `${field}: ${[].concat(messages).join(' ')}`)
+              .join(' · ')
+          : ''
+      setError(fieldErrors || t(editing ? 'projects.updateFailed' : 'projects.createFailed'))
     }
   }
 
@@ -221,6 +243,7 @@ export default function ProjectsListPage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         title={t(editing ? 'projects.editProject' : 'projects.newProject')}
+        dismissOnBackdrop={false}
       >
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <Input label={t('field.name')} value={name} onChange={(e) => setName(e.target.value)} required />
@@ -285,12 +308,14 @@ export default function ProjectsListPage() {
               label={t('projects.fromDate')}
               type="date"
               value={startDate}
+              max={endDate || undefined}
               onChange={(e) => setStartDate(e.target.value)}
             />
             <Input
               label={t('projects.toDate')}
               type="date"
               value={endDate}
+              min={startDate || undefined}
               onChange={(e) => setEndDate(e.target.value)}
             />
           </div>

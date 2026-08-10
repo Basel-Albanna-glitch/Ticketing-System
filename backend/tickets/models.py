@@ -4,6 +4,8 @@ from django.conf import settings
 from django.db import models, transaction
 from django.utils import timezone
 
+from core.models import AgentPermissionFlags
+
 
 def normalize_phone(value):
     """Reduce a phone number to its digits (dropping spaces, dashes, parens, a leading +)
@@ -11,38 +13,11 @@ def normalize_phone(value):
     return re.sub(r'\D', '', value or '')
 
 
-class TicketSettings(models.Model):
-    allow_agent_self_assign = models.BooleanField(default=False)
-    allow_agent_reassign = models.BooleanField(default=False)
-    # A closed ticket is locked (no status/deadline/comment changes) for everyone
-    # except admins, who can always reopen it. When this is on, agents who may normally
-    # edit the ticket can also keep editing it after it's closed; customers never can.
-    allow_agent_edit_after_close = models.BooleanField(default=False)
-    # When on, agents may edit customer records. Creating and deleting customers
-    # always stays admin-only.
-    allow_agent_edit_customers = models.BooleanField(default=False)
-    # When on, agents may create customer records too. Deleting a customer always
-    # stays admin-only — an accidental create is easy to fix, a delete is not.
-    allow_agent_create_customers = models.BooleanField(default=False)
-    # When on, the agent a ticket is assigned to may delete it. When off, only admins can.
-    allow_agent_delete = models.BooleanField(default=False)
-    # When on, agents may link, change, or remove the customer on a guest ticket.
-    allow_agent_link_customer = models.BooleanField(default=False)
-    # When on, agents may create, edit, and delete knowledge-base articles. When off,
-    # managing the knowledge base stays admin-only.
-    allow_agent_manage_kb = models.BooleanField(default=False)
-    # When on, agents may change who a project or one of its tasks is assigned to.
-    # When off, only admins can — an agent can still see and work the assignment,
-    # just not hand it to someone else.
-    allow_agent_assign_projects = models.BooleanField(default=False)
-    # When on, an agent may step off a project they are assigned to. When off,
-    # they can still take unclaimed work on — they just cannot drop it again
-    # without an admin, so work is never quietly abandoned.
-    allow_agent_unassign_projects = models.BooleanField(default=False)
-    # Task-level assignment, kept separate from the project-level switch: a team
-    # can be trusted to divide work between themselves inside a project without
-    # also being able to hand the whole project to someone else.
-    allow_agent_assign_tasks = models.BooleanField(default=False)
+class TicketSettings(AgentPermissionFlags):
+    """Site-wide defaults. These apply to any agent who has not been given a
+    StaffRole, so the switches keep working exactly as before for everyone who
+    was never assigned one; a role, where present, overrides them per person.
+    """
 
     class Meta:
         verbose_name = 'Ticket settings'
