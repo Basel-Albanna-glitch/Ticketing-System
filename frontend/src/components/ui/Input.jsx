@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { EyeIcon, EyeOffIcon } from './icons'
 
-export default function Input({ label, error, className = '', id, icon: IconComponent, type = 'text', ...props }) {
+export default function Input({ label, error, hint, className = '', id, icon: IconComponent, type = 'text', ...props }) {
   const inputId = id || props.name
   const isPassword = type === 'password'
   const [reveal, setReveal] = useState(false)
   const inputType = isPassword && reveal ? 'text' : type
+  const hintId = hint && inputId ? `${inputId}-hint` : undefined
 
   return (
     <div className="flex flex-col gap-1">
@@ -21,6 +22,7 @@ export default function Input({ label, error, className = '', id, icon: IconComp
         <input
           id={inputId}
           type={inputType}
+          aria-describedby={hintId}
           className={`w-full rounded-xl border bg-white py-2 text-sm text-gray-900 shadow-sm transition placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15 disabled:bg-gray-100 disabled:text-gray-500 dark:bg-white/5 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-900 dark:disabled:text-gray-500 ${
             IconComponent ? 'ps-9' : 'ps-3'
           } ${
@@ -43,6 +45,11 @@ export default function Input({ label, error, className = '', id, icon: IconComp
           </button>
         )}
       </div>
+      {hint && !error && (
+        <p id={hintId} className="text-xs text-gray-500 dark:text-gray-400">
+          {hint}
+        </p>
+      )}
       {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
     </div>
   )

@@ -128,8 +128,10 @@ export default function GuestTicketPage() {
             />
             <Input
               label={t('field.phone')}
+              name="guestPhone"
               type="tel"
               placeholder={t('guest.field.phonePlaceholder')}
+              hint={t('guest.field.phoneHint')}
               value={form.guestPhone}
               onChange={(e) => set('guestPhone', e.target.value)}
               required
