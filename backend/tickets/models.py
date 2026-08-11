@@ -160,6 +160,13 @@ class Ticket(models.Model):
     subject = models.CharField(max_length=200)
     description = models.TextField()
     priority = models.CharField(max_length=10, choices=Priority.choices, default=Priority.MEDIUM)
+    # The admin-set priority normally comes from the category (Category.priority) and so is
+    # shared by every ticket in it. This raises or lowers a single ticket off that level
+    # without touching the category. Null means "inherit from the category", which is what
+    # every ticket did before this field existed.
+    category_priority_override = models.CharField(
+        max_length=10, choices=Priority.choices, null=True, blank=True
+    )
     status = models.CharField(max_length=15, choices=Status.choices, default=Status.OPEN)
     hold_reason = models.TextField(blank=True)
     # The day work on the ticket starts; defaults to the creation day on the form.
@@ -189,6 +196,14 @@ class Ticket(models.Model):
             models.Index(fields=['assigned_agent']),
             models.Index(fields=['customer']),
         ]
+
+    @property
+    def effective_category_priority(self):
+        """The admin-set priority in force for this ticket: its own override if one was
+        set, otherwise whatever its category currently carries."""
+        if self.category_priority_override:
+            return self.category_priority_override
+        return self.category.priority if self.category_id else None
 
     def save(self, *args, **kwargs):
         if not self.reference:

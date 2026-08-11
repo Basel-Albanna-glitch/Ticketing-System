@@ -20,6 +20,7 @@ import {
   UserIcon,
 } from '../components/ui/icons'
 import { rateGuestTicket, replyGuestTicket, trackGuestTicket } from '../api/tickets'
+import { elapsedFor, formatElapsed, isTicketRunning } from '../utils/elapsed'
 import { useI18n } from '../i18n/useI18n'
 
 // The lookup pair lives in sessionStorage so a refresh (or following the emailed link back)
@@ -167,6 +168,16 @@ export default function GuestTrackPage() {
   const [ratingComment, setRatingComment] = useState('')
   const [ratingSubmitting, setRatingSubmitting] = useState(false)
   const [ratingError, setRatingError] = useState('')
+  const [now, setNow] = useState(() => Date.now())
+
+  const elapsed = elapsedFor(ticket, now)
+  // Tick only while the counter is actually moving — no interval on a finished ticket.
+  const ticking = isTicketRunning(ticket)
+  useEffect(() => {
+    if (!ticking) return undefined
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [ticking])
 
   // One lookup path for the form, the auto-restore on mount, and the refresh button.
   const load = useCallback(
@@ -351,6 +362,20 @@ export default function GuestTrackPage() {
                     </span>
                   </div>
                 )}
+
+                {/* How long this has taken: counting up while the ticket is open, frozen at
+                    the total once it's resolved. The question every guest actually has. */}
+                <div className="mt-4 flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-100">
+                  <ClockIcon className="h-4 w-4 shrink-0" />
+                  <span>
+                    <span className="text-indigo-700/70 dark:text-indigo-300/80">
+                      {elapsed?.settled ? t('tickets.resolvedIn') : t('tickets.openFor')}
+                    </span>{' '}
+                    <span className="font-semibold tabular-nums">
+                      {formatElapsed(elapsed?.ms ?? 0, t)}
+                    </span>
+                  </span>
+                </div>
 
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3 text-xs text-gray-500 dark:border-white/10 dark:text-gray-400">
                   <span className="inline-flex items-center gap-1.5">

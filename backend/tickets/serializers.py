@@ -136,13 +136,19 @@ class TicketListSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     branch = CustomerBranchSerializer(read_only=True)
     reference = serializers.CharField(read_only=True)
+    # The admin-set priority actually in force: the ticket's override when it has one,
+    # otherwise the category's. Clients display this; they write category_priority_override.
+    category_priority = serializers.CharField(
+        source='effective_category_priority', read_only=True, allow_null=True
+    )
 
     class Meta:
         model = Ticket
         fields = [
             'id', 'reference', 'subject', 'customer', 'branch',
             'guest_name', 'guest_company', 'guest_branch', 'guest_phone', 'guest_email',
-            'category', 'priority', 'status',
+            'category', 'priority', 'category_priority', 'category_priority_override',
+            'status',
             'assigned_agent', 'assigned_at', 'start_date', 'due_at', 'created_at',
             'closed_at',
         ]
@@ -416,6 +422,9 @@ class GuestTicketPublicSerializer(serializers.ModelSerializer):
             # Shown on the tracker so a guest can see why their ticket is waiting, the same
             # way a signed-in customer sees it on the ticket page.
             'hold_reason',
+            # The far end of "how long has this taken" — without these the tracker can only
+            # count up, and a finished ticket would keep ticking forever.
+            'resolved_at', 'closed_at',
         ]
 
     def get_is_assigned(self, obj):

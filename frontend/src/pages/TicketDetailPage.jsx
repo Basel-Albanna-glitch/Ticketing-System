@@ -47,10 +47,12 @@ import {
   useSetTicketDeadline,
   useTicket,
   useTicketActivity,
+  useUpdateTicket,
   useUpdateTicketStatus,
 } from '../hooks/useTicket'
 import { useArticles } from '../hooks/useArticles'
 import { useI18n } from '../i18n/useI18n'
+import { elapsedFor, formatElapsed, isTicketRunning } from '../utils/elapsed'
 
 // Local calendar date (YYYY-MM-DD) for the current day — for comparing against start_date.
 function todayLocal() {
@@ -93,6 +95,33 @@ function ActionGroup({ label, tone = 'default', children }) {
   )
 }
 
+// Collaborator name chips. `onRemove` is omitted for viewers who can only read them,
+// which is what turns the ✕ off.
+function CollaboratorChips({ collaborators, onRemove, removeLabel }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {collaborators.map((c) => (
+        <span
+          key={c.id}
+          className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700 ring-1 ring-inset ring-gray-500/15 dark:bg-white/10 dark:text-gray-200 dark:ring-white/10"
+        >
+          {c.full_name}
+          {onRemove && (
+            <button
+              type="button"
+              onClick={() => onRemove(c.id)}
+              className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+              aria-label={`${removeLabel} ${c.full_name}`}
+            >
+              ✕
+            </button>
+          )}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 function MetaItem({ icon: Icon, children }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
@@ -131,6 +160,7 @@ export default function TicketDetailPage() {
   const { data: customers } = useCustomers({ enabled: user?.role !== 'customer' })
   const permissions = usePermissions()
   const updateStatus = useUpdateTicketStatus(id)
+  const updateTicket = useUpdateTicket(id)
   const assignTicket = useAssignTicket(id)
   const setDeadline = useSetTicketDeadline(id)
   const setCollaborators = useSetTicketCollaborators(id)
@@ -139,18 +169,56 @@ export default function TicketDetailPage() {
   const setTicketCustomer = useSetTicketCustomer(id)
   const deleteTicket = useDeleteTicket(id)
   const [status, setStatus] = useState('')
+  const [categoryPriority, setCategoryPriority] = useState('')
   const [holdReason, setHoldReason] = useState('')
   const [agentId, setAgentId] = useState('')
   const [notice, setNotice] = useState('')
   const [customerId, setCustomerId] = useState('')
   const [customerBranchId, setCustomerBranchId] = useState('')
   const [reassignId, setReassignId] = useState('')
+  // An already-assigned ticket shows its agent as settled fact; the picker only comes
+  // back once the admin asks to change it.
+  const [editingAssignee, setEditingAssignee] = useState(false)
   const [collaboratorId, setCollaboratorId] = useState('')
   const [articleToAdd, setArticleToAdd] = useState('')
   const [deadline, setDeadlineInput] = useState('')
   const [editOpen, setEditOpen] = useState(false)
   // The activity log is reference material, not something you read on arrival.
   const [showActivity, setShowActivity] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
+
+  // How long this ticket has been running — the same counter the guest tracker shows, so
+  // staff and customer are looking at the same number. Ticks only while it's still open.
+  const elapsed = elapsedFor(ticket, now)
+  const ticking = isTicketRunning(ticket)
+  useEffect(() => {
+    if (!ticking) return undefined
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [ticking])
+
+  // The status box mirrors the ticket's own status, so a fresh page load — or a change
+  // someone else made — shows where the ticket actually stands instead of an empty prompt.
+  // Keyed on the server values, so a selection in progress survives the 15s poll.
+  const serverStatus = ticket?.status
+  const serverHoldReason = ticket?.hold_reason
+  const serverAssignedId = ticket?.assigned_agent?.id ?? null
+  useEffect(() => {
+    if (!serverStatus) return
+    // "Open" is this app's word for nobody having taken the ticket, so it isn't a state an
+    // assigned ticket can sit in — assigning doesn't move the status off it either. Leave
+    // the box empty there and let the agent say where the work actually stands.
+    const shown = serverAssignedId && serverStatus === 'open' ? '' : serverStatus
+    setStatus(shown)
+    setHoldReason(shown === 'on_hold' ? serverHoldReason || '' : '')
+  }, [serverStatus, serverHoldReason, serverAssignedId])
+
+  // Same idea for the category-priority override. Empty means "inherit from the category",
+  // which is what a ticket does until someone deliberately lifts it off that level.
+  const serverCategoryOverride = ticket?.category_priority_override ?? ''
+  useEffect(() => {
+    setCategoryPriority(serverCategoryOverride)
+  }, [serverCategoryOverride])
 
   // Auto-dismiss the action confirmation after a few seconds.
   useEffect(() => {
@@ -262,12 +330,18 @@ export default function TicketDetailPage() {
     if (!status) return
     updateStatus.mutate(
       { status, holdReason: status === 'on_hold' ? holdReason : undefined },
-      {
-        onSuccess: () => {
-          setHoldReason('')
-          showNotice(t('tickets.noticeStatusUpdated'))
-        },
-      }
+      // The status/hold-reason boxes resync from the refetched ticket, so nothing to reset here.
+      { onSuccess: () => showNotice(t('tickets.noticeStatusUpdated')) }
+    )
+  }
+
+  // Lifts this one ticket off its category's priority — the category itself, and every
+  // other ticket in it, are untouched. Empty hands the ticket back to the category.
+  function handleUpdateCategoryPriority() {
+    if (categoryPriority === serverCategoryOverride) return
+    updateTicket.mutate(
+      { category_priority_override: categoryPriority || null },
+      { onSuccess: () => showNotice(t('tickets.noticePriorityUpdated')) }
     )
   }
 
@@ -323,9 +397,22 @@ export default function TicketDetailPage() {
         onSuccess: () => {
           noticeAssignedTo(name)
           setAgentId('')
+          setEditingAssignee(false)
         },
       })
     }
+  }
+
+  // Open the picker on the current agent, so changing an assignment starts from who
+  // has it now rather than from a blank field.
+  function handleEditAssignee() {
+    setAgentId(ticket.assigned_agent?.id ?? '')
+    setEditingAssignee(true)
+  }
+
+  function handleCancelEditAssignee() {
+    setAgentId('')
+    setEditingAssignee(false)
   }
 
   function handleSelfAssign() {
@@ -417,6 +504,37 @@ export default function TicketDetailPage() {
       { onSuccess: () => showNotice(t('tickets.noticeArticleUnlinked')) }
     )
   }
+
+  // Once a ticket has an owner, the open question is when it's due — so this group leads
+  // the Actions card. On an unassigned ticket it stays put, below status.
+  const dueDateGroup = canEdit ? (
+    <ActionGroup label={t('field.dueDate')}>
+      <Input
+        type="datetime-local"
+        value={deadline || toDateTimeLocal(ticket.due_at)}
+        onChange={(e) => setDeadlineInput(e.target.value)}
+      />
+      <div className="flex gap-2">
+        <Button onClick={handleSetDeadline} loading={setDeadline.isPending} disabled={!deadline}>
+          {t('tickets.setDueDate')}
+        </Button>
+        {ticket.due_at && (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setDeadline.mutate(null, {
+                onSuccess: () => showNotice(t('tickets.noticeDueDateCleared')),
+              })
+              setDeadlineInput('')
+            }}
+            loading={setDeadline.isPending}
+          >
+            {t('tickets.clear')}
+          </Button>
+        )}
+      </div>
+    </ActionGroup>
+  ) : null
 
   return (
     <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
@@ -628,6 +746,17 @@ export default function TicketDetailPage() {
                 {ticket.category?.name}
               </DetailRow>
 
+              {ticket.category_priority && (
+                <DetailRow icon={StarIcon} label={t('tickets.categoryPriority')}>
+                  <PriorityBadge priority={ticket.category_priority} variant="outline" />
+                  {ticket.category_priority_override && (
+                    <span className="mt-0.5 block text-xs text-gray-400 dark:text-gray-500">
+                      {t('tickets.categoryPriorityHint')}
+                    </span>
+                  )}
+                </DetailRow>
+              )}
+
               {ticket.branch && (
                 <DetailRow icon={BadgeIcon} label={t('tickets.branch')}>
                   {ticket.branch.name}
@@ -651,26 +780,11 @@ export default function TicketDetailPage() {
               {!isCustomer && (
                 <DetailRow icon={UsersIcon} label={t('tickets.collaboratingAgents')}>
                   {collaborators.length ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {collaborators.map((c) => (
-                        <span
-                          key={c.id}
-                          className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700 ring-1 ring-inset ring-gray-500/15 dark:bg-white/10 dark:text-gray-200 dark:ring-white/10"
-                        >
-                          {c.full_name}
-                          {canAssign && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveCollaborator(c.id)}
-                              className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
-                              aria-label={`${t('common.remove')} ${c.full_name}`}
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </span>
-                      ))}
-                    </div>
+                    <CollaboratorChips
+                      collaborators={collaborators}
+                      onRemove={canAssign ? handleRemoveCollaborator : null}
+                      removeLabel={t('common.remove')}
+                    />
                   ) : (
                     <span className="text-gray-400 dark:text-gray-500">{t('tickets.none')}</span>
                   )}
@@ -680,6 +794,20 @@ export default function TicketDetailPage() {
               <DetailRow icon={CalendarIcon} label={t('field.createdAt')}>
                 {new Date(ticket.created_at).toLocaleString()}
               </DetailRow>
+
+              {elapsed && (
+                <DetailRow
+                  icon={ClockIcon}
+                  label={elapsed.settled ? t('tickets.resolvedIn') : t('tickets.openFor')}
+                >
+                  <span className="font-medium tabular-nums">{formatElapsed(elapsed.ms, t)}</span>
+                  {elapsed.settled && (
+                    <span className="mt-0.5 block text-xs text-gray-400 dark:text-gray-500">
+                      {new Date(ticket.resolved_at || ticket.closed_at).toLocaleString()}
+                    </span>
+                  )}
+                </DetailRow>
+              )}
 
               <DetailRow icon={CalendarIcon} label={t('field.startDate')}>
                 {ticket.start_date ? (
@@ -777,6 +905,8 @@ export default function TicketDetailPage() {
                   notStarted ? 'pointer-events-none opacity-60' : ''
                 }`}
               >
+                {ticket.assigned_agent && dueDateGroup}
+
                 {(canLinkCustomer || canUnlinkCustomer) && (
                   <ActionGroup label={t('field.customer')}>
                     {canUnlinkCustomer ? (
@@ -820,23 +950,54 @@ export default function TicketDetailPage() {
 
                 {canAssign && (
                   <ActionGroup label={t('tickets.assignAgent')}>
-                    <SearchableSelect
-                      value={agentId}
-                      onChange={setAgentId}
-                      placeholder={t('tickets.assignToAgent')}
-                      options={(agents || []).map((agent) => ({
-                        value: agent.id,
-                        label: agent.full_name,
-                      }))}
-                    />
-                    <Button onClick={handleAssign} loading={assignTicket.isPending} disabled={!agentId}>
-                      {t('tickets.assign')}
-                    </Button>
+                    {ticket.assigned_agent && !editingAssignee ? (
+                      <>
+                        <div className="truncate rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-100">
+                          {ticket.assigned_agent.full_name}
+                        </div>
+                        <Button variant="secondary" onClick={handleEditAssignee}>
+                          {t('common.edit')}
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <SearchableSelect
+                          value={agentId}
+                          onChange={setAgentId}
+                          placeholder={t('tickets.assignToAgent')}
+                          options={(agents || []).map((agent) => ({
+                            value: agent.id,
+                            label: agent.full_name,
+                          }))}
+                        />
+                        <Button
+                          onClick={handleAssign}
+                          loading={assignTicket.isPending}
+                          disabled={!agentId || String(agentId) === String(ticket.assigned_agent?.id)}
+                        >
+                          {t('tickets.assign')}
+                        </Button>
+                        {ticket.assigned_agent && (
+                          <Button variant="ghost" onClick={handleCancelEditAssignee}>
+                            {t('common.cancel')}
+                          </Button>
+                        )}
+                      </>
+                    )}
                   </ActionGroup>
                 )}
 
                 {canAssign && (
                   <ActionGroup label={t('tickets.collaborators')}>
+                    {collaborators.length > 0 && (
+                      <div className="rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                        <CollaboratorChips
+                          collaborators={collaborators}
+                          onRemove={handleRemoveCollaborator}
+                          removeLabel={t('common.remove')}
+                        />
+                      </div>
+                    )}
                     <SearchableSelect
                       value={collaboratorId}
                       onChange={setCollaboratorId}
@@ -904,6 +1065,7 @@ export default function TicketDetailPage() {
                     {ticket.assigned_agent ? (
                       <>
                         <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+                          {/* Only reachable in the frame before the ticket's status syncs in. */}
                           <option value="" disabled>
                             {t('tickets.updateStatus')}
                           </option>
@@ -929,7 +1091,15 @@ export default function TicketDetailPage() {
                         <Button
                           onClick={handleUpdateStatus}
                           loading={updateStatus.isPending}
-                          disabled={!status || (status === 'on_hold' && !holdReason.trim())}
+                          // The box now starts on the current status, so there's nothing to
+                          // submit until it's changed. On hold is the exception: re-submitting
+                          // the same status is how you revise the reason.
+                          disabled={
+                            !status ||
+                            (status === 'on_hold'
+                              ? !holdReason.trim()
+                              : status === ticket.status)
+                          }
                         >
                           {t('tickets.updateStatus')}
                         </Button>
@@ -942,38 +1112,36 @@ export default function TicketDetailPage() {
                   </ActionGroup>
                 )}
 
-                {canEdit && (
-                  <ActionGroup label={t('field.dueDate')}>
-                    <Input
-                      type="datetime-local"
-                      value={deadline || toDateTimeLocal(ticket.due_at)}
-                      onChange={(e) => setDeadlineInput(e.target.value)}
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={handleSetDeadline}
-                        loading={setDeadline.isPending}
-                        disabled={!deadline}
-                      >
-                        {t('tickets.setDueDate')}
-                      </Button>
-                      {ticket.due_at && (
-                        <Button
-                          variant="secondary"
-                          onClick={() => {
-                            setDeadline.mutate(null, {
-                              onSuccess: () => showNotice(t('tickets.noticeDueDateCleared')),
-                            })
-                            setDeadlineInput('')
-                          }}
-                          loading={setDeadline.isPending}
-                        >
-                          {t('tickets.clear')}
-                        </Button>
-                      )}
-                    </div>
+                {canEdit && ticket.category && (
+                  <ActionGroup label={t('tickets.categoryPriority')}>
+                    <Select
+                      value={categoryPriority}
+                      onChange={(e) => setCategoryPriority(e.target.value)}
+                    >
+                      {/* Empty = inherit, so the category default reads as a real choice
+                          rather than a blank the admin has to guess at. */}
+                      <option value="">
+                        {t('tickets.useCategoryPriority')} ({t(`priority.${ticket.category.priority}`)})
+                      </option>
+                      <option value="low">{t('priority.low')}</option>
+                      <option value="medium">{t('priority.medium')}</option>
+                      <option value="high">{t('priority.high')}</option>
+                      <option value="urgent">{t('priority.urgent')}</option>
+                    </Select>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {t('tickets.categoryPriorityHint')}
+                    </p>
+                    <Button
+                      onClick={handleUpdateCategoryPriority}
+                      loading={updateTicket.isPending}
+                      disabled={categoryPriority === serverCategoryOverride}
+                    >
+                      {t('tickets.updatePriority')}
+                    </Button>
                   </ActionGroup>
                 )}
+
+                {!ticket.assigned_agent && dueDateGroup}
 
                 {canDelete && (
                   <ActionGroup label={t('tickets.dangerZone')} tone="danger">

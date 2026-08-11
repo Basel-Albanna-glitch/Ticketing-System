@@ -111,6 +111,12 @@ export default {
     'priority.high': 'High',
     'priority.urgent': 'Urgent',
 
+    // Compact duration suffixes, appended straight to a number ("3d 4h")
+    'common.unit.day': 'd',
+    'common.unit.hour': 'h',
+    'common.unit.minute': 'm',
+    'common.unit.second': 's',
+
     // Breadcrumbs
     'crumb.dashboard': 'Dashboard',
 
@@ -237,6 +243,12 @@ export default {
     'priority.medium': 'متوسطة',
     'priority.high': 'عالية',
     'priority.urgent': 'عاجلة',
+
+    // Compact duration suffixes, appended straight to a number ("3d 4h")
+    'common.unit.day': 'ي',
+    'common.unit.hour': 'س',
+    'common.unit.minute': 'د',
+    'common.unit.second': 'ث',
 
     // Breadcrumbs
     'crumb.dashboard': 'لوحة التحكم',

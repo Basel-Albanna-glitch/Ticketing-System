@@ -106,8 +106,20 @@ export default function TicketTable({ tickets, sortBy, sortDir, onSort }) {
               <PriorityBadge priority={ticket.priority} />
             </td>
             <td className="px-4 py-2">
-              {ticket.category?.priority ? (
-                <PriorityBadge priority={ticket.category.priority} variant="outline" />
+              {/* The resolved value: this ticket's override when it has one, else the
+                  category's. category_priority_override marks the ones lifted off. */}
+              {ticket.category_priority ? (
+                <span className="inline-flex items-center gap-1">
+                  <PriorityBadge priority={ticket.category_priority} variant="outline" />
+                  {ticket.category_priority_override && (
+                    <span
+                      title={t('tickets.categoryPriorityHint')}
+                      className="text-xs text-gray-400 dark:text-gray-500"
+                    >
+                      *
+                    </span>
+                  )}
+                </span>
               ) : (
                 '—'
               )}

@@ -70,6 +70,17 @@ function thisWeekRange() {
   return { from: toISODate(monday), to: toISODate(sunday) }
 }
 
+// Monday -> Sunday of the week before this one. Shifting this week's Monday back 7 days
+// keeps the same week boundary, so the two presets always sit flush against each other.
+function lastWeekRange() {
+  const { from } = thisWeekRange()
+  const monday = new Date(`${from}T00:00:00`)
+  monday.setDate(monday.getDate() - 7)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  return { from: toISODate(monday), to: toISODate(sunday) }
+}
+
 // 1st -> last day of the current month. Day 0 of next month is this month's last day.
 function thisMonthRange() {
   const now = new Date()
@@ -82,6 +93,7 @@ function thisMonthRange() {
 const DATE_PRESETS = [
   { label: 'dashboard.today', range: todayRange },
   { label: 'dashboard.thisWeek', range: thisWeekRange },
+  { label: 'dashboard.lastWeek', range: lastWeekRange },
   { label: 'dashboard.thisMonth', range: thisMonthRange },
 ]
 

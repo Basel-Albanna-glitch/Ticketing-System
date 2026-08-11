@@ -287,10 +287,38 @@ class TicketViewSet(viewsets.ModelViewSet):
         )
 
     def update(self, request, *args, **kwargs):
-        locked = self._closed_lock_response(self.get_object())
+        ticket = self.get_object()
+        locked = self._closed_lock_response(ticket)
         if locked:
             return locked
-        return super().update(request, *args, **kwargs)
+        old_priority = ticket.priority
+        old_category_priority = ticket.effective_category_priority
+        response = super().update(request, *args, **kwargs)
+        if response.status_code >= 400:
+            return response
+        # Priority steers the queue, so raising or lowering one ticket belongs in the
+        # timeline the way status and assignment changes do. The other detail edits
+        # (subject, description, category, start date) stay unlogged, as before.
+        new_priority = response.data.get('priority')
+        if new_priority and new_priority != old_priority:
+            log_activity(
+                ticket, request.user, TicketActivity.ActivityType.PRIORITY_CHANGED,
+                f'Priority changed from {old_priority} to {new_priority}',
+                metadata={'old': old_priority, 'new': new_priority},
+            )
+        new_category_priority = response.data.get('category_priority')
+        if new_category_priority != old_category_priority:
+            log_activity(
+                ticket, request.user, TicketActivity.ActivityType.PRIORITY_CHANGED,
+                f'Category priority for this ticket changed from '
+                f'{old_category_priority or "—"} to {new_category_priority or "—"}',
+                metadata={
+                    'field': 'category_priority',
+                    'old': old_category_priority,
+                    'new': new_category_priority,
+                },
+            )
+        return response
 
     def destroy(self, request, *args, **kwargs):
         # A closed ticket can't be deleted by anyone but an admin (unless agents have the
@@ -964,13 +992,6 @@ class DashboardView(generics.GenericAPIView):
 
     def get(self, request):
         queryset = get_scoped_tickets(request.user)
-        counts = queryset.aggregate(
-            total=Count('id'),
-            open=Count('id', filter=_dashboard_status_q(Ticket.Status.OPEN)),
-            assigned=Count('id', filter=_dashboard_status_q(DASHBOARD_ASSIGNED)),
-            in_progress=Count('id', filter=Q(status=Ticket.Status.IN_PROGRESS)),
-            resolved=Count('id', filter=Q(status=Ticket.Status.RESOLVED)),
-        )
 
         valid_statuses = {*dict(Ticket.Status.choices), DASHBOARD_ASSIGNED}
         status_param = request.query_params.get('status')
@@ -995,6 +1016,17 @@ class DashboardView(generics.GenericAPIView):
             tickets_qs = tickets_qs.filter(created_at__date__gte=date_from)
         if date_to:
             tickets_qs = tickets_qs.filter(created_at__date__lte=date_to)
+
+        # The tiles describe the filtered set, so they're aggregated over the very queryset
+        # the table below is drawn from. Counting the unfiltered scope here left the tiles
+        # frozen while the filters visibly changed the list under them.
+        counts = tickets_qs.aggregate(
+            total=Count('id'),
+            open=Count('id', filter=_dashboard_status_q(Ticket.Status.OPEN)),
+            assigned=Count('id', filter=_dashboard_status_q(DASHBOARD_ASSIGNED)),
+            in_progress=Count('id', filter=Q(status=Ticket.Status.IN_PROGRESS)),
+            resolved=Count('id', filter=Q(status=Ticket.Status.RESOLVED)),
+        )
 
         recent = tickets_qs.order_by('-created_at')[:10]
         return Response({
