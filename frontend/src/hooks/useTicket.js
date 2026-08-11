@@ -15,9 +15,16 @@ import {
   updateTicketStatus,
 } from '../api/tickets'
 
+// Query keys are compared structurally, so ['ticket', 11] and ['ticket', '11'] are two
+// unrelated queries. Callers pass whichever id they happen to hold — a route param
+// (string) or ticket.id off the payload (number) — so every key is built from the same
+// normalised form. Without this, invalidating after a mutation silently missed the query
+// the page was actually reading, and the change only appeared on the next poll.
+const ticketKey = (id) => ['ticket', String(id)]
+
 export function useTicket(id) {
   return useQuery({
-    queryKey: ['ticket', id],
+    queryKey: ticketKey(id),
     queryFn: () => fetchTicket(id),
     enabled: !!id,
     refetchInterval: 15000, // live-update ticket detail (status, comments) every 15s
@@ -26,7 +33,7 @@ export function useTicket(id) {
 
 export function useTicketActivity(id) {
   return useQuery({
-    queryKey: ['ticket', id, 'activity'],
+    queryKey: [...ticketKey(id), 'activity'],
     queryFn: () => fetchActivity(id),
     enabled: !!id,
     refetchInterval: 15000, // live-update the activity timeline every 15s
@@ -36,8 +43,8 @@ export function useTicketActivity(id) {
 function useInvalidateTicket(id) {
   const queryClient = useQueryClient()
   return () => {
-    queryClient.invalidateQueries({ queryKey: ['ticket', id] })
-    queryClient.invalidateQueries({ queryKey: ['ticket', id, 'activity'] })
+    // Prefix match, so this covers the detail query and its ['...','activity'] child.
+    queryClient.invalidateQueries({ queryKey: ticketKey(id) })
     queryClient.invalidateQueries({ queryKey: ['tickets'] })
     queryClient.invalidateQueries({ queryKey: ['dashboard'] })
   }
