@@ -10,8 +10,13 @@ from rest_framework.permissions import SAFE_METHODS, BasePermission, IsAuthentic
 from rest_framework.response import Response
 
 
-from .models import Project, Task, TodoItem
-from .serializers import ProjectSerializer, TaskSerializer, TodoItemSerializer
+from .models import Project, Task, TodoFolder, TodoItem
+from .serializers import (
+    ProjectSerializer,
+    TaskSerializer,
+    TodoFolderSerializer,
+    TodoItemSerializer,
+)
 
 # Upper bound on rows from the calendar endpoint — far above any real month, but it
 # keeps a bad date range from returning the whole table.
@@ -250,6 +255,64 @@ class TaskViewSet(viewsets.ModelViewSet):
         return Response({'updated': len(ordered)})
 
 
+def visible_todo_q(user, prefix=''):
+    """Which to-dos `user` may see, as a Q.
+
+    One definition, used both to scope the list and to count a folder's contents, so a
+    folder can never advertise "4" and then open onto three. `prefix` re-roots the field
+    paths when filtering across a relation (``'items'`` from a folder).
+    """
+    p = f'{prefix}__' if prefix else ''
+    mine = Q(**{f'{p}created_by': user})
+    shared = Q(**{f'{p}is_private': False})
+    if user.role == User.Role.ADMIN:
+        return shared | mine
+    # Assigning narrows a shared item to the people it went to; unassigned work stays
+    # on the board for anyone to pick up.
+    for_me = Q(**{f'{p}assignees': user}) | Q(**{f'{p}assignees__isnull': True})
+    return mine | (shared & for_me)
+
+
+class TodoFolderViewSet(viewsets.ModelViewSet):
+    """Named groups for to-dos. Shared folders are the team's — any staff member may add
+    or rename one. A private folder is its creator's alone, invisible to everyone else.
+    """
+
+    serializer_class = TodoFolderSerializer
+    permission_classes = [IsAuthenticated, IsAdminOrAgent]
+    pagination_class = None
+
+    def get_queryset(self):
+        return (
+            TodoFolder.objects.filter(
+                Q(is_private=False) | Q(created_by=self.request.user)
+            )
+            .select_related('created_by')
+            # The count each viewer is entitled to: a shared folder holding someone's
+            # work assigned elsewhere should not advertise items they cannot open.
+            # distinct: the assignees join multiplies rows on a multi-assignee item.
+            .annotate(
+                item_count=Count(
+                    'items',
+                    filter=visible_todo_q(self.request.user, 'items'),
+                    distinct=True,
+                )
+            )
+        )
+
+    def perform_create(self, serializer):
+        last = self.get_queryset().order_by('-position').first()
+        serializer.save(
+            created_by=self.request.user,
+            position=(last.position + 1) if last else 0,
+        )
+
+    def perform_destroy(self, instance):
+        # SET_NULL on the FK loosens the items rather than deleting them; say so, since
+        # "delete folder" reads like it might take the work with it.
+        instance.delete()
+
+
 class TodoItemViewSet(viewsets.ModelViewSet):
     """The internal to-do list, staff only. Two lists in one:
 
@@ -271,21 +334,11 @@ class TodoItemViewSet(viewsets.ModelViewSet):
         # The one place visibility is enforced. Every list read, detail read, write and
         # delete goes through here, so an item you cannot see is unreachable by id too —
         # not merely hidden from the list.
-        user = self.request.user
         base = TodoItem.objects.prefetch_related('assignees').select_related(
-            'created_by', 'customer'
+            'created_by', 'customer', 'folder'
         )
-        # Whatever else is true, a private item belongs to its author alone.
-        mine = Q(created_by=user)
-        if user.role == User.Role.ADMIN:
-            return base.filter(Q(is_private=False) | mine)
-        # Assigning narrows a shared item to the people it was handed to; unassigned work
-        # stays on the board for anyone to pick up.
-        shared_and_for_me = Q(is_private=False) & (
-            Q(assignees=user) | Q(assignees__isnull=True)
-        )
-        # distinct(): the assignees join multiplies rows on a multi-assignee item.
-        return base.filter(mine | shared_and_for_me).distinct()
+        # distinct(): the assignees join inside the rule multiplies rows.
+        return base.filter(visible_todo_q(self.request.user)).distinct()
 
     def perform_create(self, serializer):
         # New items land at the top of the open list, where they will be seen. Ranked

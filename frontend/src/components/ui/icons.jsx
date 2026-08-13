@@ -234,6 +234,20 @@ export function TrashIcon(props) {
   )
 }
 
+// Drag handle. Two columns of dots — the long-standing "grab here" convention.
+export function GripIcon(props) {
+  return (
+    <Icon {...props}>
+      <circle cx="9" cy="6" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="6" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="12" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="12" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="18" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="18" r="1.1" fill="currentColor" stroke="none" />
+    </Icon>
+  )
+}
+
 export function PencilIcon(props) {
   return (
     <Icon {...props}>

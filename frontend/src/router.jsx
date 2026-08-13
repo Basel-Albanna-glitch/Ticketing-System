@@ -59,7 +59,12 @@ const router = createBrowserRouter([
           { path: '/settings', element: <SettingsPage /> },
           {
             element: <ProtectedRoute allowedRoles={['admin', 'agent']} />,
-            children: [{ path: '/todo', element: <TodoPage /> }],
+            // One page, four sections. `/todo` is the whole list; `/todo/today`,
+            // `/todo/upcoming` and `/todo/report` narrow it.
+            children: [
+              { path: '/todo', element: <TodoPage /> },
+              { path: '/todo/:view', element: <TodoPage /> },
+            ],
           },
           {
             element: (

@@ -112,6 +112,44 @@ class Task(models.Model):
         return self.title
 
 
+class TodoFolder(models.Model):
+    """A named group of to-dos, living on one side of the shared/private divide.
+
+    A folder is not a filter: putting an item in one settles which list it belongs to,
+    so a folder's contents read the same for everyone entitled to see the folder at all.
+    """
+
+    name = models.CharField(max_length=100)
+    # Fixed at creation. Shared folders are the team's; a private folder is its
+    # creator's alone, and so are the items inside it.
+    is_private = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name='todo_folders', on_delete=models.PROTECT
+    )
+    position = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['position', 'name', 'id']
+        constraints = [
+            # One "Renewals" on the shared board; but two people may each keep a private
+            # folder of the same name, since neither can see the other's.
+            models.UniqueConstraint(
+                fields=['name'],
+                condition=models.Q(is_private=False),
+                name='unique_shared_todo_folder_name',
+            ),
+            models.UniqueConstraint(
+                fields=['name', 'created_by'],
+                condition=models.Q(is_private=True),
+                name='unique_private_todo_folder_name_per_user',
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
 class TodoItem(models.Model):
     """An internal to-do, tied to nothing else.
 
@@ -136,6 +174,12 @@ class TodoItem(models.Model):
     # Defaults to False so the shared board stays the norm and every existing row keeps
     # the behaviour it had before this field existed.
     is_private = models.BooleanField(default=False)
+    # Optional grouping. Null means loose — the "Ungrouped" pile at the foot of its
+    # section. A folder decides the item's privacy, so the two can never disagree;
+    # SET_NULL means deleting a folder loosens its items rather than destroying work.
+    folder = models.ForeignKey(
+        TodoFolder, related_name='items', null=True, blank=True, on_delete=models.SET_NULL
+    )
     priority = models.CharField(max_length=10, choices=Priority.choices, default=Priority.MEDIUM)
     # Optional window, to the minute. `duration_minutes` is derived from the pair
     # rather than stored, so the two can never drift apart.

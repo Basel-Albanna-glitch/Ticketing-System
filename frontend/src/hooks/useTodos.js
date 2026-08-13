@@ -1,14 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createTodo,
+  createTodoFolder,
   deleteTodo,
+  deleteTodoFolder,
   fetchTodoCalendar,
+  fetchTodoFolders,
   fetchTodos,
   reorderTodos,
   updateTodo,
+  updateTodoFolder,
 } from '../api/todos'
 
 const KEY = ['todos']
+const FOLDER_KEY = ['todo-folders']
 
 export function useTodos(filters = {}) {
   return useQuery({
@@ -29,7 +34,38 @@ export function useTodoCalendar({ from, to, enabled = true }) {
 
 function useInvalidateTodos() {
   const queryClient = useQueryClient()
-  return () => queryClient.invalidateQueries({ queryKey: KEY })
+  // Folders carry a visible-item count, so anything that moves an item between them
+  // — or in and out of one — has to refresh both.
+  return () => {
+    queryClient.invalidateQueries({ queryKey: KEY })
+    queryClient.invalidateQueries({ queryKey: FOLDER_KEY })
+  }
+}
+
+export function useTodoFolders() {
+  return useQuery({
+    queryKey: FOLDER_KEY,
+    queryFn: fetchTodoFolders,
+    placeholderData: (previousData) => previousData,
+  })
+}
+
+export function useCreateTodoFolder() {
+  const invalidate = useInvalidateTodos()
+  return useMutation({ mutationFn: createTodoFolder, onSuccess: invalidate })
+}
+
+export function useUpdateTodoFolder() {
+  const invalidate = useInvalidateTodos()
+  return useMutation({
+    mutationFn: ({ id, ...payload }) => updateTodoFolder(id, payload),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteTodoFolder() {
+  const invalidate = useInvalidateTodos()
+  return useMutation({ mutationFn: deleteTodoFolder, onSuccess: invalidate })
 }
 
 export function useCreateTodo() {
@@ -62,8 +98,14 @@ export function useReorderTodos(filters = {}) {
       const previous = queryClient.getQueryData(key)
       queryClient.setQueryData(key, (old) => {
         if (!old) return old
+        // `ids` covers one group, not the whole list. Rebuilding from it alone would
+        // drop every other group from the cache until the refetch lands, so instead
+        // the moved rows are dealt back into the slots they already occupied.
         const byId = new Map(old.map((item) => [item.id, item]))
-        return ids.map((id) => byId.get(id)).filter(Boolean)
+        const moved = ids.map((id) => byId.get(id)).filter(Boolean)
+        const inGroup = new Set(ids)
+        let cursor = 0
+        return old.map((item) => (inGroup.has(item.id) ? moved[cursor++] || item : item))
       })
       return { previous }
     },

@@ -3,7 +3,7 @@ from accounts.serializers import CustomerBranchSerializer, UserSerializer
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Project, Task, TodoItem
+from .models import Project, Task, TodoFolder, TodoItem
 
 
 def _can_edit(request, obj):
@@ -261,6 +261,32 @@ class TaskSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class TodoFolderSerializer(serializers.ModelSerializer):
+    created_by = UserSerializer(read_only=True)
+    item_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = TodoFolder
+        fields = ['id', 'name', 'is_private', 'created_by', 'position', 'item_count', 'created_at']
+        read_only_fields = ['position']
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('A folder needs a name.')
+        return value
+
+    def validate_is_private(self, value):
+        # Which side a folder sits on is fixed once it holds anything: flipping it would
+        # silently drag every item across the divide with it.
+        if self.instance and value != self.instance.is_private:
+            raise serializers.ValidationError(
+                'A folder cannot move between shared and private. '
+                'Make a new folder on the other side and move the to-dos across.'
+            )
+        return value
+
+
 class TodoItemSerializer(serializers.ModelSerializer):
     customer = UserSerializer(read_only=True)
     customer_id = serializers.PrimaryKeyRelatedField(
@@ -276,11 +302,17 @@ class TodoItemSerializer(serializers.ModelSerializer):
         many=True, required=False, write_only=True,
     )
     created_by = UserSerializer(read_only=True)
+    folder = TodoFolderSerializer(read_only=True)
+    folder_id = serializers.PrimaryKeyRelatedField(
+        source='folder', queryset=TodoFolder.objects.all(),
+        allow_null=True, required=False, write_only=True,
+    )
 
     class Meta:
         model = TodoItem
         fields = [
             'id', 'title', 'notes', 'done', 'is_private', 'priority',
+            'folder', 'folder_id',
             'start_at', 'due_at', 'duration_minutes',
             'customer', 'customer_id',
             'assignees', 'assignee_ids', 'created_by', 'position',
@@ -312,6 +344,28 @@ class TodoItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {'start_at': 'Start must be at or before the due time.'}
             )
+
+        # A folder settles which side its items sit on, so the folder wins over any
+        # is_private in the same payload — the two can never end up disagreeing.
+        if 'folder' in attrs and attrs['folder'] is not None:
+            folder = attrs['folder']
+            request = self.context.get('request')
+            user = request.user if request else None
+            if folder.is_private:
+                # Someone else's private folder is not a place you can put work: you
+                # would be hiding the item somewhere even you cannot look.
+                if user and folder.created_by_id != user.id:
+                    raise serializers.ValidationError(
+                        {'folder_id': 'That private folder belongs to someone else.'}
+                    )
+                author_id = getattr(self.instance, 'created_by_id', None) or (
+                    user.id if user else None
+                )
+                if user and author_id != user.id:
+                    raise serializers.ValidationError(
+                        {'folder_id': 'Only the person who created a to-do can make it private.'}
+                    )
+            attrs['is_private'] = folder.is_private
         return attrs
 
     def validate_is_private(self, value):
