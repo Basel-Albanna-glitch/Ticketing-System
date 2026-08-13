@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import Input from '../ui/Input'
 import Select from '../ui/Select'
 import { useAuth } from '../../auth/useAuth'
+import useDismissOnOutsideClick from '../../hooks/useDismissOnOutsideClick'
 import { useCategories } from '../../hooks/useCategories'
 import { useI18n } from '../../i18n/useI18n'
 
@@ -18,13 +19,7 @@ function StatusDropdown({ selected, onToggle, onClear }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
-  useEffect(() => {
-    function onClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [])
+  useDismissOnOutsideClick(ref, useCallback(() => setOpen(false), []), open)
 
   const selectedOption = STATUS_OPTIONS.find((o) => o.value === selected[0])
   const summary =

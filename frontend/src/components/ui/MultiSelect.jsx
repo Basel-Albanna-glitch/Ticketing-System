@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import useDismissOnOutsideClick from '../../hooks/useDismissOnOutsideClick'
 import { useI18n } from '../../i18n/useI18n'
 
 // A multi-select with a search box, built to mirror SearchableSelect. `options` is an
@@ -18,13 +19,7 @@ export default function MultiSelect({
   const ref = useRef(null)
   const inputRef = useRef(null)
 
-  useEffect(() => {
-    function onClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [])
+  useDismissOnOutsideClick(ref, useCallback(() => setOpen(false), []), open)
 
   useEffect(() => {
     if (open) inputRef.current?.focus()

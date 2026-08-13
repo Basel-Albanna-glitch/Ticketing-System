@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import useDismissOnOutsideClick from '../../hooks/useDismissOnOutsideClick'
 import { useI18n } from '../../i18n/useI18n'
 
 // A single-select dropdown with a built-in search box. `options` is an array of
@@ -17,13 +18,7 @@ export default function SearchableSelect({
   const ref = useRef(null)
   const inputRef = useRef(null)
 
-  useEffect(() => {
-    function onClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [])
+  useDismissOnOutsideClick(ref, useCallback(() => setOpen(false), []), open)
 
   useEffect(() => {
     if (open) inputRef.current?.focus()

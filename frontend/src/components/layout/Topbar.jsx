@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Avatar from '../ui/Avatar'
 import Logo from '../ui/Logo'
@@ -7,6 +7,7 @@ import LanguageToggle from '../ui/LanguageToggle'
 import NotificationBell from './NotificationBell'
 import { LogoutIcon, MenuIcon, SettingsIcon, UserIcon } from '../ui/icons'
 import { useAuth } from '../../auth/useAuth'
+import useDismissOnOutsideClick from '../../hooks/useDismissOnOutsideClick'
 import { useI18n } from '../../i18n/useI18n'
 
 const MENU_ITEM =
@@ -21,19 +22,14 @@ function UserMenu() {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
+  useDismissOnOutsideClick(ref, useCallback(() => setOpen(false), []), open)
+
   useEffect(() => {
-    function onClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
     function onEscape(e) {
       if (e.key === 'Escape') setOpen(false)
     }
-    document.addEventListener('mousedown', onClickOutside)
     document.addEventListener('keydown', onEscape)
-    return () => {
-      document.removeEventListener('mousedown', onClickOutside)
-      document.removeEventListener('keydown', onEscape)
-    }
+    return () => document.removeEventListener('keydown', onEscape)
   }, [])
 
   function go(to) {

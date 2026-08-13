@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BellIcon } from '../ui/icons'
+import useDismissOnOutsideClick from '../../hooks/useDismissOnOutsideClick'
 import {
   useMarkAllNotificationsRead,
   useMarkNotificationRead,
@@ -34,13 +35,7 @@ export default function NotificationBell() {
   const unread = data?.unread_count || 0
   const notifications = data?.results || []
 
-  useEffect(() => {
-    function onClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [])
+  useDismissOnOutsideClick(ref, useCallback(() => setOpen(false), []), open)
 
   // Audio can't start before the page has seen a gesture, so arm it on the first one.
   useEffect(() => {
