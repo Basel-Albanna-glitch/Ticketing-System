@@ -18,6 +18,7 @@ import PriorityBadge from '../components/tickets/PriorityBadge'
 import {
   CalendarIcon,
   CheckCircleIcon,
+  ClockIcon,
   GripIcon,
   InboxIcon,
   LockIcon,
@@ -100,88 +101,181 @@ function formatDuration(minutes, t) {
   return parts.join(' ')
 }
 
-// A ranked count. One hue throughout: the bar encodes magnitude only, and identity is
-// carried by the label beside it — never by colour alone. Width is relative to the
-// largest row, so the longest bar fills and the rest read against it.
-function CountBar({ label, value, max }) {
+// Bar colours for the priority breakdown. Priority is a status scale, not a set of
+// arbitrary categories, so it keeps the same colours it wears as a badge everywhere else
+// in the app — and every bar is labelled, so the colour is never carrying the meaning by
+// itself. Identity breakdowns (people, folders) stay one hue: their rows come and go, and
+// cycling hues through a changing list would repaint the survivors on every filter.
+const PRIORITY_BAR = {
+  urgent: 'bg-red-500',
+  high: 'bg-orange-500',
+  medium: 'bg-blue-500',
+  low: 'bg-gray-400',
+}
+
+// A ranked count. Width is relative to the largest row, so the longest bar fills and the
+// rest read against it. Text wears ink colours, never the bar's.
+function CountBar({ label, value, max, tone = 'bg-indigo-500' }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="w-28 shrink-0 truncate text-xs text-gray-600 dark:text-gray-300">{label}</div>
+      <div className="w-32 shrink-0 truncate text-xs text-gray-600 dark:text-gray-300" title={label}>
+        {label}
+      </div>
       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
         <div
           // Width is the only inline style: it is data, not design.
           style={{ width: `${max > 0 ? Math.round((value / max) * 100) : 0}%` }}
-          className="h-full rounded-full bg-indigo-500 transition-[width] duration-500"
+          className={`h-full rounded-full transition-[width] duration-500 ${tone}`}
         />
       </div>
-      <div className="w-8 shrink-0 text-end text-xs font-medium tabular-nums text-gray-700 dark:text-gray-200">
+      <div className="w-6 shrink-0 text-end text-xs font-medium tabular-nums text-gray-700 dark:text-gray-200">
         {value}
       </div>
     </div>
   )
 }
 
+function ReportBlock({ title, rows, tone, t, emptyKey }) {
+  const max = Math.max(1, ...rows.map((r) => r.value))
+  return (
+    <div>
+      <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+        {title}
+      </h3>
+      {rows.length === 0 ? (
+        <p className="text-xs text-gray-400 dark:text-gray-500">{t(emptyKey)}</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {rows.map((row) => (
+            <CountBar
+              key={row.key ?? row.label}
+              label={row.label}
+              value={row.value}
+              max={max}
+              tone={row.tone || tone}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Where the list stands, rather than what is on it. Counts only what the viewer is
 // allowed to see, so two people can read different totals and both be right.
-function TodoReport({ rows, isOverdue, t }) {
+function TodoReport({ rows, t }) {
   const open = rows.filter((i) => !i.done)
-  const byPriority = ['urgent', 'high', 'medium', 'low'].map((p) => ({
-    key: p,
-    label: t(`priority.${p}`),
-    value: open.filter((i) => i.priority === p).length,
-  }))
-  const counts = new Map()
+  const now = Date.now()
+  const endOfToday = new Date()
+  endOfToday.setHours(23, 59, 59, 999)
+
+  // Kept disjoint on purpose: an item is either already late or still has today to run.
+  // Two headline numbers that double-count the same work are worse than one.
+  const overdue = open.filter((i) => i.due_at && new Date(i.due_at).getTime() < now)
+  const dueToday = open.filter((i) => {
+    if (!i.due_at) return false
+    const due = new Date(i.due_at).getTime()
+    return due >= now && due <= endOfToday.getTime()
+  })
+  const unassigned = open.filter((i) => !i.assignees?.length)
+  const weekAgo = now - 7 * 864e5
+  const doneThisWeek = rows.filter(
+    (i) => i.done && i.completed_at && new Date(i.completed_at).getTime() >= weekAgo
+  )
+
+  const byPriority = ['urgent', 'high', 'medium', 'low']
+    .map((p) => ({
+      key: p,
+      label: t(`priority.${p}`),
+      value: open.filter((i) => i.priority === p).length,
+      tone: PRIORITY_BAR[p],
+    }))
+    // A priority nobody is using is noise, not information.
+    .filter((r) => r.value > 0)
+
+  const perPerson = new Map()
   for (const item of open) {
-    const people = item.assignees?.length ? item.assignees.map((a) => a.full_name) : [null]
-    for (const name of people) counts.set(name, (counts.get(name) || 0) + 1)
+    const names = item.assignees?.length ? item.assignees.map((a) => a.full_name) : [null]
+    // A shared item counts once for each person carrying it — the question is how much
+    // each of them has on, not how the total divides up.
+    for (const name of names) perPerson.set(name, (perPerson.get(name) || 0) + 1)
   }
-  const byPerson = [...counts.entries()]
+  const byPerson = [...perPerson.entries()]
     .map(([name, value]) => ({ label: name || t('projects.unassigned'), value }))
     .sort((a, b) => b.value - a.value)
 
-  const priorityMax = Math.max(1, ...byPriority.map((r) => r.value))
-  const personMax = Math.max(1, ...byPerson.map((r) => r.value))
+  const perFolder = new Map()
+  for (const item of open) {
+    const name = item.folder?.name || t('todo.ungrouped')
+    perFolder.set(name, (perFolder.get(name) || 0) + 1)
+  }
+  const byFolder = [...perFolder.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value)
+  // One "Ungrouped" bar restates the open total; it only informs once folders exist.
+  const showFolders = byFolder.length > 1
 
   return (
-    <Card>
-      <SectionHeader
-        icon={ReportsIcon}
-        title={t('todo.reportTitle')}
-        description={t('todo.reportHint')}
-      />
-      {open.length === 0 ? (
-        <EmptyState title={t('todo.reportEmpty')} description={t('todo.reportEmptyHint')} />
-      ) : (
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-          <div>
-            <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-              {t('todo.reportByPriority')}
-            </h3>
-            <div className="flex flex-col gap-2">
-              {byPriority.map((row) => (
-                <CountBar key={row.key} label={row.label} value={row.value} max={priorityMax} />
-              ))}
+    <div className="flex flex-col gap-6">
+      {/* The numbers worth acting on, rather than a restatement of the list's size. */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatTile
+          label={t('todo.statOverdue')}
+          value={overdue.length}
+          icon={CalendarIcon}
+          color={overdue.length ? 'red' : 'green'}
+        />
+        <StatTile label={t('todo.reportDueToday')} value={dueToday.length} icon={ClockIcon} color="amber" />
+        <StatTile
+          label={t('todo.reportUnassigned')}
+          value={unassigned.length}
+          icon={InboxIcon}
+          color={unassigned.length ? 'purple' : 'green'}
+        />
+        <StatTile
+          label={t('todo.reportDoneThisWeek')}
+          value={doneThisWeek.length}
+          icon={CheckCircleIcon}
+          color="green"
+        />
+      </div>
+
+      <Card>
+        <SectionHeader
+          icon={ReportsIcon}
+          title={t('todo.reportTitle')}
+          description={t('todo.reportHint')}
+        />
+        {open.length === 0 ? (
+          <EmptyState title={t('todo.reportEmpty')} description={t('todo.reportEmptyHint')} />
+        ) : (
+          <div className="flex flex-col gap-8">
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+              <ReportBlock
+                title={t('todo.reportByPriority')}
+                rows={byPriority}
+                t={t}
+                emptyKey="todo.reportNone"
+              />
+              <ReportBlock
+                title={t('todo.reportByPerson')}
+                rows={byPerson}
+                t={t}
+                emptyKey="todo.reportNone"
+              />
             </div>
-            <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-              {t('todo.reportOverdue')}{' '}
-              <span className="font-medium tabular-nums text-gray-800 dark:text-gray-200">
-                {rows.filter(isOverdue).length}
-              </span>
-            </p>
+            {showFolders && (
+              <ReportBlock
+                title={t('todo.reportByFolder')}
+                rows={byFolder}
+                t={t}
+                emptyKey="todo.reportNone"
+              />
+            )}
           </div>
-          <div>
-            <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-              {t('todo.reportByPerson')}
-            </h3>
-            <div className="flex flex-col gap-2">
-              {byPerson.map((row) => (
-                <CountBar key={row.label} label={row.label} value={row.value} max={personMax} />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </Card>
+        )}
+      </Card>
+    </div>
   )
 }
 
@@ -689,16 +783,20 @@ export default function TodoPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatTile label={t('todo.statOpen')} value={openCount} icon={InboxIcon} color="indigo" />
-        <StatTile label={t('todo.statDone')} value={doneCount} icon={CheckCircleIcon} color="green" />
-        <StatTile
-          label={t('todo.statOverdue')}
-          value={overdueCount}
-          icon={CalendarIcon}
-          color={overdueCount ? 'red' : 'green'}
-        />
-      </div>
+      {/* The report brings its own headline numbers, and a second Overdue tile directly
+          above them would only invite a double-take over which one is authoritative. */}
+      {!isReport && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StatTile label={t('todo.statOpen')} value={openCount} icon={InboxIcon} color="indigo" />
+          <StatTile label={t('todo.statDone')} value={doneCount} icon={CheckCircleIcon} color="green" />
+          <StatTile
+            label={t('todo.statOverdue')}
+            value={overdueCount}
+            icon={CalendarIcon}
+            color={overdueCount ? 'red' : 'green'}
+          />
+        </div>
+      )}
 
       {isLoading ? (
         <Card>
@@ -707,7 +805,7 @@ export default function TodoPage() {
           </div>
         </Card>
       ) : isReport ? (
-        <TodoReport rows={allRows} isOverdue={isOverdue} t={t} />
+        <TodoReport rows={allRows} t={t} />
       ) : (
         <>
           <TodoSection
