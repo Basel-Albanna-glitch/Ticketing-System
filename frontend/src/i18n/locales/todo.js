@@ -1,7 +1,22 @@
-// Internal to-do list — a shared staff list, unrelated to projects or customers.
+// Internal to-do list — a shared staff board plus each person's own private list,
+// unrelated to projects or customers.
 export default {
   en: {
-    'todo.subtitle': 'Internal jobs the team is carrying, shared across all staff.',
+    'todo.subtitle': 'Internal jobs the team is carrying, plus your own private list.',
+    'todo.sectionPublic': 'Shared',
+    'todo.sectionPublicHintAdmin': "Every shared to-do, whoever it's assigned to.",
+    'todo.sectionPublicHintAgent':
+      'Assigned to you, plus anything nobody has picked up yet.',
+    'todo.sectionPrivate': 'Private',
+    'todo.sectionPrivateHint': 'Only you can see these — not other agents, not admins.',
+    'todo.privateEmpty': 'No private to-dos',
+    'todo.privateEmptyHint': 'Turn on "Keep this private" to add one only you can see.',
+    'todo.assignNarrowsHint':
+      'Only the people above — and admins — will see this. Other agents will not.',
+    'todo.unassignedHint': 'Unassigned, so it stays on the board for anyone to pick up.',
+    'todo.makePrivate': 'Keep this private',
+    'todo.makePrivateHint': 'Hidden from everyone else, including admins.',
+    'todo.privacyOwnerOnly': 'Only whoever created a to-do can change this.',
     'todo.newItem': 'New to-do',
     'todo.editItem': 'Edit to-do',
     'todo.addItem': 'Add',
@@ -23,7 +38,19 @@ export default {
     'todo.deleteFailed': 'Could not delete this item.',
   },
   ar: {
-    'todo.subtitle': 'مهام داخلية يتشاركها جميع الموظفين.',
+    'todo.subtitle': 'مهام داخلية يتشاركها الفريق، إضافة إلى قائمتك الخاصة.',
+    'todo.sectionPublic': 'مشتركة',
+    'todo.sectionPublicHintAdmin': 'جميع المهام المشتركة، أيًّا كان المسؤول عنها.',
+    'todo.sectionPublicHintAgent': 'المُسندة إليك، إضافة إلى ما لم يتولَّه أحد بعد.',
+    'todo.sectionPrivate': 'خاصة',
+    'todo.sectionPrivateHint': 'أنت وحدك من يراها — لا الوكلاء الآخرون ولا المدراء.',
+    'todo.privateEmpty': 'لا توجد مهام خاصة',
+    'todo.privateEmptyHint': 'فعّل «اجعلها خاصة» لإضافة مهمة يراها أنت فقط.',
+    'todo.assignNarrowsHint': 'سيراها المذكورون أعلاه والمدراء فقط، لا بقية الوكلاء.',
+    'todo.unassignedHint': 'غير مُسندة، لذا تبقى على اللوحة ليتولّاها أي شخص.',
+    'todo.makePrivate': 'اجعلها خاصة',
+    'todo.makePrivateHint': 'مخفية عن الجميع، بمن فيهم المدراء.',
+    'todo.privacyOwnerOnly': 'يمكن لمنشئ المهمة وحده تغيير هذا.',
     'todo.newItem': 'مهمة داخلية جديدة',
     'todo.editItem': 'تعديل المهمة',
     'todo.addItem': 'إضافة',

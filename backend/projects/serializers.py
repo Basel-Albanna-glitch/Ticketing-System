@@ -280,7 +280,7 @@ class TodoItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = TodoItem
         fields = [
-            'id', 'title', 'notes', 'done', 'priority',
+            'id', 'title', 'notes', 'done', 'is_private', 'priority',
             'start_at', 'due_at', 'duration_minutes',
             'customer', 'customer_id',
             'assignees', 'assignee_ids', 'created_by', 'position',
@@ -313,6 +313,20 @@ class TodoItemSerializer(serializers.ModelSerializer):
                 {'start_at': 'Start must be at or before the due time.'}
             )
         return attrs
+
+    def validate_is_private(self, value):
+        # Whose item it is decides who may hide it. Without this, anyone could flip a
+        # colleague's item to private and quietly pull it off the shared board — where it
+        # would then be readable only by an author who never chose to hide it.
+        instance = self.instance
+        if instance is None or value == instance.is_private:
+            return value
+        request = self.context.get('request')
+        if request and instance.created_by_id != request.user.id:
+            raise serializers.ValidationError(
+                'Only the person who created a to-do can change whether it is private.'
+            )
+        return value
 
     def validate_assignee_ids(self, value):
         for user in value:

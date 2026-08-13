@@ -113,11 +113,14 @@ class Task(models.Model):
 
 
 class TodoItem(models.Model):
-    """An internal to-do, shared across staff and tied to nothing else.
+    """An internal to-do, tied to nothing else.
 
     Deliberately separate from Task: a Task belongs to a project and moves through
     delivery stages, while these are the small internal jobs that belong nowhere —
     renew a certificate, order hardware, chase a supplier.
+
+    Two lists in one table, split by `is_private`: a shared board the whole team reads,
+    and each person's own list that nobody else sees — admins included.
     """
 
     class Priority(models.TextChoices):
@@ -129,6 +132,10 @@ class TodoItem(models.Model):
     title = models.CharField(max_length=200)
     notes = models.TextField(blank=True)
     done = models.BooleanField(default=False)
+    # Private items are visible only to created_by — not to other agents, not to admins.
+    # Defaults to False so the shared board stays the norm and every existing row keeps
+    # the behaviour it had before this field existed.
+    is_private = models.BooleanField(default=False)
     priority = models.CharField(max_length=10, choices=Priority.choices, default=Priority.MEDIUM)
     # Optional window, to the minute. `duration_minutes` is derived from the pair
     # rather than stored, so the two can never drift apart.
@@ -158,7 +165,11 @@ class TodoItem(models.Model):
     class Meta:
         # Open work first, then manual order; ties break on id so it is total.
         ordering = ['done', 'position', 'id']
-        indexes = [models.Index(fields=['done', 'position'])]
+        indexes = [
+            models.Index(fields=['done', 'position']),
+            # Every list read filters on visibility first.
+            models.Index(fields=['is_private', 'created_by']),
+        ]
 
     def __str__(self):
         return self.title

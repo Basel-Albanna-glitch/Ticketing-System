@@ -203,7 +203,11 @@ def delivery_payload(date_from, date_to):
     today = timezone.localdate()
     projects = in_range(Project.objects.all(), date_from, date_to)
     tasks = in_range(Task.objects.all(), date_from, date_to)
-    todos = in_range(TodoItem.objects.all(), date_from, date_to)
+    # Public to-dos only. These are team delivery figures, and someone's private list is
+    # neither the team's work nor anyone else's business — counting it here would leak
+    # how much of it exists to every report reader.
+    shared_todos = TodoItem.objects.filter(is_private=False)
+    todos = in_range(shared_todos, date_from, date_to)
 
     # Overdue is a live fact, not a windowed one: a task is late today whether or
     # not it was created inside the range.
@@ -230,7 +234,7 @@ def delivery_payload(date_from, date_to):
         'tasks_overdue': overdue_tasks.count(),
         'todos_total': todos.count(),
         'todos_done': todos.filter(done=True).count(),
-        'todos_overdue': TodoItem.objects.filter(
+        'todos_overdue': shared_todos.filter(
             done=False, due_at__lt=timezone.now()
         ).count(),
         'by_task_stage': list(

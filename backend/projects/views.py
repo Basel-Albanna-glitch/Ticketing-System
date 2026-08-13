@@ -251,25 +251,46 @@ class TaskViewSet(viewsets.ModelViewSet):
 
 
 class TodoItemViewSet(viewsets.ModelViewSet):
-    """The internal to-do list: one shared list, staff only.
+    """The internal to-do list, staff only. Two lists in one:
 
-    Not scoped per user by design — the point is that anyone on the team can see
-    what is outstanding and pick it up.
+    - **Shared** — the team board. An admin reads all of it. An agent reads the items
+      assigned to them, the ones nobody has picked up yet, and anything they wrote
+      themselves: handing a job to a colleague should not delete it from your own view.
+    - **Private** — items only their author reads. Withheld from everyone else,
+      admins included, so "private" means what it says.
     """
 
     serializer_class = TodoItemSerializer
     permission_classes = [IsAuthenticated, IsAdminOrAgent]
     pagination_class = None
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ['done', 'priority', 'assignees', 'customer']
+    filterset_fields = ['done', 'priority', 'assignees', 'customer', 'is_private']
     search_fields = ['title', 'notes']
 
     def get_queryset(self):
-        return TodoItem.objects.prefetch_related('assignees').select_related('created_by', 'customer')
+        # The one place visibility is enforced. Every list read, detail read, write and
+        # delete goes through here, so an item you cannot see is unreachable by id too —
+        # not merely hidden from the list.
+        user = self.request.user
+        base = TodoItem.objects.prefetch_related('assignees').select_related(
+            'created_by', 'customer'
+        )
+        # Whatever else is true, a private item belongs to its author alone.
+        mine = Q(created_by=user)
+        if user.role == User.Role.ADMIN:
+            return base.filter(Q(is_private=False) | mine)
+        # Assigning narrows a shared item to the people it was handed to; unassigned work
+        # stays on the board for anyone to pick up.
+        shared_and_for_me = Q(is_private=False) & (
+            Q(assignees=user) | Q(assignees__isnull=True)
+        )
+        # distinct(): the assignees join multiplies rows on a multi-assignee item.
+        return base.filter(mine | shared_and_for_me).distinct()
 
     def perform_create(self, serializer):
-        # New items land at the top of the open list, where they will be seen.
-        first = TodoItem.objects.order_by('position').first()
+        # New items land at the top of the open list, where they will be seen. Ranked
+        # against what this user can see, so another person's private item can't nudge it.
+        first = self.get_queryset().order_by('position').first()
         serializer.save(
             created_by=self.request.user,
             position=(first.position - 1) if first and first.position > 0 else 0,
@@ -280,8 +301,9 @@ class TodoItemViewSet(viewsets.ModelViewSet):
         """To-dos whose window touches [from, to], for the calendar.
 
         Only dated items appear — an undated to-do belongs on the list, not on a
-        day. An agent sees their own plus the ones nobody has taken, since those
-        are still the team's to pick up; admins see everything.
+        day. Who sees what is decided by get_queryset(), the same as the list: this
+        view used to carry its own narrower copy of the rule, so the calendar and the
+        list disagreed about which to-dos an agent had.
         """
         start = parse_date(request.query_params.get('from') or '')
         end = parse_date(request.query_params.get('to') or '')
@@ -296,10 +318,6 @@ class TodoItemViewSet(viewsets.ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset()).filter(
             starts_in | ends_in | spans
         )
-        if request.user.role == User.Role.AGENT:
-            queryset = queryset.filter(
-                Q(assignees=request.user) | Q(assignees__isnull=True)
-            ).distinct()
         return Response(
             self.get_serializer(queryset.order_by('due_at', 'id')[:CALENDAR_MAX_PROJECTS], many=True).data
         )
@@ -310,7 +328,9 @@ class TodoItemViewSet(viewsets.ModelViewSet):
         ids = request.data.get('ids')
         if not isinstance(ids, list):
             return Response({'detail': 'ids is required.'}, status=status.HTTP_400_BAD_REQUEST)
-        items = {i.id: i for i in TodoItem.objects.filter(id__in=ids)}
+        # Through get_queryset(), not TodoItem.objects — otherwise this would reposition
+        # (and so confirm the existence of) another person's private items.
+        items = {i.id: i for i in self.get_queryset().filter(id__in=ids)}
         unknown = [i for i in ids if i not in items]
         if unknown:
             return Response({'ids': f'Unknown to-dos: {unknown}'}, status=status.HTTP_400_BAD_REQUEST)
