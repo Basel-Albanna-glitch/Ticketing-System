@@ -108,6 +108,52 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 
 Migrations and `collectstatic` run automatically on each backend start.
 
+## 6. Scheduled tasks
+
+Two alerts are time-based, and the stack has no scheduler of its own — no Celery,
+no worker, no cron container. Both commands are safe to run as often as you like:
+each alert goes out once, enforced in the database rather than by the schedule.
+
+```bash
+crontab -e
+```
+
+```cron
+# To-do reminders — every 5 minutes.
+*/5 * * * * cd /home/ubuntu/ticketing && docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T backend python manage.py notify_todo_reminders >> /home/ubuntu/cron.log 2>&1
+# Licence expiry warnings — once a day, early.
+30 6 * * * cd /home/ubuntu/ticketing && docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T backend python manage.py notify_license_expiry >> /home/ubuntu/cron.log 2>&1
+```
+
+Without cron these still fire, but only while somebody has the app open: the
+notification poll doubles as a heartbeat. That is enough for a licence warning
+with a day's grace and not enough for a reminder set for 07:00, which would wait
+until the first person signs in.
+
+**Email must be configured for any of this to leave the server.** `docker-compose.prod.yml`
+defaults `DJANGO_EMAIL_BACKEND` to Django's *console* backend, which prints mail to
+the container log and discards it. Set these in `.env.prod` and restart:
+
+```
+DJANGO_EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.yourprovider.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=...
+EMAIL_HOST_PASSWORD=...
+EMAIL_USE_TLS=True
+DEFAULT_FROM_EMAIL=Hermes Support <support@example.com>
+```
+
+`DEFAULT_FROM_EMAIL` is the only place the sender address is set — it is per-server,
+not per-user, and nothing in the app UI can change it. Sending fails silently by
+design, so a wrong host produces no error anywhere: verify with
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T backend \
+  python manage.py shell -c "from django.core.mail import send_mail; \
+  send_mail('test', 'it works', None, ['you@example.com'])"
+```
+
 ## Backups
 
 The Postgres data lives in the `postgres_data` volume and uploads in `media_data`;
