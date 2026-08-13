@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from accounts.models import CustomerBranch, User
 from accounts.serializers import CustomerBranchSerializer, UserSerializer
 from django.utils import timezone
@@ -321,14 +323,16 @@ class TodoItemSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'notes', 'done', 'is_private', 'priority',
             'folder', 'folder_id', 'attachments',
-            'start_at', 'due_at', 'remind_at', 'reminder_sent_at', 'duration_minutes',
+            'start_at', 'due_at', 'remind_offset_minutes', 'remind_at', 'reminder_sent_at',
+            'duration_minutes',
             'customer', 'customer_id',
             'assignees', 'assignee_ids', 'created_by', 'position',
             'completed_at', 'created_at', 'updated_at',
         ]
         # Order belongs to the reorder endpoint; completion and reminder delivery are
-        # stamped by the server.
-        read_only_fields = ['position', 'completed_at', 'reminder_sent_at']
+        # stamped by the server. remind_at is derived from due_at and the offset, so it
+        # is reported rather than accepted — the two could otherwise disagree.
+        read_only_fields = ['position', 'completed_at', 'reminder_sent_at', 'remind_at']
 
     def get_duration_minutes(self, obj):
         if not obj.start_at or not obj.due_at:
@@ -353,6 +357,28 @@ class TodoItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {'start_at': 'Start must be at or before the due time.'}
             )
+
+        # The reminder is an offset from the due date, so recompute whenever either end
+        # moves: pushing a deadline back should take its reminder along, not leave it
+        # firing on the old schedule.
+        if 'remind_offset_minutes' in attrs or 'due_at' in attrs:
+            offset = attrs.get(
+                'remind_offset_minutes',
+                getattr(self.instance, 'remind_offset_minutes', None),
+            )
+            if offset is None:
+                attrs['remind_at'] = None
+            elif due is None:
+                if 'remind_offset_minutes' in attrs:
+                    raise serializers.ValidationError(
+                        {'remind_offset_minutes': 'Set a due date before choosing a reminder.'}
+                    )
+                # The due date was removed. A relative reminder has nothing left to hang
+                # on, so it goes with it rather than blocking the edit.
+                attrs['remind_offset_minutes'] = None
+                attrs['remind_at'] = None
+            else:
+                attrs['remind_at'] = due - timedelta(minutes=offset)
 
         # A folder settles which side its items sit on, so the folder wins over any
         # is_private in the same payload — the two can never end up disagreeing.

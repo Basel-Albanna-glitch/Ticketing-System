@@ -200,8 +200,12 @@ class TodoItem(models.Model):
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, related_name='todo_items_created', on_delete=models.PROTECT
     )
-    # When to nudge whoever is carrying this. Independent of due_at: you often want
-    # warning the day before, not a ping as the deadline passes.
+    # How long before the due date to nudge whoever is carrying this — "three days
+    # before" rather than a fixed moment, so moving the deadline carries the reminder
+    # with it. Null means no reminder; 0 means at the deadline itself.
+    remind_offset_minutes = models.PositiveIntegerField(null=True, blank=True)
+    # The moment the reminder is due, derived from due_at and the offset. Stored rather
+    # than computed on read so the sweep can find it with an indexed query.
     remind_at = models.DateTimeField(null=True, blank=True)
     # Stamped when the reminder actually goes out. Doubles as the guard that stops a
     # second one — there is no task queue here, so the sweep can run more than once.

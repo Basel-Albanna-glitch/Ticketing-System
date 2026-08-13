@@ -67,6 +67,27 @@ const VIEW_HINT_KEY = {
   report: 'todo.reportHint',
 }
 
+// Reminder offsets, in minutes before the due date. Coarse on purpose: a to-do list
+// wants "a few days' warning", not a time picker.
+const REMINDER_OFFSETS = [
+  { minutes: 0, labelKey: 'todo.remindAtDue' },
+  { minutes: 60, labelKey: 'todo.remind1h' },
+  { minutes: 1440, labelKey: 'todo.remind1d' },
+  { minutes: 4320, labelKey: 'todo.remind3d' },
+  { minutes: 10080, labelKey: 'todo.remind7d' },
+  { minutes: 20160, labelKey: 'todo.remind14d' },
+]
+
+// What the chosen offset works out to, so nobody has to do the arithmetic to find out
+// their "7 days before" already fell in the past.
+function remindPreview(form, t) {
+  const due = new Date(form.due_at)
+  if (Number.isNaN(due.getTime())) return ''
+  const when = new Date(due.getTime() - Number(form.remind_offset_minutes) * 60000)
+  const stamp = when.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+  return when.getTime() <= Date.now() ? `${stamp} — ${t('todo.remindInPast')}` : stamp
+}
+
 const EMPTY_FORM = {
   title: '',
   notes: '',
@@ -77,7 +98,7 @@ const EMPTY_FORM = {
   folder_id: '',
   start_at: '',
   due_at: '',
-  remind_at: '',
+  remind_offset_minutes: '',
   customer_id: '',
   assignee_ids: [],
 }
@@ -741,7 +762,8 @@ export default function TodoPage() {
       folder_id: item.folder?.id ?? '',
       start_at: toLocalInput(item.start_at),
       due_at: toLocalInput(item.due_at),
-      remind_at: toLocalInput(item.remind_at),
+      remind_offset_minutes:
+        item.remind_offset_minutes == null ? '' : String(item.remind_offset_minutes),
       customer_id: item.customer?.id ?? '',
       assignee_ids: (item.assignees || []).map((a) => a.id),
     })
@@ -757,7 +779,9 @@ export default function TodoPage() {
       ...form,
       start_at: fromLocalInput(form.start_at),
       due_at: fromLocalInput(form.due_at),
-      remind_at: fromLocalInput(form.remind_at),
+      // '' means no reminder; the server derives remind_at from this and the due date.
+      remind_offset_minutes:
+        form.remind_offset_minutes === '' ? null : Number(form.remind_offset_minutes),
       customer_id: form.customer_id || null,
       folder_id: form.folder_id || null,
     }
@@ -1090,20 +1114,34 @@ export default function TodoPage() {
             />
           </div>
           <div>
-            <Input
+            <Select
               label={t('todo.remindAt')}
-              type="datetime-local"
-              value={form.remind_at}
-              onChange={(e) => setForm({ ...form, remind_at: e.target.value })}
-            />
+              value={form.remind_offset_minutes}
+              disabled={!form.due_at}
+              onChange={(e) => setForm({ ...form, remind_offset_minutes: e.target.value })}
+            >
+              <option value="">{t('todo.remindNone')}</option>
+              {REMINDER_OFFSETS.map((o) => (
+                <option key={o.minutes} value={o.minutes}>
+                  {t(o.labelKey)}
+                </option>
+              ))}
+            </Select>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {/* Says who actually gets it, because "remind me" is the natural reading
-                  and on a shared item it is wrong. */}
-              {form.is_private
-                ? t('todo.remindAtHintPrivate')
-                : form.assignee_ids.length
-                  ? t('todo.remindAtHintAssigned')
-                  : t('todo.remindAtHintUnassigned')}
+              {/* Three things a reader needs: that it hangs off the due date, when it
+                  will actually land, and who gets it — "remind me" is the natural
+                  reading and on a shared item it is wrong. */}
+              {!form.due_at
+                ? t('todo.remindNeedsDueDate')
+                : form.remind_offset_minutes === ''
+                  ? t('todo.remindNoneHint')
+                  : `${remindPreview(form, t)} · ${
+                      form.is_private
+                        ? t('todo.remindAtHintPrivate')
+                        : form.assignee_ids.length
+                          ? t('todo.remindAtHintAssigned')
+                          : t('todo.remindAtHintUnassigned')
+                    }`}
             </p>
           </div>
           <Select
