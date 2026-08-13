@@ -321,13 +321,14 @@ class TodoItemSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'notes', 'done', 'is_private', 'priority',
             'folder', 'folder_id', 'attachments',
-            'start_at', 'due_at', 'duration_minutes',
+            'start_at', 'due_at', 'remind_at', 'reminder_sent_at', 'duration_minutes',
             'customer', 'customer_id',
             'assignees', 'assignee_ids', 'created_by', 'position',
             'completed_at', 'created_at', 'updated_at',
         ]
-        # Order belongs to the reorder endpoint; completion is stamped on save.
-        read_only_fields = ['position', 'completed_at']
+        # Order belongs to the reorder endpoint; completion and reminder delivery are
+        # stamped by the server.
+        read_only_fields = ['position', 'completed_at', 'reminder_sent_at']
 
     def get_duration_minutes(self, obj):
         if not obj.start_at or not obj.due_at:
@@ -402,4 +403,8 @@ class TodoItemSerializer(serializers.ModelSerializer):
         # Stamp the moment work was finished, and clear it if the box is unticked.
         if 'done' in validated_data and validated_data['done'] != instance.done:
             validated_data['completed_at'] = timezone.now() if validated_data['done'] else None
+        # Moving the reminder arms it again. Without this, pushing a reminder you have
+        # already had back to tomorrow would silently never fire.
+        if 'remind_at' in validated_data and validated_data['remind_at'] != instance.remind_at:
+            validated_data['reminder_sent_at'] = None
         return super().update(instance, validated_data)

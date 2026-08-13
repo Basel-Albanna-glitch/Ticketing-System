@@ -97,7 +97,7 @@ class NotificationPreferenceSerializer(serializers.ModelSerializer):
         model = NotificationPreference
         fields = [
             'email_on_new_comment', 'email_on_status_change', 'email_on_assignment',
-            'email_on_license_expiry',
+            'email_on_license_expiry', 'email_on_todo_reminder',
         ]
 
 

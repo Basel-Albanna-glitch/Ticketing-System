@@ -17,6 +17,7 @@ import Textarea from '../components/ui/Textarea'
 import Toggle from '../components/ui/Toggle'
 import PriorityBadge from '../components/tickets/PriorityBadge'
 import {
+  BellIcon,
   CalendarIcon,
   CheckCircleIcon,
   ClockIcon,
@@ -76,6 +77,7 @@ const EMPTY_FORM = {
   folder_id: '',
   start_at: '',
   due_at: '',
+  remind_at: '',
   customer_id: '',
   assignee_ids: [],
 }
@@ -455,6 +457,17 @@ function TodoRow({ item, drag, t, isOverdue, onToggleDone, onEdit, onDelete, del
               {item.attachments.length}
             </span>
           )}
+          {/* Only while it is still pending: once sent, the bell would claim a reminder
+              is coming that already went. */}
+          {item.remind_at && !item.reminder_sent_at && !item.done && (
+            <span
+              className="inline-flex items-center gap-1"
+              title={`${t('todo.remindAt')}: ${new Date(item.remind_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}`}
+            >
+              <BellIcon className="h-3.5 w-3.5" />
+              {new Date(item.remind_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+            </span>
+          )}
           {item.customer && (
             <span className="truncate text-indigo-600 dark:text-indigo-400">
               {item.customer.full_name}
@@ -728,6 +741,7 @@ export default function TodoPage() {
       folder_id: item.folder?.id ?? '',
       start_at: toLocalInput(item.start_at),
       due_at: toLocalInput(item.due_at),
+      remind_at: toLocalInput(item.remind_at),
       customer_id: item.customer?.id ?? '',
       assignee_ids: (item.assignees || []).map((a) => a.id),
     })
@@ -743,6 +757,7 @@ export default function TodoPage() {
       ...form,
       start_at: fromLocalInput(form.start_at),
       due_at: fromLocalInput(form.due_at),
+      remind_at: fromLocalInput(form.remind_at),
       customer_id: form.customer_id || null,
       folder_id: form.folder_id || null,
     }
@@ -1073,6 +1088,23 @@ export default function TodoPage() {
               readOnly
               disabled
             />
+          </div>
+          <div>
+            <Input
+              label={t('todo.remindAt')}
+              type="datetime-local"
+              value={form.remind_at}
+              onChange={(e) => setForm({ ...form, remind_at: e.target.value })}
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {/* Says who actually gets it, because "remind me" is the natural reading
+                  and on a shared item it is wrong. */}
+              {form.is_private
+                ? t('todo.remindAtHintPrivate')
+                : form.assignee_ids.length
+                  ? t('todo.remindAtHintAssigned')
+                  : t('todo.remindAtHintUnassigned')}
+            </p>
           </div>
           <Select
             label={t('todo.folder')}

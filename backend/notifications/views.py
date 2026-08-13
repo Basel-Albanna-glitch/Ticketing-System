@@ -18,9 +18,15 @@ class NotificationViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         # This poll doubles as the heartbeat for time-based alerts, which have no
-        # scheduler of their own. Hourly at most, off-thread, and a no-op if a sweep
-        # already covered today's deadlines.
+        # scheduler of their own. Both sweeps are off-thread and rate-limited per
+        # process, and both are no-ops once their work is already done.
         maybe_sweep_license_expiry()
+        # Imported here rather than at module scope: notifications is the lower-level
+        # app, and a top-level import of projects would tie the two together for the
+        # sake of one call.
+        from projects.reminders import maybe_sweep_todo_reminders
+
+        maybe_sweep_todo_reminders()
         qs = self.get_queryset()
         unread = Notification.objects.filter(recipient=request.user, is_read=False).count()
         return Response({

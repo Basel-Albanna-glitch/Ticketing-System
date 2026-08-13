@@ -18,6 +18,7 @@ import {
   BadgeIcon,
   BookIcon,
   ChatIcon,
+  ClockIcon,
   FolderOpenIcon,
   TrashIcon,
   BoardIcon,
@@ -257,6 +258,13 @@ function NotificationSection() {
       icon: BadgeIcon,
       label: t('settings.notifications.licenseExpiry.label'),
       hint: t('settings.notifications.licenseExpiry.hint'),
+    },
+    // The internal to-do list is staff-only, so a customer has no reminders to get.
+    user?.role !== 'customer' && {
+      key: 'email_on_todo_reminder',
+      icon: ClockIcon,
+      label: t('settings.notifications.todoReminder.label'),
+      hint: t('settings.notifications.todoReminder.hint'),
     },
   ].filter(Boolean)
 

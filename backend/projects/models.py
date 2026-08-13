@@ -200,6 +200,12 @@ class TodoItem(models.Model):
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, related_name='todo_items_created', on_delete=models.PROTECT
     )
+    # When to nudge whoever is carrying this. Independent of due_at: you often want
+    # warning the day before, not a ping as the deadline passes.
+    remind_at = models.DateTimeField(null=True, blank=True)
+    # Stamped when the reminder actually goes out. Doubles as the guard that stops a
+    # second one — there is no task queue here, so the sweep can run more than once.
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
     # Manual rank, same idea as Task.position — the list is drag-ordered.
     position = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -213,6 +219,8 @@ class TodoItem(models.Model):
             models.Index(fields=['done', 'position']),
             # Every list read filters on visibility first.
             models.Index(fields=['is_private', 'created_by']),
+            # The reminder sweep asks exactly this: what is due and not yet sent.
+            models.Index(fields=['remind_at', 'reminder_sent_at']),
         ]
 
     def __str__(self):

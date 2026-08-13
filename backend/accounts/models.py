@@ -201,6 +201,8 @@ class NotificationPreference(models.Model):
     email_on_assignment = models.BooleanField(default=True)
     # Customers: their own licence nearing its end date. Admins: any customer's.
     email_on_license_expiry = models.BooleanField(default=True)
+    # Staff: a to-do they are carrying has reached its reminder time.
+    email_on_todo_reminder = models.BooleanField(default=True)
 
     def __str__(self):
         return f'Notification preferences for {self.user.username}'

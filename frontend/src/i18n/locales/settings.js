@@ -53,6 +53,9 @@ export default {
     'settings.notifications.licenseExpiry.label': 'Email me before a license expires',
     'settings.notifications.licenseExpiry.hint':
       'Get an email 30 days, 7 days and 1 day before a license end date, and on the day itself.',
+    'settings.notifications.todoReminder.label': 'Email me when a to-do reminder is due',
+    'settings.notifications.todoReminder.hint':
+      'For to-dos assigned to you, and ones you wrote that nobody has taken.',
     'settings.notifications.emailGroup': 'Email',
     'settings.notifications.saved': 'Saved',
     'settings.notifications.inAppNote':
@@ -229,6 +232,9 @@ export default {
     'settings.notifications.licenseExpiry.label': 'أرسل لي بريدًا إلكترونيًا قبل انتهاء الترخيص',
     'settings.notifications.licenseExpiry.hint':
       'استلم بريدًا إلكترونيًا قبل 30 يومًا و7 أيام ويوم واحد من تاريخ انتهاء الترخيص، وفي يوم الانتهاء نفسه.',
+    'settings.notifications.todoReminder.label': 'أرسل لي بريدًا عند حلول موعد تذكير مهمة',
+    'settings.notifications.todoReminder.hint':
+      'للمهام المُسندة إليك، وتلك التي أنشأتها ولم يتولَّها أحد.',
     'settings.notifications.emailGroup': 'البريد الإلكتروني',
     'settings.notifications.saved': 'تم الحفظ',
     'settings.notifications.inAppNote':
