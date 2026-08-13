@@ -3,6 +3,7 @@ import {
   createTodo,
   createTodoFolder,
   deleteTodo,
+  deleteTodoAttachment,
   deleteTodoFolder,
   fetchTodoCalendar,
   fetchTodoFolders,
@@ -10,6 +11,7 @@ import {
   reorderTodos,
   updateTodo,
   updateTodoFolder,
+  uploadTodoAttachments,
 } from '../api/todos'
 
 const KEY = ['todos']
@@ -40,6 +42,22 @@ function useInvalidateTodos() {
     queryClient.invalidateQueries({ queryKey: KEY })
     queryClient.invalidateQueries({ queryKey: FOLDER_KEY })
   }
+}
+
+export function useUploadTodoAttachments() {
+  const invalidate = useInvalidateTodos()
+  return useMutation({
+    mutationFn: ({ id, files }) => uploadTodoAttachments(id, files),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteTodoAttachment() {
+  const invalidate = useInvalidateTodos()
+  return useMutation({
+    mutationFn: ({ id, attachmentId }) => deleteTodoAttachment(id, attachmentId),
+    onSuccess: invalidate,
+  })
 }
 
 export function useTodoFolders() {

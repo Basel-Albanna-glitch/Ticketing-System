@@ -8,7 +8,7 @@ from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from openpyxl import Workbook
-from openpyxl.utils import get_column_letter
+from core.xlsx import write_sheet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -414,19 +414,9 @@ class LicenseReportView(APIView):
 STATE_LABELS = {'expired': 'Expired', 'expiring': 'Expiring soon', 'active': 'Active'}
 
 
-def _write_sheet(workbook, title, headers, rows, first):
-    """Append one sheet of plain rows, sized to its headers."""
-    # A fresh Workbook already has one empty sheet; the first write claims it rather than
-    # leaving a stray "Sheet" tab in the download.
-    sheet = workbook.active if first else workbook.create_sheet()
-    sheet.title = title
-    sheet.append(headers)
-    for row in rows:
-        sheet.append(row)
-    for i, header in enumerate(headers, start=1):
-        widest = max([len(str(header))] + [len(str(r[i - 1])) for r in rows] or [0])
-        sheet.column_dimensions[get_column_letter(i)].width = min(50, max(12, widest + 2))
-    return sheet
+# Kept as a local alias: the implementation now lives in core so the to-do export can
+# share it, and the call sites below read the same as they always did.
+_write_sheet = write_sheet
 
 
 class ReportsExportView(APIView):

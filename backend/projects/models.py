@@ -217,3 +217,32 @@ class TodoItem(models.Model):
 
     def __str__(self):
         return self.title
+
+
+def todo_attachment_upload_path(instance, filename):
+    return f'todos/todo_{instance.todo_id}/{filename}'
+
+
+class TodoAttachment(models.Model):
+    """A file kept with a to-do — a quote to chase, a photo of the serial plate.
+
+    It inherits the to-do's audience rather than carrying its own: a file on a private
+    item is as private as the item, and deleting the item takes its files with it.
+    """
+
+    todo = models.ForeignKey(TodoItem, related_name='attachments', on_delete=models.CASCADE)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='+',
+    )
+    file = models.FileField(upload_to=todo_attachment_upload_path)
+    original_filename = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=100, blank=True)
+    size = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return self.original_filename

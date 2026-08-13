@@ -2,18 +2,25 @@ from accounts.models import User
 from accounts.permissions import CanViewSection, IsAdminOrAgent
 from django.db import transaction
 from django.db.models import Count, Max, Q
+from django.http import HttpResponse
+from django.utils import timezone
 from django.utils.dateparse import parse_date
+from openpyxl import Workbook
+
+from core.xlsx import write_sheet
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import SAFE_METHODS, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 
 
-from .models import Project, Task, TodoFolder, TodoItem
+from .models import Project, Task, TodoAttachment, TodoFolder, TodoItem
 from .serializers import (
     ProjectSerializer,
     TaskSerializer,
+    TodoAttachmentSerializer,
     TodoFolderSerializer,
     TodoItemSerializer,
 )
@@ -334,7 +341,7 @@ class TodoItemViewSet(viewsets.ModelViewSet):
         # The one place visibility is enforced. Every list read, detail read, write and
         # delete goes through here, so an item you cannot see is unreachable by id too —
         # not merely hidden from the list.
-        base = TodoItem.objects.prefetch_related('assignees').select_related(
+        base = TodoItem.objects.prefetch_related('assignees', 'attachments').select_related(
             'created_by', 'customer', 'folder'
         )
         # distinct(): the assignees join inside the rule multiplies rows.
@@ -374,6 +381,151 @@ class TodoItemViewSet(viewsets.ModelViewSet):
         return Response(
             self.get_serializer(queryset.order_by('due_at', 'id')[:CALENDAR_MAX_PROJECTS], many=True).data
         )
+
+    @action(detail=True, methods=['post'], url_path='attachments', parser_classes=[MultiPartParser, FormParser])
+    def attachments(self, request, pk=None):
+        """Attach files to a to-do. Multipart, files under ``attachments``.
+
+        Kept off create/update on purpose: those speak JSON, and a multipart body cannot
+        express "no assignees" — the key is simply absent — so folding files into them
+        would have made clearing a field impossible to tell from omitting it.
+        """
+        # get_object() runs the visibility rule, so files can only be added to a to-do
+        # the caller can already see.
+        todo = self.get_object()
+        files = request.FILES.getlist('attachments')
+        if not files:
+            return Response({'attachments': 'No files were sent.'}, status=status.HTTP_400_BAD_REQUEST)
+        created = [
+            TodoAttachment.objects.create(
+                todo=todo,
+                uploaded_by=request.user,
+                file=f,
+                original_filename=f.name,
+                content_type=f.content_type or '',
+                size=f.size,
+            )
+            for f in files
+        ]
+        return Response(
+            TodoAttachmentSerializer(created, many=True, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=['delete'], url_path=r'attachments/(?P<attachment_id>\d+)')
+    def delete_attachment(self, request, pk=None, attachment_id=None):
+        todo = self.get_object()
+        attachment = todo.attachments.filter(pk=attachment_id).first()
+        if attachment is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        # The stored file goes with the row; leaving it on disk would accumulate
+        # orphans nothing in the app can reach.
+        attachment.file.delete(save=False)
+        attachment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=['get'], url_path='export', pagination_class=None)
+    def export(self, request):
+        """The to-do list as a multi-sheet .xlsx, scoped to what the caller may see.
+
+        Two people exporting at the same moment can get different workbooks, and both are
+        correct: the file carries the same visibility rules the screen does, so nobody
+        downloads their way around a private item.
+        """
+        rows = list(self.filter_queryset(self.get_queryset()))
+        now = timezone.now()
+        today_end = timezone.localtime(now).replace(
+            hour=23, minute=59, second=59, microsecond=999999
+        )
+        open_rows = [t for t in rows if not t.done]
+        done_rows = [t for t in rows if t.done]
+        overdue = [t for t in open_rows if t.due_at and t.due_at < now]
+        due_today = [t for t in open_rows if t.due_at and now <= t.due_at <= today_end]
+
+        # Only completed work with both ends recorded can be timed; items finished before
+        # completed_at existed would otherwise drag the average to nonsense.
+        spans = [
+            (t.completed_at - t.created_at).total_seconds() / 86400
+            for t in done_rows
+            if t.completed_at
+        ]
+        avg_days = round(sum(spans) / len(spans), 1) if spans else ''
+
+        workbook = Workbook()
+        write_sheet(workbook, 'Summary', ['Metric', 'Value'], [
+            ['Generated', timezone.localtime(now).strftime('%Y-%m-%d %H:%M')],
+            ['Exported by', request.user.full_name or request.user.username],
+            ['Total to-dos', len(rows)],
+            ['Open', len(open_rows)],
+            ['Done', len(done_rows)],
+            ['Overdue', len(overdue)],
+            ['Due today', len(due_today)],
+            ['Nobody assigned', len([t for t in open_rows if not t.assignees.all()])],
+            ['Average days to complete', avg_days],
+        ], first=True)
+
+        def person_names(todo):
+            return ', '.join(a.full_name for a in todo.assignees.all())
+
+        def when(value):
+            return timezone.localtime(value).strftime('%Y-%m-%d %H:%M') if value else ''
+
+        write_sheet(
+            workbook,
+            'To-dos',
+            ['Title', 'Status', 'Priority', 'Folder', 'List', 'Assignees', 'Customer',
+             'Start', 'Due', 'Created', 'Completed', 'Notes', 'Files'],
+            [
+                [
+                    t.title,
+                    'Done' if t.done else ('Overdue' if t in overdue else 'Open'),
+                    t.get_priority_display(),
+                    t.folder.name if t.folder_id else 'Unfiled',
+                    'Private' if t.is_private else 'Shared',
+                    person_names(t),
+                    t.customer.full_name if t.customer_id else '',
+                    when(t.start_at),
+                    when(t.due_at),
+                    when(t.created_at),
+                    when(t.completed_at),
+                    ' '.join(t.notes.split()),
+                    t.attachments.count(),
+                ]
+                for t in rows
+            ],
+        )
+
+        def tally(pairs):
+            counts = {}
+            for key in pairs:
+                counts[key] = counts.get(key, 0) + 1
+            return sorted(counts.items(), key=lambda kv: -kv[1])
+
+        write_sheet(
+            workbook, 'By person', ['Person', 'Open to-dos'],
+            tally([
+                a.full_name
+                for t in open_rows
+                for a in (t.assignees.all() or [None])
+                if a is not None
+            ] + ['(nobody)'] * len([t for t in open_rows if not t.assignees.all()])),
+        )
+        write_sheet(
+            workbook, 'By folder', ['Folder', 'Open to-dos'],
+            tally([t.folder.name if t.folder_id else 'Unfiled' for t in open_rows]),
+        )
+        write_sheet(
+            workbook, 'By priority', ['Priority', 'Open to-dos'],
+            tally([t.get_priority_display() for t in open_rows]),
+        )
+
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        stamp = timezone.localtime(now).strftime('%Y-%m-%d')
+        response['Content-Disposition'] = f'attachment; filename="todos_{stamp}.xlsx"'
+        workbook.save(response)
+        return response
 
     @action(detail=False, methods=['post'])
     def reorder(self, request):

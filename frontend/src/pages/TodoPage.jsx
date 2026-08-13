@@ -6,6 +6,7 @@ import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import Input from '../components/ui/Input'
+import FileInput from '../components/ui/FileInput'
 import Modal from '../components/ui/Modal'
 import MultiSelect from '../components/ui/MultiSelect'
 import Select from '../components/ui/Select'
@@ -22,6 +23,7 @@ import {
   GripIcon,
   InboxIcon,
   LockIcon,
+  PaperClipIcon,
   PencilIcon,
   PlusIcon,
   ReportsIcon,
@@ -29,6 +31,7 @@ import {
   UsersIcon,
 } from '../components/ui/icons'
 import SearchableSelect from '../components/ui/SearchableSelect'
+import { exportTodos } from '../api/todos'
 import { useAuth } from '../auth/useAuth'
 import { useAgents } from '../hooks/useAgents'
 import { useCustomers } from '../hooks/useCustomers'
@@ -36,28 +39,30 @@ import {
   useCreateTodo,
   useCreateTodoFolder,
   useDeleteTodo,
+  useDeleteTodoAttachment,
   useDeleteTodoFolder,
   useReorderTodos,
   useTodoFolders,
   useTodos,
   useUpdateTodo,
   useUpdateTodoFolder,
+  useUploadTodoAttachments,
 } from '../hooks/useTodos'
 import { useI18n } from '../i18n/useI18n'
 
 // The sections of the to-do list, keyed by the URL segment that selects them. An
 // unknown segment falls through to the whole list rather than erroring.
 const VIEW_LABEL_KEY = {
+  inbox: 'todo.inbox',
   today: 'todo.viewToday',
   upcoming: 'todo.viewUpcoming',
-  all: 'common.all',
   report: 'todo.viewReport',
 }
 
 const VIEW_HINT_KEY = {
+  inbox: 'todo.subtitle',
   today: 'todo.viewTodayHint',
   upcoming: 'todo.viewUpcomingHint',
-  all: 'todo.subtitle',
   report: 'todo.reportHint',
 }
 
@@ -85,6 +90,14 @@ function toLocalInput(iso) {
 
 function fromLocalInput(value) {
   return value ? new Date(value).toISOString() : null
+}
+
+// 2048 -> "2 KB". Whole units only: a file listing is scanned, not audited.
+function formatBytes(bytes) {
+  if (!bytes) return '0 KB'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 // 330 -> "5h 30m"; 90 -> "1h 30m"; 45 -> "45m"
@@ -163,11 +176,13 @@ function ReportBlock({ title, rows, tone, t, emptyKey }) {
 
 // Where the list stands, rather than what is on it. Counts only what the viewer is
 // allowed to see, so two people can read different totals and both be right.
-function TodoReport({ rows, t }) {
+function TodoReport({ rows, t, onExport, exporting }) {
   const open = rows.filter((i) => !i.done)
   const now = Date.now()
   const endOfToday = new Date()
   endOfToday.setHours(23, 59, 59, 999)
+  const endOfWeek = new Date(endOfToday)
+  endOfWeek.setDate(endOfWeek.getDate() + 7)
 
   // Kept disjoint on purpose: an item is either already late or still has today to run.
   // Two headline numbers that double-count the same work are worse than one.
@@ -206,13 +221,55 @@ function TodoReport({ rows, t }) {
 
   const perFolder = new Map()
   for (const item of open) {
-    const name = item.folder?.name || t('todo.ungrouped')
+    const name = item.folder?.name || t('todo.unfiled')
     perFolder.set(name, (perFolder.get(name) || 0) + 1)
   }
   const byFolder = [...perFolder.entries()]
     .map(([label, value]) => ({ label, value }))
     .sort((a, b) => b.value - a.value)
-  // One "Ungrouped" bar restates the open total; it only informs once folders exist.
+
+  // When the open work actually lands. Ordered late → never, and the buckets partition
+  // the open list exactly, so the column sums to the open total.
+  const dueOn = (i) => (i.due_at ? new Date(i.due_at).getTime() : null)
+  const byDue = [
+    { key: 'overdue', label: t('todo.dueOverdue'), value: overdue.length, tone: 'bg-red-500' },
+    { key: 'today', label: t('todo.dueToday'), value: dueToday.length, tone: 'bg-orange-500' },
+    {
+      key: 'week',
+      label: t('todo.dueThisWeek'),
+      value: open.filter((i) => {
+        const d = dueOn(i)
+        return d !== null && d > endOfToday.getTime() && d <= endOfWeek.getTime()
+      }).length,
+      tone: 'bg-blue-500',
+    },
+    {
+      key: 'later',
+      label: t('todo.dueLater'),
+      value: open.filter((i) => {
+        const d = dueOn(i)
+        return d !== null && d > endOfWeek.getTime()
+      }).length,
+      tone: 'bg-indigo-400',
+    },
+    {
+      key: 'none',
+      label: t('todo.dueNone'),
+      value: open.filter((i) => dueOn(i) === null).length,
+      tone: 'bg-gray-400',
+    },
+  ].filter((r) => r.value > 0)
+
+  // Only work with both ends recorded can be timed. Items closed before completed_at
+  // existed have no start-to-finish span and would drag the average to nonsense.
+  const spans = rows
+    .filter((i) => i.done && i.completed_at)
+    .map((i) => (new Date(i.completed_at) - new Date(i.created_at)) / 864e5)
+  const avgDays = spans.length ? (spans.reduce((a, b) => a + b, 0) / spans.length).toFixed(1) : null
+  const oldestOpen = open.length
+    ? Math.floor((now - Math.min(...open.map((i) => new Date(i.created_at).getTime()))) / 864e5)
+    : null
+  // A lone Inbox bar restates the open total; it only informs once folders exist.
   const showFolders = byFolder.length > 1
 
   return (
@@ -245,6 +302,11 @@ function TodoReport({ rows, t }) {
           icon={ReportsIcon}
           title={t('todo.reportTitle')}
           description={t('todo.reportHint')}
+          action={
+            <Button variant="secondary" onClick={onExport} loading={exporting}>
+              {t('todo.exportXlsx')}
+            </Button>
+          }
         />
         {open.length === 0 ? (
           <EmptyState title={t('todo.reportEmpty')} description={t('todo.reportEmptyHint')} />
@@ -264,14 +326,43 @@ function TodoReport({ rows, t }) {
                 emptyKey="todo.reportNone"
               />
             </div>
-            {showFolders && (
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
               <ReportBlock
-                title={t('todo.reportByFolder')}
-                rows={byFolder}
+                title={t('todo.reportWhenDue')}
+                rows={byDue}
                 t={t}
                 emptyKey="todo.reportNone"
               />
-            )}
+              {showFolders && (
+                <ReportBlock
+                  title={t('todo.reportByFolder')}
+                  rows={byFolder}
+                  t={t}
+                  emptyKey="todo.reportNone"
+                />
+              )}
+            </div>
+
+            {/* Two figures that need a sentence rather than a bar: one looks backwards
+                at how long finished work took, the other at what has sat longest. */}
+            <div className="flex flex-wrap gap-x-8 gap-y-2 border-t border-gray-100 pt-4 text-xs text-gray-500 dark:border-white/10 dark:text-gray-400">
+              {avgDays !== null && (
+                <span>
+                  {t('todo.reportAvgDays')}{' '}
+                  <span className="font-medium tabular-nums text-gray-800 dark:text-gray-200">
+                    {avgDays}
+                  </span>
+                </span>
+              )}
+              {oldestOpen !== null && (
+                <span>
+                  {t('todo.reportOldestOpen')}{' '}
+                  <span className="font-medium tabular-nums text-gray-800 dark:text-gray-200">
+                    {oldestOpen}
+                  </span>
+                </span>
+              )}
+            </div>
           </div>
         )}
       </Card>
@@ -358,6 +449,12 @@ function TodoRow({ item, drag, t, isOverdue, onToggleDone, onEdit, onDelete, del
             </span>
           )}
           {item.duration_minutes != null && <span>{formatDuration(item.duration_minutes, t)}</span>}
+          {item.attachments?.length > 0 && (
+            <span className="inline-flex items-center gap-0.5" title={t('todo.attachments')}>
+              <PaperClipIcon className="h-3.5 w-3.5" />
+              {item.attachments.length}
+            </span>
+          )}
           {item.customer && (
             <span className="truncate text-indigo-600 dark:text-indigo-400">
               {item.customer.full_name}
@@ -408,7 +505,7 @@ function TodoRow({ item, drag, t, isOverdue, onToggleDone, onEdit, onDelete, del
 }
 
 // A folder as a heading over its rows, not a box around them. `folder` is null for the
-// Ungrouped pile.
+// Inbox pile.
 function FolderGroup({ folder, rows, collapsed, onToggleCollapse, onRename, onDeleteFolder, t, rowProps }) {
   return (
     <div className="group/folder">
@@ -423,7 +520,7 @@ function FolderGroup({ folder, rows, collapsed, onToggleCollapse, onRename, onDe
             {collapsed ? '▶' : '▼'}
           </span>
           <span className="truncate text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            {folder ? folder.name : t('todo.ungrouped')}
+            {folder ? folder.name : t('todo.unfiled')}
           </span>
           <span className="text-xs tabular-nums text-gray-400 dark:text-gray-600">{rows.length}</span>
         </button>
@@ -484,7 +581,7 @@ function TodoSection({
   rowProps,
 }) {
   const loose = rows.filter((item) => !item.folder)
-  // An empty Ungrouped heading is pure noise when folders are carrying everything; it
+  // An empty Inbox heading is pure noise when folders are carrying everything; it
   // only earns its place when there is loose work, or when there are no folders at all.
   const showLoose = loose.length > 0 || folders.length === 0
   return (
@@ -493,11 +590,15 @@ function TodoSection({
         icon={icon}
         title={`${title} (${rows.length})`}
         description={description}
+        // Omitted in the Inbox, where a new folder would appear to do nothing: the
+        // Inbox shows only what is unfiled, so the folder lands out of sight.
         action={
-          <Button variant="ghost" onClick={onAddFolder} loading={addingFolder}>
-            <PlusIcon className="h-4 w-4" />
-            {t('todo.newFolder')}
-          </Button>
+          onAddFolder ? (
+            <Button variant="ghost" onClick={onAddFolder} loading={addingFolder}>
+              <PlusIcon className="h-4 w-4" />
+              {t('todo.newFolder')}
+            </Button>
+          ) : null
         }
       />
       {rows.length === 0 && folders.length === 0 ? (
@@ -540,7 +641,7 @@ export default function TodoPage() {
   // The section comes from the URL, so each one is its own address: the sidebar can
   // mark the active one, and a link to "Today" survives being shared or bookmarked.
   const { view: rawView } = useParams()
-  const view = VIEW_LABEL_KEY[rawView] ? rawView : 'all'
+  const view = VIEW_LABEL_KEY[rawView] ? rawView : 'inbox'
   const isReport = view === 'report'
   // 'open' and 'done' are server-side filters; 'all' sends nothing. The report needs
   // the whole picture, so it ignores the status filter rather than reporting on a slice.
@@ -555,6 +656,8 @@ export default function TodoPage() {
   // every one of them reacting to the shared mutation state.
   const deletingId = deleteTodo.isPending ? deleteTodo.variables : null
   const reorder = useReorderTodos(filters)
+  const uploadAttachments = useUploadTodoAttachments()
+  const deleteAttachment = useDeleteTodoAttachment()
   const { data: folders } = useTodoFolders()
   const createFolder = useCreateTodoFolder()
   const updateFolder = useUpdateTodoFolder()
@@ -566,6 +669,9 @@ export default function TodoPage() {
   // A new item is always yours; an existing one only if you wrote it.
   const canChangePrivacy = !editing || editing.created_by?.id === user?.id
   const [form, setForm] = useState(EMPTY_FORM)
+  // Files chosen in the modal but not yet uploaded — they go up once the to-do exists.
+  const [pendingFiles, setPendingFiles] = useState([])
+  const [exporting, setExporting] = useState(false)
   const [error, setError] = useState('')
   const [draggingId, setDraggingId] = useState(null)
   const [dragOverId, setDragOverId] = useState(null)
@@ -578,7 +684,8 @@ export default function TodoPage() {
   const endOfToday = new Date()
   endOfToday.setHours(23, 59, 59, 999)
   const inView = (item) => {
-    if (view === 'all' || isReport) return true
+    // The Inbox is the list itself: folders and all. Only the date views narrow.
+    if (view === 'inbox' || isReport) return true
     if (!item.due_at) return false
     return view === 'today'
       ? new Date(item.due_at) <= endOfToday
@@ -592,6 +699,8 @@ export default function TodoPage() {
   const publicRows = rows.filter((item) => !item.is_private)
   const privateRows = rows.filter((item) => item.is_private)
   const allFolders = folders || []
+  // Folders show wherever rows do. The date views keep them so you can still see which
+  // folder a dated item belongs to.
   const publicFolders = allFolders.filter((f) => !f.is_private)
   const privateFolders = allFolders.filter((f) => f.is_private)
   const openCount = rows.filter((item) => !item.done).length
@@ -603,12 +712,14 @@ export default function TodoPage() {
   function openCreate() {
     setEditing(null)
     setForm(EMPTY_FORM)
+    setPendingFiles([])
     setError('')
     setModalOpen(true)
   }
 
   function openEdit(item) {
     setEditing(item)
+    setPendingFiles([])
     setForm({
       title: item.title,
       notes: item.notes || '',
@@ -636,14 +747,68 @@ export default function TodoPage() {
       folder_id: form.folder_id || null,
     }
     try {
-      if (editing) await updateTodo.mutateAsync({ id: editing.id, ...payload })
-      else await createTodo.mutateAsync(payload)
+      const saved = editing
+        ? await updateTodo.mutateAsync({ id: editing.id, ...payload })
+        : await createTodo.mutateAsync(payload)
+      // Files go up after the to-do exists, since a new one has no id to hang them on.
+      // Failing here leaves the saved to-do alone and says so, rather than pretending
+      // the whole save failed and inviting a duplicate.
+      if (pendingFiles.length) {
+        try {
+          await uploadAttachments.mutateAsync({ id: saved.id, files: pendingFiles })
+        } catch {
+          setError(t('todo.attachmentUploadFailed'))
+          setPendingFiles([])
+          return
+        }
+      }
       setModalOpen(false)
       setEditing(null)
       setForm(EMPTY_FORM)
+      setPendingFiles([])
     } catch (err) {
       const data = err?.response?.data
       setError(data ? Object.values(data).flat().join(' ') : t('todo.saveFailed'))
+    }
+  }
+
+  function handleDeleteAttachment(attachment) {
+    if (!editing) return
+    if (!window.confirm(`${t('todo.deleteAttachmentConfirm')} "${attachment.original_filename}"?`))
+      return
+    deleteAttachment.mutate(
+      { id: editing.id, attachmentId: attachment.id },
+      {
+        onSuccess: () =>
+          // The modal holds its own copy of the to-do, so drop the row from it too;
+          // otherwise a deleted file lingers on screen until the modal is reopened.
+          setEditing((current) =>
+            current
+              ? { ...current, attachments: current.attachments.filter((a) => a.id !== attachment.id) }
+              : current
+          ),
+        onError: () => window.alert(t('todo.attachmentDeleteFailed')),
+      }
+    )
+  }
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const { blob, filename } = await exportTodos()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      // Without this the blob is held for the life of the document.
+      URL.revokeObjectURL(url)
+    } catch {
+      window.alert(t('todo.exportFailed'))
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -743,19 +908,20 @@ export default function TodoPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Every view is a section now, All included, so the trail is the same shape
+          whichever one you are in. */}
       <Breadcrumbs
         items={[
           { label: t('crumb.dashboard'), to: '/dashboard' },
-          ...(view === 'all'
-            ? [{ label: t('nav.todo') }]
-            : [{ label: t('nav.todo'), to: '/todo' }, { label: t(VIEW_LABEL_KEY[view]) }]),
+          { label: t('nav.todo'), to: '/todo' },
+          { label: t(VIEW_LABEL_KEY[view]) },
         ]}
       />
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
-            {view === 'all' ? t('nav.todo') : t(VIEW_LABEL_KEY[view])}
+            {t(VIEW_LABEL_KEY[view])}
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {t(VIEW_HINT_KEY[view])}
@@ -805,7 +971,7 @@ export default function TodoPage() {
           </div>
         </Card>
       ) : isReport ? (
-        <TodoReport rows={allRows} t={t} />
+        <TodoReport rows={allRows} t={t} onExport={handleExport} exporting={exporting} />
       ) : (
         <>
           <TodoSection
@@ -913,7 +1079,7 @@ export default function TodoPage() {
             value={form.folder_id}
             onChange={(e) => setForm({ ...form, folder_id: e.target.value })}
           >
-            <option value="">{t('todo.ungrouped')}</option>
+            <option value="">{t('todo.unfiled')}</option>
             {folderOptions.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.name}
@@ -965,11 +1131,55 @@ export default function TodoPage() {
               checked={form.is_private}
               disabled={!canChangePrivacy}
               // Folders belong to one side, so a folder chosen before the flip is no
-              // longer a legal home — drop back to Ungrouped rather than send a
+              // longer a legal home — drop back to the Inbox rather than send a
               // mismatch the server would reject.
               onChange={(value) => setForm({ ...form, is_private: value, folder_id: '' })}
               aria-label={t('todo.makePrivate')}
             />
+          </div>
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {t('todo.attachments')}
+            </span>
+            {/* Already-uploaded files, each removable. Only on an existing to-do — a new
+                one has nothing stored yet. */}
+            {editing?.attachments?.length > 0 && (
+              <ul className="flex flex-col gap-1">
+                {editing.attachments.map((a) => (
+                  <li
+                    key={a.id}
+                    className="flex items-center gap-2 rounded-lg border border-gray-200/70 px-2 py-1.5 text-xs dark:border-white/10"
+                  >
+                    <PaperClipIcon className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" />
+                    <a
+                      href={a.file}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="min-w-0 flex-1 truncate text-indigo-600 hover:underline dark:text-indigo-400"
+                    >
+                      {a.original_filename}
+                    </a>
+                    <span className="shrink-0 tabular-nums text-gray-400 dark:text-gray-500">
+                      {formatBytes(a.size)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteAttachment(a)}
+                      aria-label={`${t('common.delete')} ${a.original_filename}`}
+                      className="shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                    >
+                      <TrashIcon className="h-3.5 w-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <FileInput files={pendingFiles} onChange={setPendingFiles} />
+            {!editing && pendingFiles.length > 0 && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {t('todo.attachmentsAfterSave')}
+              </p>
+            )}
           </div>
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <Button type="submit" loading={createTodo.isPending || updateTodo.isPending}>

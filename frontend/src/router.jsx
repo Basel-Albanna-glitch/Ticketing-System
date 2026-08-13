@@ -59,10 +59,11 @@ const router = createBrowserRouter([
           { path: '/settings', element: <SettingsPage /> },
           {
             element: <ProtectedRoute allowedRoles={['admin', 'agent']} />,
-            // One page, four sections. `/todo` is the whole list; `/todo/today`,
-            // `/todo/upcoming` and `/todo/report` narrow it.
+            // The to-do list is its sections, not a page with sections hanging off it:
+            // /todo is an entry point that lands on the Inbox rather than a view of its
+            // own. `replace` keeps it out of history, so Back does not bounce off it.
             children: [
-              { path: '/todo', element: <TodoPage /> },
+              { path: '/todo', element: <Navigate to="/todo/inbox" replace /> },
               { path: '/todo/:view', element: <TodoPage /> },
             ],
           },

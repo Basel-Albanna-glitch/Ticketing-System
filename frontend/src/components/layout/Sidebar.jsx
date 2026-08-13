@@ -33,6 +33,7 @@ const NAV_ITEMS = [
     // Revealed once you are in the to-do list, rather than sitting open permanently and
     // making every other section look shallow by comparison.
     children: [
+      { to: '/todo/inbox', labelKey: 'todo.inbox' },
       { to: '/todo/today', labelKey: 'todo.viewToday' },
       { to: '/todo/upcoming', labelKey: 'todo.viewUpcoming' },
       { to: '/todo/report', labelKey: 'todo.viewReport' },

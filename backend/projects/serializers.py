@@ -3,7 +3,7 @@ from accounts.serializers import CustomerBranchSerializer, UserSerializer
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Project, Task, TodoFolder, TodoItem
+from .models import Project, Task, TodoAttachment, TodoFolder, TodoItem
 
 
 def _can_edit(request, obj):
@@ -261,6 +261,13 @@ class TaskSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class TodoAttachmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TodoAttachment
+        fields = ['id', 'file', 'original_filename', 'content_type', 'size', 'created_at']
+        read_only_fields = fields
+
+
 class TodoFolderSerializer(serializers.ModelSerializer):
     created_by = UserSerializer(read_only=True)
     item_count = serializers.IntegerField(read_only=True)
@@ -302,6 +309,7 @@ class TodoItemSerializer(serializers.ModelSerializer):
         many=True, required=False, write_only=True,
     )
     created_by = UserSerializer(read_only=True)
+    attachments = TodoAttachmentSerializer(many=True, read_only=True)
     folder = TodoFolderSerializer(read_only=True)
     folder_id = serializers.PrimaryKeyRelatedField(
         source='folder', queryset=TodoFolder.objects.all(),
@@ -312,7 +320,7 @@ class TodoItemSerializer(serializers.ModelSerializer):
         model = TodoItem
         fields = [
             'id', 'title', 'notes', 'done', 'is_private', 'priority',
-            'folder', 'folder_id',
+            'folder', 'folder_id', 'attachments',
             'start_at', 'due_at', 'duration_minutes',
             'customer', 'customer_id',
             'assignees', 'assignee_ids', 'created_by', 'position',
