@@ -9,7 +9,9 @@ import {
   BookIcon,
   CalendarIcon,
   CheckCircleIcon,
+  ClockIcon,
   DashboardIcon,
+  InboxIcon,
   LogoutIcon,
   ReportsIcon,
   SettingsIcon,
@@ -32,11 +34,14 @@ const NAV_ITEMS = [
     roles: ['agent', 'admin'],
     // Revealed once you are in the to-do list, rather than sitting open permanently and
     // making every other section look shallow by comparison.
+    // Each view gets the glyph it earns: the whole pile, the day, the days ahead, and
+    // the numbers over them. Report shares the Reports icon — it is the same idea at a
+    // smaller scale, and nesting under To-do is what tells the two apart.
     children: [
-      { to: '/todo/inbox', labelKey: 'todo.inbox' },
-      { to: '/todo/today', labelKey: 'todo.viewToday' },
-      { to: '/todo/upcoming', labelKey: 'todo.viewUpcoming' },
-      { to: '/todo/report', labelKey: 'todo.viewReport' },
+      { to: '/todo/inbox', labelKey: 'todo.inbox', icon: InboxIcon },
+      { to: '/todo/today', labelKey: 'todo.viewToday', icon: ClockIcon },
+      { to: '/todo/upcoming', labelKey: 'todo.viewUpcoming', icon: CalendarIcon },
+      { to: '/todo/report', labelKey: 'todo.viewReport', icon: ReportsIcon },
     ],
   },
   { to: '/customers', labelKey: 'nav.customers', icon: UsersIcon, roles: ['agent', 'admin'], permission: 'allow_agent_view_customers' },
@@ -59,15 +64,18 @@ function navLinkClass({ isActive }) {
   return `group relative flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
     isActive
       ? 'bg-gradient-to-r from-indigo-50 to-transparent text-indigo-700 ring-1 ring-inset ring-indigo-200/70 dark:from-indigo-500/15 dark:text-indigo-300 dark:ring-indigo-400/20'
-      : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200'
+      : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-gray-100'
   }`
 }
 
+// The icon takes over most of the indent that used to be padding, so the labels stay on
+// roughly the line they sat on before — a sub-nav that shifts sideways when icons arrive
+// reads as a different menu.
 function subLinkClass({ isActive }) {
-  return `block rounded-lg py-1.5 pe-3 ps-9 text-sm transition-colors ${
+  return `flex items-center gap-2 rounded-lg py-1.5 pe-3 ps-3.5 text-sm transition-colors ${
     isActive
       ? 'font-medium text-indigo-700 dark:text-indigo-300'
-      : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
+      : 'text-gray-500 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100'
   }`
 }
 
@@ -103,6 +111,8 @@ function NavItem({ item, open, onNavigate, t, sectionActive }) {
               onClick={onNavigate}
               className={subLinkClass}
             >
+              {/* Smaller than the parent's, so the nesting still reads as nesting. */}
+              <child.icon className="h-4 w-4 shrink-0" />
               {t(child.labelKey)}
             </NavLink>
           ))}
@@ -169,7 +179,7 @@ export default function Sidebar({ open = true, onNavigate }) {
             type="button"
             onClick={handleLogout}
             tabIndex={open ? undefined : -1}
-            className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
+            className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-gray-100"
           >
             <LogoutIcon className="h-5 w-5 shrink-0" />
             {t('topbar.logout')}
