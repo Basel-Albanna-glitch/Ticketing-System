@@ -230,6 +230,88 @@ class TodoItem(models.Model):
     def __str__(self):
         return self.title
 
+    # --- Per-assignee completion -------------------------------------------------
+    #
+    # `done` is the state of the whole job. On an item three people are carrying, two of
+    # them being finished is real information a single boolean cannot hold, so each
+    # assignee's own share is tracked separately in TodoAssigneeCompletion. The three
+    # methods below are the only places the two representations are reconciled, and
+    # between them they hold one invariant: a done item has every assignee ticked, and an
+    # open item does not.
+
+    def sync_done_from_assignees(self):
+        """Close the item once every assignee has finished, reopen it if one is taken
+        back. Unassigned work is left alone — there is nobody to wait for.
+        """
+        assignee_ids = set(self.assignees.values_list('id', flat=True))
+        if not assignee_ids:
+            return
+        completed = set(self.assignee_completions.values_list('user_id', flat=True))
+        all_done = assignee_ids <= completed
+        if all_done == self.done:
+            return
+        self.done = all_done
+        self.completed_at = timezone.now() if all_done else None
+        self.save(update_fields=['done', 'completed_at', 'updated_at'])
+
+    def apply_done_to_assignees(self, actor=None):
+        """The same rule read the other way: closing the whole to-do finishes everybody's
+        part, and reopening it hands every part back.
+        """
+        if self.done:
+            already = set(self.assignee_completions.values_list('user_id', flat=True))
+            TodoAssigneeCompletion.objects.bulk_create(
+                TodoAssigneeCompletion(todo=self, user_id=user_id, marked_by=actor)
+                for user_id in self.assignees.values_list('id', flat=True)
+                if user_id not in already
+            )
+        else:
+            self.assignee_completions.all().delete()
+
+    def reconcile_assignee_completions(self, actor=None):
+        """After the assignee list changes: drop ticks belonging to people no longer on
+        the item, and — on an item already closed — tick whoever has just been added, so
+        "done" never sits alongside an unfinished part.
+        """
+        assignee_ids = set(self.assignees.values_list('id', flat=True))
+        self.assignee_completions.exclude(user_id__in=assignee_ids).delete()
+        if self.done:
+            self.apply_done_to_assignees(actor)
+
+
+class TodoAssigneeCompletion(models.Model):
+    """One assignee's "my share is finished" on a to-do carried by several people.
+
+    A row means that person is done; no row means they are not. Modelled as presence
+    rather than a flag so the pair (todo, user) can be unique, and so removing somebody
+    from an item removes their tick with them.
+    """
+
+    todo = models.ForeignKey(
+        TodoItem, related_name='assignee_completions', on_delete=models.CASCADE
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name='todo_shares_completed', on_delete=models.CASCADE
+    )
+    # An admin may close a part on someone's behalf, and that is worth recording: it is
+    # the difference between a person saying they finished and somebody saying it for them.
+    marked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='+',
+    )
+    completed_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['completed_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['todo', 'user'], name='unique_todo_assignee_completion'
+            )
+        ]
+
+    def __str__(self):
+        return f'{self.user} finished {self.todo}'
+
 
 def todo_attachment_upload_path(instance, filename):
     return f'todos/todo_{instance.todo_id}/{filename}'

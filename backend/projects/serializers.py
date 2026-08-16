@@ -312,6 +312,10 @@ class TodoItemSerializer(serializers.ModelSerializer):
     )
     created_by = UserSerializer(read_only=True)
     attachments = TodoAttachmentSerializer(many=True, read_only=True)
+    # Who among the assignees has finished their share. Written through its own endpoint
+    # rather than here: it is one person's statement about their own work, not a field of
+    # the to-do that anyone editing the item may set.
+    assignee_completions = serializers.SerializerMethodField()
     folder = TodoFolderSerializer(read_only=True)
     folder_id = serializers.PrimaryKeyRelatedField(
         source='folder', queryset=TodoFolder.objects.all(),
@@ -326,7 +330,7 @@ class TodoItemSerializer(serializers.ModelSerializer):
             'start_at', 'due_at', 'remind_offset_minutes', 'remind_at', 'reminder_sent_at',
             'duration_minutes',
             'customer', 'customer_id',
-            'assignees', 'assignee_ids', 'created_by', 'position',
+            'assignees', 'assignee_ids', 'assignee_completions', 'created_by', 'position',
             'completed_at', 'created_at', 'updated_at',
         ]
         # Order belongs to the reorder endpoint; completion and reminder delivery are
@@ -338,6 +342,16 @@ class TodoItemSerializer(serializers.ModelSerializer):
         if not obj.start_at or not obj.due_at:
             return None
         return int((obj.due_at - obj.start_at).total_seconds() // 60)
+
+    def get_assignee_completions(self, obj):
+        return [
+            {
+                'user_id': c.user_id,
+                'completed_at': c.completed_at,
+                'marked_by_id': c.marked_by_id,
+            }
+            for c in obj.assignee_completions.all()
+        ]
 
     def validate_title(self, value):
         if not value.strip():
@@ -401,6 +415,28 @@ class TodoItemSerializer(serializers.ModelSerializer):
                         {'folder_id': 'Only the person who created a to-do can make it private.'}
                     )
             attrs['is_private'] = folder.is_private
+
+        # A private to-do is its author's alone. Nobody else can read it, so assigning
+        # one would hand somebody work they cannot open — and would put a name on the
+        # board against an item that is not on the board. Checked after the folder rule
+        # above, which can be what made the item private in the first place.
+        is_private = attrs.get('is_private', getattr(self.instance, 'is_private', False))
+        if is_private:
+            if 'assignees' in attrs:
+                assignees = attrs['assignees']
+            elif self.instance is not None:
+                assignees = list(self.instance.assignees.all())
+            else:
+                assignees = []
+            if assignees:
+                raise serializers.ValidationError(
+                    {
+                        'assignee_ids': (
+                            'A private to-do is yours alone and cannot be assigned to '
+                            'anyone. Remove the assignees, or keep it on the shared board.'
+                        )
+                    }
+                )
         return attrs
 
     def validate_is_private(self, value):
@@ -426,6 +462,7 @@ class TodoItemSerializer(serializers.ModelSerializer):
         return value
 
     def update(self, instance, validated_data):
+        was_done = instance.done
         # Stamp the moment work was finished, and clear it if the box is unticked.
         if 'done' in validated_data and validated_data['done'] != instance.done:
             validated_data['completed_at'] = timezone.now() if validated_data['done'] else None
@@ -433,4 +470,15 @@ class TodoItemSerializer(serializers.ModelSerializer):
         # already had back to tomorrow would silently never fire.
         if 'remind_at' in validated_data and validated_data['remind_at'] != instance.remind_at:
             validated_data['reminder_sent_at'] = None
-        return super().update(instance, validated_data)
+        instance = super().update(instance, validated_data)
+
+        # Both after the save, since each reads the assignee list this update just wrote.
+        # Order matters: clear out ticks for people who have left before deciding whether
+        # everyone remaining is finished.
+        request = self.context.get('request')
+        actor = request.user if request else None
+        if 'assignees' in validated_data:
+            instance.reconcile_assignee_completions(actor)
+        if instance.done != was_done:
+            instance.apply_done_to_assignees(actor)
+        return instance

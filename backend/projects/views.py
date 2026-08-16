@@ -16,7 +16,14 @@ from rest_framework.permissions import SAFE_METHODS, BasePermission, IsAuthentic
 from rest_framework.response import Response
 
 
-from .models import Project, Task, TodoAttachment, TodoFolder, TodoItem
+from .models import (
+    Project,
+    Task,
+    TodoAssigneeCompletion,
+    TodoAttachment,
+    TodoFolder,
+    TodoItem,
+)
 from .serializers import (
     ProjectSerializer,
     TaskSerializer,
@@ -341,9 +348,9 @@ class TodoItemViewSet(viewsets.ModelViewSet):
         # The one place visibility is enforced. Every list read, detail read, write and
         # delete goes through here, so an item you cannot see is unreachable by id too —
         # not merely hidden from the list.
-        base = TodoItem.objects.prefetch_related('assignees', 'attachments').select_related(
-            'created_by', 'customer', 'folder'
-        )
+        base = TodoItem.objects.prefetch_related(
+            'assignees', 'attachments', 'assignee_completions'
+        ).select_related('created_by', 'customer', 'folder')
         # distinct(): the assignees join inside the rule multiplies rows.
         return base.filter(visible_todo_q(self.request.user)).distinct()
 
@@ -381,6 +388,47 @@ class TodoItemViewSet(viewsets.ModelViewSet):
         return Response(
             self.get_serializer(queryset.order_by('due_at', 'id')[:CALENDAR_MAX_PROJECTS], many=True).data
         )
+
+    @action(detail=True, methods=['post'], url_path=r'assignees/(?P<user_id>\d+)/done')
+    def assignee_done(self, request, pk=None, user_id=None):
+        """Mark one assignee's share of a to-do finished, or hand it back.
+
+        Body: ``{"done": true|false}``, defaulting to true.
+
+        Your own share is yours to close. An admin may close anyone's, since the shared
+        board is theirs to answer for — and the row records which of the two it was.
+        Nobody else may: a tick is a statement about somebody's own work, and it is only
+        worth reading if the person it names is the one who made it.
+
+        Closing the last outstanding share closes the whole to-do; taking one back
+        reopens it. The response is the to-do itself, in its new state.
+        """
+        # get_object() runs the visibility rule, so an item the caller cannot see is
+        # unreachable here too.
+        todo = self.get_object()
+        user_id = int(user_id)
+        if not todo.assignees.filter(pk=user_id).exists():
+            return Response(
+                {'detail': 'That person is not assigned to this to-do.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if user_id != request.user.id and request.user.role != User.Role.ADMIN:
+            return Response(
+                {'detail': "Only an admin can mark someone else's share done."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        done = request.data.get('done', True)
+        if isinstance(done, str):
+            done = done.lower() not in ('false', '0', '')
+        if done:
+            TodoAssigneeCompletion.objects.get_or_create(
+                todo=todo, user_id=user_id, defaults={'marked_by': request.user}
+            )
+        else:
+            todo.assignee_completions.filter(user_id=user_id).delete()
+        todo.sync_done_from_assignees()
+        return Response(self.get_serializer(self.get_object()).data)
 
     @action(detail=True, methods=['post'], url_path='attachments', parser_classes=[MultiPartParser, FormParser])
     def attachments(self, request, pk=None):
