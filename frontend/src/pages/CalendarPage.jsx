@@ -15,9 +15,10 @@ import { useProjectCalendar } from '../hooks/useProjects'
 import { useTicketCalendar } from '../hooks/useTicketCalendar'
 import { useTodoCalendar } from '../hooks/useTodos'
 import { useI18n } from '../i18n/useI18n'
+import { WEEK_START, addDays, gridStart, startOfMonth, toKey } from '../utils/calendarDates'
 
-// Weeks start on Sunday, matching the working week where this is deployed.
-const WEEK_START = 0
+// Always six, so the grid keeps its height between a month needing five weeks and one
+// needing six. Which day the week starts on lives in utils/calendarDates.
 const WEEKS_SHOWN = 6
 
 // Quick ranges. 'month' keeps the grid; the rest narrow to a span and switch to an
@@ -30,30 +31,6 @@ const PRIORITY_DOT = {
   medium: 'bg-blue-500',
   high: 'bg-orange-500',
   urgent: 'bg-red-500',
-}
-
-// Local YYYY-MM-DD. Deliberately not toISOString(), which shifts to UTC and can land on
-// the previous day for anyone east of Greenwich.
-function toKey(date) {
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${date.getFullYear()}-${month}-${day}`
-}
-
-function addDays(date, days) {
-  const next = new Date(date)
-  next.setDate(next.getDate() + days)
-  return next
-}
-
-function startOfMonth(date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1)
-}
-
-// The first cell of the grid: the WEEK_START on or before the 1st of the month.
-function gridStart(month) {
-  const first = startOfMonth(month)
-  return addDays(first, -((first.getDay() - WEEK_START + 7) % 7))
 }
 
 // Who is on this. Overlapping avatars keep the footprint tiny inside a day square;
@@ -403,7 +380,7 @@ export default function CalendarPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
             {t('nav.calendar')}
           </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('calendar.subtitle')}</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-300">{t('calendar.subtitle')}</p>
         </div>
         {/* Live tally of what the current range and filters actually surface. */}
         <div className="flex items-center gap-2">
@@ -455,7 +432,7 @@ export default function CalendarPage() {
               onClick={() => shiftMonth(-1)}
               disabled={!isMonthView}
               aria-label={t('calendar.prevMonth')}
-              className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent dark:text-gray-400 dark:hover:bg-white/10"
+              className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent dark:text-gray-300 dark:hover:bg-white/10"
             >
               <ChevronRightIcon className="h-5 w-5 rotate-180 rtl:rotate-0" />
             </button>
@@ -467,7 +444,7 @@ export default function CalendarPage() {
               onClick={() => shiftMonth(1)}
               disabled={!isMonthView}
               aria-label={t('calendar.nextMonth')}
-              className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent dark:text-gray-400 dark:hover:bg-white/10"
+              className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent dark:text-gray-300 dark:hover:bg-white/10"
             >
               <ChevronRightIcon className="h-5 w-5 rtl:rotate-180" />
             </button>
@@ -488,7 +465,7 @@ export default function CalendarPage() {
                 className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${
                   range === option
                     ? 'bg-white text-indigo-600 shadow-soft dark:bg-gray-900 dark:text-indigo-300'
-                    : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
+                    : 'text-gray-500 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100'
                 }`}
               >
                 {t(`calendar.range.${option}`)}
@@ -518,7 +495,7 @@ export default function CalendarPage() {
                 {weekdayNames.map((name) => (
                   <div
                     key={name}
-                    className="bg-gray-50/60 px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:bg-white/[0.02] dark:text-gray-500"
+                    className="bg-gray-50/60 px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:bg-white/[0.02] dark:text-gray-400"
                   >
                     {name}
                   </div>
@@ -552,13 +529,13 @@ export default function CalendarPage() {
                               ? 'bg-indigo-600 text-white'
                               : inMonth
                                 ? 'text-gray-700 dark:text-gray-300'
-                                : 'text-gray-400 dark:text-gray-600'
+                                : 'text-gray-400 dark:text-gray-500'
                           }`}
                         >
                           {day.getDate()}
                         </span>
                         {tickets.length + dayProjects.length + dayTodos.length > 0 && (
-                          <span className="rounded-full bg-gray-100 px-1.5 text-[10px] font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">
+                          <span className="rounded-full bg-gray-100 px-1.5 text-[10px] font-medium text-gray-500 dark:bg-white/10 dark:text-gray-300">
                             {tickets.length + dayProjects.length + dayTodos.length}
                           </span>
                         )}
@@ -578,7 +555,7 @@ export default function CalendarPage() {
                             key={`t-${entry.todo.id}-${entry.kind}`}
                             todo={entry.todo}
                             kind={entry.kind}
-                            onOpen={() => navigate('/todo')}
+                            onOpen={() => navigate(`/todo/${entry.todo.id}/edit`)}
                             t={t}
                           />
                         ))}
@@ -656,7 +633,7 @@ export default function CalendarPage() {
                       </div>
                       <div className="flex min-w-0 flex-1 flex-col gap-1">
                         {!byDay.has(key) && !projectsByDay.has(key) && (
-                          <span className="text-xs text-gray-400 dark:text-gray-600">
+                          <span className="text-xs text-gray-400 dark:text-gray-500">
                             {t('calendar.dayEmpty')}
                           </span>
                         )}
@@ -665,7 +642,7 @@ export default function CalendarPage() {
                             key={`t-${entry.todo.id}-${entry.kind}`}
                             todo={entry.todo}
                             kind={entry.kind}
-                            onOpen={() => navigate('/todo')}
+                            onOpen={() => navigate(`/todo/${entry.todo.id}/edit`)}
                             t={t}
                           />
                         ))}
@@ -693,7 +670,7 @@ export default function CalendarPage() {
                   )
                 })}
               {visibleCount === 0 && !isLoading && (
-                <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">
+                <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-400">
                   {t('calendar.empty')}
                 </p>
               )}
@@ -702,7 +679,7 @@ export default function CalendarPage() {
         )}
 
         {/* Priority legend */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gray-100 px-4 py-3 text-[11px] text-gray-500 dark:border-white/10 dark:text-gray-400">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gray-100 px-4 py-3 text-[11px] text-gray-500 dark:border-white/10 dark:text-gray-300">
           {Object.entries(PRIORITY_DOT).map(([priority, dot]) => (
             <span key={priority} className="inline-flex items-center gap-1.5">
               <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
@@ -747,7 +724,7 @@ export default function CalendarPage() {
                         done · Amman Mart" reads as a single sentence and none of the
                         three values is findable. */}
                     <dl className="mt-2 grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 px-1.5 text-[11px]">
-                      <dt className="text-gray-400 dark:text-gray-500">{t('field.status')}</dt>
+                      <dt className="text-gray-400 dark:text-gray-400">{t('field.status')}</dt>
                       <dd>
                         <span
                           className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
@@ -764,7 +741,7 @@ export default function CalendarPage() {
                         </span>
                       </dd>
 
-                      <dt className="text-gray-400 dark:text-gray-500">{t('projects.progress')}</dt>
+                      <dt className="text-gray-400 dark:text-gray-400">{t('projects.progress')}</dt>
                       <dd className="text-gray-700 dark:text-gray-200">
                         <ProgressBar
                           value={entry.project.done_task_count || 0}
@@ -773,21 +750,21 @@ export default function CalendarPage() {
                         />
                       </dd>
 
-                      <dt className="text-gray-400 dark:text-gray-500">{t('field.customer')}</dt>
+                      <dt className="text-gray-400 dark:text-gray-400">{t('field.customer')}</dt>
                       <dd className="text-gray-700 dark:text-gray-200">
                         {entry.project.customer?.full_name || (
-                          <span className="text-gray-400 dark:text-gray-500">
+                          <span className="text-gray-400 dark:text-gray-400">
                             {t('projects.noCustomer')}
                           </span>
                         )}
                       </dd>
 
-                      <dt className="text-gray-400 dark:text-gray-500">{t('projects.assignees')}</dt>
+                      <dt className="text-gray-400 dark:text-gray-400">{t('projects.assignees')}</dt>
                       <dd className="text-gray-700 dark:text-gray-200">
                         {entry.project.assignees?.length ? (
                           entry.project.assignees.map((a) => a.full_name).join(', ')
                         ) : (
-                          <span className="text-gray-400 dark:text-gray-500">
+                          <span className="text-gray-400 dark:text-gray-400">
                             {t('projects.unassigned')}
                           </span>
                         )}
@@ -813,10 +790,10 @@ export default function CalendarPage() {
                     <TodoChip
                       todo={entry.todo}
                       kind={entry.kind}
-                      onOpen={() => navigate('/todo')}
+                      onOpen={() => navigate(`/todo/${entry.todo.id}/edit`)}
                       t={t}
                     />
-                    <p className="mt-1 flex flex-wrap items-center gap-2 px-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 flex flex-wrap items-center gap-2 px-1.5 text-[11px] text-gray-500 dark:text-gray-300">
                       <span>{t(`priority.${entry.todo.priority}`)}</span>
                       {entry.todo.duration_minutes != null && (
                         <span>{Math.round(entry.todo.duration_minutes / 60)}h</span>
@@ -836,7 +813,7 @@ export default function CalendarPage() {
 
           {selectedTickets.length > 0 && (
             <section>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300">
                 {t('nav.tickets')}
               </h3>
               <div className="flex flex-col gap-1.5">
@@ -852,7 +829,7 @@ export default function CalendarPage() {
                       onOpen={openTicket}
                       t={t}
                     />
-                    <p className="mt-1 flex flex-wrap items-center gap-2 px-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 flex flex-wrap items-center gap-2 px-1.5 text-[11px] text-gray-500 dark:text-gray-300">
                       <span className="font-mono">{entry.ticket.reference}</span>
                       <span>{t(`priority.${entry.ticket.priority}`)}</span>
                       <span>{t(`status.${entry.ticket.status}`)}</span>
@@ -869,7 +846,7 @@ export default function CalendarPage() {
           {selectedProjects.length === 0 &&
             selectedTickets.length === 0 &&
             selectedTodos.length === 0 && (
-            <p className="py-4 text-center text-sm text-gray-400 dark:text-gray-500">
+            <p className="py-4 text-center text-sm text-gray-400 dark:text-gray-400">
               {t('calendar.dayEmpty')}
             </p>
           )}
