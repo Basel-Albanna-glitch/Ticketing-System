@@ -6,6 +6,14 @@ export async function fetchTodos(filters = {}) {
   return data
 }
 
+// One to-do, for the edit page reached by URL rather than from a row already on screen.
+// The server applies the same visibility rule it applies to the list, so an item you
+// may not read 404s here rather than merely being absent from the list.
+export async function fetchTodo(id) {
+  const { data } = await client.get(`/todos/${id}/`)
+  return data
+}
+
 // Dated to-dos overlapping the calendar's visible window.
 export async function fetchTodoCalendar({ from, to }) {
   const { data } = await client.get('/todos/calendar/', { params: { from, to } })
@@ -24,6 +32,15 @@ export async function updateTodo(id, payload) {
 
 export async function deleteTodo(id) {
   await client.delete(`/todos/${id}/`)
+}
+
+// One assignee's share of a shared to-do, finished or handed back. Separate from the
+// to-do's own fields because it is a statement about one person's work rather than a
+// property of the item — and the server only lets you make it about yourself, unless
+// you are an admin. Returns the to-do, which may itself have closed as a result.
+export async function setTodoAssigneeDone(id, userId, done) {
+  const { data } = await client.post(`/todos/${id}/assignees/${userId}/done/`, { done })
+  return data
 }
 
 // `ids` is one group's rows in their new order — a section, or a folder within one.

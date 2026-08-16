@@ -1,21 +1,18 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import Avatar from '../components/ui/Avatar'
 import Breadcrumbs from '../components/ui/Breadcrumbs'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
-import Input from '../components/ui/Input'
-import FileInput from '../components/ui/FileInput'
-import Modal from '../components/ui/Modal'
-import MultiSelect from '../components/ui/MultiSelect'
+import SegmentedControl from '../components/ui/SegmentedControl'
 import Select from '../components/ui/Select'
 import Spinner from '../components/ui/Spinner'
 import SectionHeader from '../components/ui/SectionHeader'
 import StatTile from '../components/ui/StatTile'
-import Textarea from '../components/ui/Textarea'
-import Toggle from '../components/ui/Toggle'
 import PriorityBadge from '../components/tickets/PriorityBadge'
+import TodoAgenda from '../components/todo/TodoAgenda'
+import { formatDuration } from '../components/todo/format'
 import {
   BellIcon,
   CalendarIcon,
@@ -23,6 +20,9 @@ import {
   ClockIcon,
   GripIcon,
   InboxIcon,
+  LayoutDenseIcon,
+  LayoutSplitIcon,
+  LayoutStackIcon,
   LockIcon,
   PaperClipIcon,
   PencilIcon,
@@ -31,23 +31,17 @@ import {
   TrashIcon,
   UsersIcon,
 } from '../components/ui/icons'
-import SearchableSelect from '../components/ui/SearchableSelect'
 import { exportTodos } from '../api/todos'
 import { useAuth } from '../auth/useAuth'
-import { useAgents } from '../hooks/useAgents'
-import { useCustomers } from '../hooks/useCustomers'
 import {
-  useCreateTodo,
   useCreateTodoFolder,
   useDeleteTodo,
-  useDeleteTodoAttachment,
   useDeleteTodoFolder,
   useReorderTodos,
   useTodoFolders,
   useTodos,
   useUpdateTodo,
   useUpdateTodoFolder,
-  useUploadTodoAttachments,
 } from '../hooks/useTodos'
 import { useI18n } from '../i18n/useI18n'
 
@@ -67,74 +61,42 @@ const VIEW_HINT_KEY = {
   report: 'todo.reportHint',
 }
 
-// Reminder offsets, in minutes before the due date. Coarse on purpose: a to-do list
-// wants "a few days' warning", not a time picker.
-const REMINDER_OFFSETS = [
-  { minutes: 0, labelKey: 'todo.remindAtDue' },
-  { minutes: 60, labelKey: 'todo.remind1h' },
-  { minutes: 1440, labelKey: 'todo.remind1d' },
-  { minutes: 4320, labelKey: 'todo.remind3d' },
-  { minutes: 10080, labelKey: 'todo.remind7d' },
-  { minutes: 20160, labelKey: 'todo.remind14d' },
-]
-
-// What the chosen offset works out to, so nobody has to do the arithmetic to find out
-// their "7 days before" already fell in the past.
-function remindPreview(form, t) {
-  const due = new Date(form.due_at)
-  if (Number.isNaN(due.getTime())) return ''
-  const when = new Date(due.getTime() - Number(form.remind_offset_minutes) * 60000)
-  const stamp = when.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
-  return when.getTime() <= Date.now() ? `${stamp} — ${t('todo.remindInPast')}` : stamp
+// How the two sections are arranged. Nobody's list looks like anybody else's — a shared
+// board that dwarfs a three-item private list wants different space than the reverse —
+// so the arrangement is the reader's call, not a fixed choice made here.
+//
+// `wrapper` is how the pair is laid out; `dense` packs the rows inside them.
+const LAYOUTS = {
+  split: {
+    icon: LayoutSplitIcon,
+    labelKey: 'todo.layoutSplit',
+    hintKey: 'todo.layoutSplitHint',
+    wrapper: 'grid grid-cols-1 items-start gap-6 xl:grid-cols-2',
+    dense: false,
+  },
+  stacked: {
+    icon: LayoutStackIcon,
+    labelKey: 'todo.layoutStacked',
+    hintKey: 'todo.layoutStackedHint',
+    wrapper: 'flex flex-col gap-6',
+    dense: false,
+  },
+  dense: {
+    icon: LayoutDenseIcon,
+    labelKey: 'todo.layoutDense',
+    hintKey: 'todo.layoutDenseHint',
+    wrapper: 'grid grid-cols-1 items-start gap-6 xl:grid-cols-2',
+    dense: true,
+  },
 }
 
-const EMPTY_FORM = {
-  title: '',
-  notes: '',
-  priority: 'medium',
-  // New work is shared by default — the team board is the norm, and a private item is
-  // the deliberate exception.
-  is_private: false,
-  folder_id: '',
-  start_at: '',
-  due_at: '',
-  remind_offset_minutes: '',
-  customer_id: '',
-  assignee_ids: [],
-}
+const LAYOUT_KEY = 'todo_layout'
 
-// <input type="datetime-local"> speaks 'YYYY-MM-DDTHH:mm' in local time, while the API
-// speaks ISO with an offset. These two convert between them without a UTC round trip.
-function toLocalInput(iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-}
-
-function fromLocalInput(value) {
-  return value ? new Date(value).toISOString() : null
-}
-
-// 2048 -> "2 KB". Whole units only: a file listing is scanned, not audited.
-function formatBytes(bytes) {
-  if (!bytes) return '0 KB'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-// 330 -> "5h 30m"; 90 -> "1h 30m"; 45 -> "45m"
-function formatDuration(minutes, t) {
-  if (minutes == null) return null
-  const abs = Math.max(0, minutes)
-  const days = Math.floor(abs / 1440)
-  const hours = Math.floor((abs % 1440) / 60)
-  const mins = abs % 60
-  const parts = []
-  if (days) parts.push(`${days}${t('todo.dayShort')}`)
-  if (hours) parts.push(`${hours}${t('todo.hourShort')}`)
-  if (mins || !parts.length) parts.push(`${mins}${t('todo.minuteShort')}`)
-  return parts.join(' ')
+// Per browser, not per account: this is how one person likes to read the page on one
+// screen, and it should not follow a 32" monitor's two columns onto a laptop.
+function storedLayout() {
+  const stored = localStorage.getItem(LAYOUT_KEY)
+  return LAYOUTS[stored] ? stored : 'split'
 }
 
 // Bar colours for the priority breakdown. Priority is a status scale, not a set of
@@ -175,11 +137,11 @@ function ReportBlock({ title, rows, tone, t, emptyKey }) {
   const max = Math.max(1, ...rows.map((r) => r.value))
   return (
     <div>
-      <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+      <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-400">
         {title}
       </h3>
       {rows.length === 0 ? (
-        <p className="text-xs text-gray-400 dark:text-gray-500">{t(emptyKey)}</p>
+        <p className="text-xs text-gray-400 dark:text-gray-400">{t(emptyKey)}</p>
       ) : (
         <div className="flex flex-col gap-2">
           {rows.map((row) => (
@@ -215,7 +177,9 @@ function TodoReport({ rows, t, onExport, exporting }) {
     const due = new Date(i.due_at).getTime()
     return due >= now && due <= endOfToday.getTime()
   })
-  const unassigned = open.filter((i) => !i.assignees?.length)
+  // Private work is nobody else's to pick up, so it is not "waiting for an owner" —
+  // counting it here would report a backlog that does not exist.
+  const unassigned = open.filter((i) => !i.is_private && !i.assignees?.length)
   const weekAgo = now - 7 * 864e5
   const doneThisWeek = rows.filter(
     (i) => i.done && i.completed_at && new Date(i.completed_at).getTime() >= weekAgo
@@ -233,7 +197,14 @@ function TodoReport({ rows, t, onExport, exporting }) {
 
   const perPerson = new Map()
   for (const item of open) {
-    const names = item.assignees?.length ? item.assignees.map((a) => a.full_name) : [null]
+    // A private item cannot be assigned, but somebody is plainly carrying it: its author,
+    // who is the only person who can see it. Filing it under "nobody" would understate
+    // what that person actually has on.
+    const names = item.is_private
+      ? [item.created_by?.full_name ?? null]
+      : item.assignees?.length
+        ? item.assignees.map((a) => a.full_name)
+        : [null]
     // A shared item counts once for each person carrying it — the question is how much
     // each of them has on, not how the total divides up.
     for (const name of names) perPerson.set(name, (perPerson.get(name) || 0) + 1)
@@ -368,7 +339,7 @@ function TodoReport({ rows, t, onExport, exporting }) {
 
             {/* Two figures that need a sentence rather than a bar: one looks backwards
                 at how long finished work took, the other at what has sat longest. */}
-            <div className="flex flex-wrap gap-x-8 gap-y-2 border-t border-gray-100 pt-4 text-xs text-gray-500 dark:border-white/10 dark:text-gray-400">
+            <div className="flex flex-wrap gap-x-8 gap-y-2 border-t border-gray-100 pt-4 text-xs text-gray-500 dark:border-white/10 dark:text-gray-300">
               {avgDays !== null && (
                 <span>
                   {t('todo.reportAvgDays')}{' '}
@@ -409,7 +380,7 @@ function folderError(err, fallback) {
 //
 // Only the grip is draggable. The row body is a button that opens the item, and a region
 // that is simultaneously "click to edit" and "drag to move" resolves to neither.
-function TodoRow({ item, drag, t, isOverdue, onToggleDone, onEdit, onDelete, deletingId, rows }) {
+function TodoRow({ item, drag, t, isOverdue, onToggleDone, onEdit, onDelete, deletingId, rows, dense }) {
   const overdue = isOverdue(item)
   return (
     <div
@@ -424,7 +395,9 @@ function TodoRow({ item, drag, t, isOverdue, onToggleDone, onEdit, onDelete, del
         e.preventDefault()
         drag.onDrop(item, rows)
       }}
-      className={`group relative flex items-start gap-2.5 rounded-lg py-2.5 pe-2 ps-1 transition-colors hover:bg-gray-50 dark:hover:bg-white/5 ${
+      className={`group relative flex items-start gap-2.5 rounded-lg ${
+        dense ? 'py-1.5' : 'py-2.5'
+      } pe-2 ps-1 transition-colors hover:bg-gray-50 dark:hover:bg-white/5 ${
         drag.draggingId === item.id ? 'opacity-40' : ''
       } ${drag.dragOverId === item.id ? 'ring-2 ring-inset ring-indigo-400/60' : ''}`}
     >
@@ -441,7 +414,7 @@ function TodoRow({ item, drag, t, isOverdue, onToggleDone, onEdit, onDelete, del
         onDragStart={() => drag.onStart(item)}
         onDragEnd={drag.onEnd}
         aria-hidden
-        className="mt-0.5 shrink-0 cursor-grab text-gray-300 opacity-0 transition-opacity active:cursor-grabbing group-hover:opacity-100 dark:text-gray-600"
+        className="mt-0.5 shrink-0 cursor-grab text-gray-300 opacity-0 transition-opacity active:cursor-grabbing group-hover:opacity-100 dark:text-gray-500"
       >
         <GripIcon className="h-4 w-4" />
       </span>
@@ -449,16 +422,22 @@ function TodoRow({ item, drag, t, isOverdue, onToggleDone, onEdit, onDelete, del
         <span
           className={`text-sm ${
             item.done
-              ? 'text-gray-400 line-through dark:text-gray-500'
+              ? 'text-gray-400 line-through dark:text-gray-400'
               : 'font-medium text-gray-900 dark:text-gray-100'
           }`}
         >
           {item.title}
         </span>
-        {item.notes && (
-          <p className="mt-0.5 line-clamp-1 text-xs text-gray-500 dark:text-gray-400">{item.notes}</p>
+        {/* The notes preview is the first thing to go when packing rows in: it is the
+            one line that repeats what opening the item would tell you anyway. */}
+        {item.notes && !dense && (
+          <p className="mt-0.5 line-clamp-1 text-xs text-gray-500 dark:text-gray-300">{item.notes}</p>
         )}
-        <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-gray-400 dark:text-gray-500">
+        <div
+          className={`${
+            dense ? 'mt-0.5' : 'mt-1'
+          } flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-gray-400 dark:text-gray-400`}
+        >
           {item.due_at && (
             <span
               className={`inline-flex items-center gap-1 ${
@@ -518,7 +497,7 @@ function TodoRow({ item, drag, t, isOverdue, onToggleDone, onEdit, onDelete, del
         className={`mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${
           item.done
             ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20'
-            : 'border-gray-200 text-gray-500 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 dark:border-white/10 dark:text-gray-400 dark:hover:border-emerald-500/30 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-300'
+            : 'border-gray-200 text-gray-500 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 dark:border-white/10 dark:text-gray-300 dark:hover:border-emerald-500/30 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-300'
         }`}
       >
         <CheckCircleIcon className="h-3.5 w-3.5" />
@@ -530,7 +509,7 @@ function TodoRow({ item, drag, t, isOverdue, onToggleDone, onEdit, onDelete, del
         disabled={deletingId === item.id}
         title={t('common.delete')}
         aria-label={`${t('common.delete')} ${item.title}`}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-gray-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 disabled:opacity-50 group-hover:opacity-100 dark:text-gray-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-gray-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 disabled:opacity-50 group-hover:opacity-100 dark:text-gray-400 dark:hover:bg-red-500/10 dark:hover:text-red-400"
       >
         {deletingId === item.id ? <Spinner /> : <TrashIcon className="h-4 w-4" />}
       </button>
@@ -550,13 +529,15 @@ function FolderGroup({ folder, rows, collapsed, onToggleCollapse, onRename, onDe
           className="flex min-w-0 flex-1 items-center gap-1.5 py-1 text-start"
           aria-expanded={!collapsed}
         >
-          <span className="w-3 text-[10px] text-gray-400 dark:text-gray-500">
+          <span className="w-3 text-[10px] text-gray-400 dark:text-gray-400">
             {collapsed ? '▶' : '▼'}
           </span>
-          <span className="truncate text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          <span className="truncate text-xs font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">
             {folder ? folder.name : t('todo.unfiled')}
           </span>
-          <span className="text-xs tabular-nums text-gray-400 dark:text-gray-600">{rows.length}</span>
+          {/* A count is information, not decoration, so it stays out of the faint tier
+              the separators and chevrons sit in. */}
+          <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400">{rows.length}</span>
         </button>
         {folder && (
           <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/folder:opacity-100">
@@ -565,7 +546,7 @@ function FolderGroup({ folder, rows, collapsed, onToggleCollapse, onRename, onDe
               onClick={() => onRename(folder)}
               title={t('todo.renameFolder')}
               aria-label={`${t('todo.renameFolder')} ${folder.name}`}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-white/10 dark:hover:text-gray-200"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-100"
             >
               <PencilIcon className="h-3.5 w-3.5" />
             </button>
@@ -574,7 +555,7 @@ function FolderGroup({ folder, rows, collapsed, onToggleCollapse, onRename, onDe
               onClick={() => onDeleteFolder(folder)}
               title={t('todo.deleteFolder')}
               aria-label={`${t('todo.deleteFolder')} ${folder.name}`}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-gray-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-500/10 dark:hover:text-red-400"
             >
               <TrashIcon className="h-3.5 w-3.5" />
             </button>
@@ -583,7 +564,7 @@ function FolderGroup({ folder, rows, collapsed, onToggleCollapse, onRename, onDe
       </div>
       {!collapsed &&
         (rows.length === 0 ? (
-          <p className="py-3 ps-6 text-xs text-gray-400 dark:text-gray-500">{t('todo.folderEmpty')}</p>
+          <p className="py-3 ps-6 text-xs text-gray-400 dark:text-gray-400">{t('todo.folderEmpty')}</p>
         ) : (
           <div className="divide-y divide-gray-100 dark:divide-white/5">
             {rows.map((item) => (
@@ -611,6 +592,7 @@ function TodoSection({
   onRename,
   onDeleteFolder,
   addingFolder,
+  dense,
   t,
   rowProps,
 }) {
@@ -638,7 +620,7 @@ function TodoSection({
       {rows.length === 0 && folders.length === 0 ? (
         <EmptyState title={emptyTitle} description={emptyHint} />
       ) : (
-        <div className="flex flex-col gap-5">
+        <div className={`flex flex-col ${dense ? 'gap-3' : 'gap-5'}`}>
           {folders.map((folder) => (
             <FolderGroup
               key={folder.id}
@@ -671,42 +653,38 @@ function TodoSection({
 export default function TodoPage() {
   const { t } = useI18n()
   const { user } = useAuth()
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
   const [filter, setFilter] = useState('open')
   // The section comes from the URL, so each one is its own address: the sidebar can
   // mark the active one, and a link to "Today" survives being shared or bookmarked.
   const { view: rawView } = useParams()
   const view = VIEW_LABEL_KEY[rawView] ? rawView : 'inbox'
   const isReport = view === 'report'
+  // Upcoming is dated work by definition, so it is grouped by day rather than piled
+  // into one list: "next Tuesday and the Friday after" is a shape a flat list hides.
+  const isAgenda = view === 'upcoming'
+  // The two Shared/Private sections, and everything that only makes sense alongside them.
+  const isSections = !isReport && !isAgenda
   // 'open' and 'done' are server-side filters; 'all' sends nothing. The report needs
   // the whole picture, so it ignores the status filter rather than reporting on a slice.
   const filters = isReport || filter === 'all' ? {} : { done: filter === 'done' }
   const { data: todos, isLoading } = useTodos(filters)
-  const { data: agents } = useAgents({ includeAdmins: true })
-  const { data: customers } = useCustomers()
-  const createTodo = useCreateTodo()
   const updateTodo = useUpdateTodo()
   const deleteTodo = useDeleteTodo()
   // Which row is mid-delete, so only that button shows a spinner rather than
   // every one of them reacting to the shared mutation state.
   const deletingId = deleteTodo.isPending ? deleteTodo.variables : null
   const reorder = useReorderTodos(filters)
-  const uploadAttachments = useUploadTodoAttachments()
-  const deleteAttachment = useDeleteTodoAttachment()
   const { data: folders } = useTodoFolders()
   const createFolder = useCreateTodoFolder()
   const updateFolder = useUpdateTodoFolder()
   const deleteFolder = useDeleteTodoFolder()
   const [collapsedIds, setCollapsedIds] = useState(() => new Set())
+  const [layout, setLayout] = useState(storedLayout)
+  const activeLayout = LAYOUTS[layout]
 
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editing, setEditing] = useState(null)
-  // A new item is always yours; an existing one only if you wrote it.
-  const canChangePrivacy = !editing || editing.created_by?.id === user?.id
-  const [form, setForm] = useState(EMPTY_FORM)
-  // Files chosen in the modal but not yet uploaded — they go up once the to-do exists.
-  const [pendingFiles, setPendingFiles] = useState([])
   const [exporting, setExporting] = useState(false)
-  const [error, setError] = useState('')
   const [draggingId, setDraggingId] = useState(null)
   const [dragOverId, setDragOverId] = useState(null)
   // Which section the dragged row came from, so a drop can be refused across the divide.
@@ -743,92 +721,15 @@ export default function TodoPage() {
   const isOverdue = (item) => !item.done && item.due_at && new Date(item.due_at).getTime() < now
   const overdueCount = rows.filter(isOverdue).length
 
+  // Adding and editing both happen on a page of their own. Each carries where it was
+  // opened from, so saving returns to the view you left rather than dumping everyone
+  // in the Inbox.
   function openCreate() {
-    setEditing(null)
-    setForm(EMPTY_FORM)
-    setPendingFiles([])
-    setError('')
-    setModalOpen(true)
+    navigate('/todo/new', { state: { from: pathname } })
   }
 
   function openEdit(item) {
-    setEditing(item)
-    setPendingFiles([])
-    setForm({
-      title: item.title,
-      notes: item.notes || '',
-      priority: item.priority,
-      is_private: item.is_private,
-      folder_id: item.folder?.id ?? '',
-      start_at: toLocalInput(item.start_at),
-      due_at: toLocalInput(item.due_at),
-      remind_offset_minutes:
-        item.remind_offset_minutes == null ? '' : String(item.remind_offset_minutes),
-      customer_id: item.customer?.id ?? '',
-      assignee_ids: (item.assignees || []).map((a) => a.id),
-    })
-    setError('')
-    setModalOpen(true)
-  }
-
-  async function handleSubmit(event) {
-    event.preventDefault()
-    setError('')
-    // Every extra field is optional: empty means null, not an empty string.
-    const payload = {
-      ...form,
-      start_at: fromLocalInput(form.start_at),
-      due_at: fromLocalInput(form.due_at),
-      // '' means no reminder; the server derives remind_at from this and the due date.
-      remind_offset_minutes:
-        form.remind_offset_minutes === '' ? null : Number(form.remind_offset_minutes),
-      customer_id: form.customer_id || null,
-      folder_id: form.folder_id || null,
-    }
-    try {
-      const saved = editing
-        ? await updateTodo.mutateAsync({ id: editing.id, ...payload })
-        : await createTodo.mutateAsync(payload)
-      // Files go up after the to-do exists, since a new one has no id to hang them on.
-      // Failing here leaves the saved to-do alone and says so, rather than pretending
-      // the whole save failed and inviting a duplicate.
-      if (pendingFiles.length) {
-        try {
-          await uploadAttachments.mutateAsync({ id: saved.id, files: pendingFiles })
-        } catch {
-          setError(t('todo.attachmentUploadFailed'))
-          setPendingFiles([])
-          return
-        }
-      }
-      setModalOpen(false)
-      setEditing(null)
-      setForm(EMPTY_FORM)
-      setPendingFiles([])
-    } catch (err) {
-      const data = err?.response?.data
-      setError(data ? Object.values(data).flat().join(' ') : t('todo.saveFailed'))
-    }
-  }
-
-  function handleDeleteAttachment(attachment) {
-    if (!editing) return
-    if (!window.confirm(`${t('todo.deleteAttachmentConfirm')} "${attachment.original_filename}"?`))
-      return
-    deleteAttachment.mutate(
-      { id: editing.id, attachmentId: attachment.id },
-      {
-        onSuccess: () =>
-          // The modal holds its own copy of the to-do, so drop the row from it too;
-          // otherwise a deleted file lingers on screen until the modal is reopened.
-          setEditing((current) =>
-            current
-              ? { ...current, attachments: current.attachments.filter((a) => a.id !== attachment.id) }
-              : current
-          ),
-        onError: () => window.alert(t('todo.attachmentDeleteFailed')),
-      }
-    )
+    navigate(`/todo/${item.id}/edit`, { state: { from: pathname } })
   }
 
   async function handleExport() {
@@ -849,6 +750,13 @@ export default function TodoPage() {
     } finally {
       setExporting(false)
     }
+  }
+
+  // Written straight through rather than in an effect: the only way it changes is
+  // somebody pressing one of three buttons.
+  function changeLayout(next) {
+    setLayout(next)
+    localStorage.setItem(LAYOUT_KEY, next)
   }
 
   function toggleCollapse(key) {
@@ -939,11 +847,8 @@ export default function TodoPage() {
     onEdit: openEdit,
     onDelete: handleDelete,
     deletingId,
+    dense: activeLayout.dense,
   }
-
-  // The folders this item could move into: the side it is on, and — for a private
-  // folder — only your own, which is all the server sends anyway.
-  const folderOptions = allFolders.filter((f) => f.is_private === form.is_private)
 
   return (
     <div className="flex flex-col gap-6">
@@ -962,13 +867,29 @@ export default function TodoPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
             {t(VIEW_LABEL_KEY[view])}
           </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-300">
             {t(VIEW_HINT_KEY[view])}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {/* The report covers open and done alike, so a status filter would only
-              contradict it. */}
+          {/* The layout switch arranges the two sections, so it only appears where they
+              do — not on the report, and not on the calendar, which has a shape of its
+              own. The status filter narrows any of them, so it stays. */}
+          {isSections && (
+            <SegmentedControl
+              value={layout}
+              onChange={changeLayout}
+              iconOnly
+              aria-label={t('todo.layout')}
+              options={Object.entries(LAYOUTS).map(([key, config]) => ({
+                value: key,
+                icon: config.icon,
+                label: t(config.labelKey),
+                // The glyph shows the arrangement; the tooltip says what it is for.
+                title: `${t(config.labelKey)} — ${t(config.hintKey)}`,
+              }))}
+            />
+          )}
           {!isReport && (
             <Select
               value={filter}
@@ -989,8 +910,10 @@ export default function TodoPage() {
       </div>
 
       {/* The report brings its own headline numbers, and a second Overdue tile directly
-          above them would only invite a double-take over which one is authoritative. */}
-      {!isReport && (
+          above them would only invite a double-take over which one is authoritative. The
+          calendar counts a month, while these count the whole open list — two different
+          answers to "how much is there", side by side, and no way to tell which is which. */}
+      {isSections && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <StatTile label={t('todo.statOpen')} value={openCount} icon={InboxIcon} color="indigo" />
           <StatTile label={t('todo.statDone')} value={doneCount} icon={CheckCircleIcon} color="green" />
@@ -1009,10 +932,17 @@ export default function TodoPage() {
             <Spinner />
           </div>
         </Card>
+      ) : isAgenda ? (
+        // The agenda groups the same rows the sections would have shown, so it needs no
+        // query of its own — and no second answer to what is on the list.
+        <TodoAgenda rows={allRows} />
       ) : isReport ? (
         <TodoReport rows={allRows} t={t} onExport={handleExport} exporting={exporting} />
       ) : (
-        <>
+        // Whichever arrangement was chosen. The two-column ones collapse to one below
+        // xl regardless: at half a laptop's width a row's dates, badges and buttons
+        // wrap onto four lines each, which is nobody's idea of a layout.
+        <div className={activeLayout.wrapper}>
           <TodoSection
             icon={UsersIcon}
             title={t('todo.sectionPublic')}
@@ -1031,6 +961,7 @@ export default function TodoPage() {
             onRename={handleRenameFolder}
             onDeleteFolder={handleDeleteFolder}
             addingFolder={createFolder.isPending}
+            dense={activeLayout.dense}
             t={t}
             rowProps={rowProps}
           />
@@ -1048,215 +979,13 @@ export default function TodoPage() {
             onRename={handleRenameFolder}
             onDeleteFolder={handleDeleteFolder}
             addingFolder={createFolder.isPending}
+            dense={activeLayout.dense}
             t={t}
             rowProps={rowProps}
           />
-        </>
+        </div>
       )}
 
-      <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={t(editing ? 'todo.editItem' : 'todo.newItem')}
-        dismissOnBackdrop={false}
-      >
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Input
-            label={t('projects.taskTitle')}
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            required
-          />
-          <Textarea
-            label={t('todo.notes')}
-            rows={3}
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-          />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Select
-              label={t('field.priority')}
-              value={form.priority}
-              onChange={(e) => setForm({ ...form, priority: e.target.value })}
-            >
-              <option value="low">{t('priority.low')}</option>
-              <option value="medium">{t('priority.medium')}</option>
-              <option value="high">{t('priority.high')}</option>
-              <option value="urgent">{t('priority.urgent')}</option>
-            </Select>
-            <Input
-              label={t('projects.fromDate')}
-              type="datetime-local"
-              value={form.start_at}
-              onChange={(e) => setForm({ ...form, start_at: e.target.value })}
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Input
-              label={t('projects.toDate')}
-              type="datetime-local"
-              value={form.due_at}
-              onChange={(e) => setForm({ ...form, due_at: e.target.value })}
-            />
-            {/* Read-only: it follows the dates rather than being typed. */}
-            <Input
-              label={t('todo.duration')}
-              value={
-                form.start_at && form.due_at
-                  ? formatDuration(
-                      Math.round((new Date(form.due_at) - new Date(form.start_at)) / 60000),
-                      t
-                    )
-                  : t('common.none')
-              }
-              readOnly
-              disabled
-            />
-          </div>
-          <div>
-            <Select
-              label={t('todo.remindAt')}
-              value={form.remind_offset_minutes}
-              disabled={!form.due_at}
-              onChange={(e) => setForm({ ...form, remind_offset_minutes: e.target.value })}
-            >
-              <option value="">{t('todo.remindNone')}</option>
-              {REMINDER_OFFSETS.map((o) => (
-                <option key={o.minutes} value={o.minutes}>
-                  {t(o.labelKey)}
-                </option>
-              ))}
-            </Select>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {/* Three things a reader needs: that it hangs off the due date, when it
-                  will actually land, and who gets it — "remind me" is the natural
-                  reading and on a shared item it is wrong. */}
-              {!form.due_at
-                ? t('todo.remindNeedsDueDate')
-                : form.remind_offset_minutes === ''
-                  ? t('todo.remindNoneHint')
-                  : `${remindPreview(form, t)} · ${
-                      form.is_private
-                        ? t('todo.remindAtHintPrivate')
-                        : form.assignee_ids.length
-                          ? t('todo.remindAtHintAssigned')
-                          : t('todo.remindAtHintUnassigned')
-                    }`}
-            </p>
-          </div>
-          <Select
-            label={t('todo.folder')}
-            value={form.folder_id}
-            onChange={(e) => setForm({ ...form, folder_id: e.target.value })}
-          >
-            <option value="">{t('todo.unfiled')}</option>
-            {folderOptions.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </Select>
-          <SearchableSelect
-            label={`${t('field.customer')} (${t('common.optional')})`}
-            value={form.customer_id}
-            onChange={(value) => setForm({ ...form, customer_id: value })}
-            placeholder={t('todo.noCustomer')}
-            options={[
-              { value: '', label: t('todo.noCustomer') },
-              ...(customers || []).map((c) => ({
-                value: c.id,
-                label: `${c.full_name} (${c.username})`,
-              })),
-            ]}
-          />
-          <div>
-            <MultiSelect
-              label={t('projects.assignees')}
-              value={form.assignee_ids}
-              onChange={(ids) => setForm({ ...form, assignee_ids: ids })}
-              placeholder={t('projects.unassigned')}
-              options={(agents || []).map((a) => ({ value: a.id, label: a.full_name }))}
-            />
-            {/* Assigning is not just a label — it decides who still sees the item. */}
-            {!form.is_private && (
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {form.assignee_ids.length
-                  ? t('todo.assignNarrowsHint')
-                  : t('todo.unassignedHint')}
-              </p>
-            )}
-          </div>
-          {/* Only the author may move an item between the two lists, so this is read-only
-              on someone else's — the server refuses it either way. */}
-          <div className="flex items-start justify-between gap-4 rounded-xl border border-gray-200/70 p-3 dark:border-white/10">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                {t('todo.makePrivate')}
-              </p>
-              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                {canChangePrivacy ? t('todo.makePrivateHint') : t('todo.privacyOwnerOnly')}
-              </p>
-            </div>
-            <Toggle
-              checked={form.is_private}
-              disabled={!canChangePrivacy}
-              // Folders belong to one side, so a folder chosen before the flip is no
-              // longer a legal home — drop back to the Inbox rather than send a
-              // mismatch the server would reject.
-              onChange={(value) => setForm({ ...form, is_private: value, folder_id: '' })}
-              aria-label={t('todo.makePrivate')}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {t('todo.attachments')}
-            </span>
-            {/* Already-uploaded files, each removable. Only on an existing to-do — a new
-                one has nothing stored yet. */}
-            {editing?.attachments?.length > 0 && (
-              <ul className="flex flex-col gap-1">
-                {editing.attachments.map((a) => (
-                  <li
-                    key={a.id}
-                    className="flex items-center gap-2 rounded-lg border border-gray-200/70 px-2 py-1.5 text-xs dark:border-white/10"
-                  >
-                    <PaperClipIcon className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" />
-                    <a
-                      href={a.file}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="min-w-0 flex-1 truncate text-indigo-600 hover:underline dark:text-indigo-400"
-                    >
-                      {a.original_filename}
-                    </a>
-                    <span className="shrink-0 tabular-nums text-gray-400 dark:text-gray-500">
-                      {formatBytes(a.size)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteAttachment(a)}
-                      aria-label={`${t('common.delete')} ${a.original_filename}`}
-                      className="shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                    >
-                      <TrashIcon className="h-3.5 w-3.5" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <FileInput files={pendingFiles} onChange={setPendingFiles} />
-            {!editing && pendingFiles.length > 0 && (
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {t('todo.attachmentsAfterSave')}
-              </p>
-            )}
-          </div>
-          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-          <Button type="submit" loading={createTodo.isPending || updateTodo.isPending}>
-            {t(editing ? 'projects.saveChanges' : 'todo.addItem')}
-          </Button>
-        </form>
-      </Modal>
     </div>
   )
 }

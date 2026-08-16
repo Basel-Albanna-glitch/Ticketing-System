@@ -2,6 +2,8 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import ProtectedRoute from './auth/ProtectedRoute'
 import AgentDetailPage from './pages/AgentDetailPage'
 import TodoPage from './pages/TodoPage'
+import TodoCreatePage from './pages/TodoCreatePage'
+import TodoEditPage from './pages/TodoEditPage'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './pages/LoginPage'
 import GuestTicketPage from './pages/GuestTicketPage'
@@ -64,7 +66,13 @@ const router = createBrowserRouter([
             // own. `replace` keeps it out of history, so Back does not bounce off it.
             children: [
               { path: '/todo', element: <Navigate to="/todo/inbox" replace /> },
+              // Ahead of :view on purpose in the reading, though the router ranks the
+              // literal segment first regardless — /todo/new is the add form, not a
+              // fifth section of the list.
+              { path: '/todo/new', element: <TodoCreatePage /> },
               { path: '/todo/:view', element: <TodoPage /> },
+              // Two segments, so it never competes with :view.
+              { path: '/todo/:id/edit', element: <TodoEditPage /> },
             ],
           },
           {

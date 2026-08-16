@@ -298,6 +298,35 @@ export function BookIcon(props) {
   )
 }
 
+// The three layout choices, drawn as the arrangement each one produces: two panels
+// abreast, two panels stacked, and stacked panels whose rows are packed tighter.
+export function LayoutSplitIcon(props) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="4.5" width="7.5" height="15" rx="1.5" />
+      <rect x="13" y="4.5" width="7.5" height="15" rx="1.5" />
+    </Icon>
+  )
+}
+
+export function LayoutStackIcon(props) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="4.5" width="17" height="6.5" rx="1.5" />
+      <rect x="3.5" y="13" width="17" height="6.5" rx="1.5" />
+    </Icon>
+  )
+}
+
+export function LayoutDenseIcon(props) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />
+      <path d="M3.5 9.5h17M3.5 12h17M3.5 14.5h17" />
+    </Icon>
+  )
+}
+
 // Star for satisfaction ratings — `filled` toggles the solid fill.
 export function StarIcon({ filled = false, className = 'h-5 w-5' }) {
   return (

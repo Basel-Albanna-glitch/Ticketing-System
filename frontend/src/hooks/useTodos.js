@@ -5,10 +5,12 @@ import {
   deleteTodo,
   deleteTodoAttachment,
   deleteTodoFolder,
+  fetchTodo,
   fetchTodoCalendar,
   fetchTodoFolders,
   fetchTodos,
   reorderTodos,
+  setTodoAssigneeDone,
   updateTodo,
   updateTodoFolder,
   uploadTodoAttachments,
@@ -22,6 +24,16 @@ export function useTodos(filters = {}) {
     queryKey: [...KEY, filters],
     queryFn: () => fetchTodos(filters),
     placeholderData: (previousData) => previousData,
+  })
+}
+
+// Keyed under ['todos'] so the mutations' blanket invalidation refreshes it too — an
+// edit page left open after a change elsewhere should not show stale fields.
+export function useTodo(id) {
+  return useQuery({
+    queryKey: [...KEY, 'detail', id],
+    queryFn: () => fetchTodo(id),
+    enabled: Boolean(id),
   })
 }
 
@@ -42,6 +54,16 @@ function useInvalidateTodos() {
     queryClient.invalidateQueries({ queryKey: KEY })
     queryClient.invalidateQueries({ queryKey: FOLDER_KEY })
   }
+}
+
+// Ticking the last outstanding share closes the to-do itself, so this invalidates the
+// list as well as the item — the row has to move to Done.
+export function useSetTodoAssigneeDone() {
+  const invalidate = useInvalidateTodos()
+  return useMutation({
+    mutationFn: ({ id, userId, done }) => setTodoAssigneeDone(id, userId, done),
+    onSuccess: invalidate,
+  })
 }
 
 export function useUploadTodoAttachments() {
