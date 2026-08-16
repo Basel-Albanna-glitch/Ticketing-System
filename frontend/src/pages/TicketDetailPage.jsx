@@ -84,7 +84,7 @@ function ActionGroup({ label, tone = 'default', children }) {
       {label && (
         <span
           className={`text-xs font-medium uppercase tracking-wide ${
-            danger ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'
+            danger ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-400'
           }`}
         >
           {label}
@@ -124,8 +124,8 @@ function CollaboratorChips({ collaborators, onRemove, removeLabel }) {
 
 function MetaItem({ icon: Icon, children }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-      <Icon className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
+    <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-300">
+      <Icon className="h-3.5 w-3.5 text-gray-400 dark:text-gray-400" />
       {children}
     </span>
   )
@@ -140,7 +140,7 @@ function DetailRow({ icon: Icon, label, children }) {
         <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <dt className="text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+        <dt className="text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-400">
           {label}
         </dt>
         <dd className="mt-0.5 break-words text-sm text-gray-800 dark:text-gray-200">{children}</dd>
@@ -234,7 +234,7 @@ export default function TicketDetailPage() {
         <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           {t('tickets.notFound')}
         </h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('tickets.notFoundHint')}</p>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-300">{t('tickets.notFoundHint')}</p>
         <Button className="mt-4" onClick={() => navigate('/tickets')}>
           {t('nav.tickets')}
         </Button>
@@ -579,11 +579,11 @@ export default function TicketDetailPage() {
             />
             <div className="relative">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">
+                <span className="rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs font-medium text-gray-500 dark:bg-white/10 dark:text-gray-300">
                   {ticket.reference || `#${ticket.id}`}
                 </span>
                 {ticket.reference && (
-                  <span className="rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">
+                  <span className="rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs font-medium text-gray-500 dark:bg-white/10 dark:text-gray-300">
                     #{ticket.id}
                   </span>
                 )}
@@ -613,7 +613,7 @@ export default function TicketDetailPage() {
               </div>
 
               <div className="mt-5">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-400">
                   {t('field.description')}
                 </span>
                 <div className="mt-1.5 rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-white/10 dark:bg-white/5">
@@ -718,24 +718,24 @@ export default function TicketDetailPage() {
                   {isGuestOrigin && (
                     <span className="flex flex-col gap-0.5">
                       {ticket.customer && (
-                        <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-400">
                           {t('tickets.guest')}
                         </span>
                       )}
                       <span>{ticket.guest_name || t('tickets.guest')}</span>
                       {ticket.guest_company && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">🏢 {ticket.guest_company}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-300">🏢 {ticket.guest_company}</span>
                       )}
                       {/* Kept here even when a real branch is linked below: this is what the
                           guest actually typed, which is worth seeing next to the rest. */}
                       {ticket.guest_branch && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">🏬 {ticket.guest_branch}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-300">🏬 {ticket.guest_branch}</span>
                       )}
                       {ticket.guest_phone && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">📞 {ticket.guest_phone}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-300">📞 {ticket.guest_phone}</span>
                       )}
                       {ticket.guest_email && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">✉ {ticket.guest_email}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-300">✉ {ticket.guest_email}</span>
                       )}
                     </span>
                   )}
@@ -750,7 +750,7 @@ export default function TicketDetailPage() {
                 <DetailRow icon={StarIcon} label={t('tickets.categoryPriority')}>
                   <PriorityBadge priority={ticket.category_priority} variant="outline" />
                   {ticket.category_priority_override && (
-                    <span className="mt-0.5 block text-xs text-gray-400 dark:text-gray-500">
+                    <span className="mt-0.5 block text-xs text-gray-400 dark:text-gray-400">
                       {t('tickets.categoryPriorityHint')}
                     </span>
                   )}
@@ -767,10 +767,10 @@ export default function TicketDetailPage() {
               {!isCustomer && (
                 <DetailRow icon={UserIcon} label={t('field.assignedAgent')}>
                   {ticket.assigned_agent?.full_name || (
-                    <span className="text-gray-400 dark:text-gray-500">{t('status.open')}</span>
+                    <span className="text-gray-400 dark:text-gray-400">{t('status.open')}</span>
                   )}
                   {ticket.assigned_agent && ticket.assigned_at && (
-                    <span className="mt-0.5 block text-xs text-gray-400 dark:text-gray-500">
+                    <span className="mt-0.5 block text-xs text-gray-400 dark:text-gray-400">
                       {t('field.assignedOn')} {new Date(ticket.assigned_at).toLocaleString()}
                     </span>
                   )}
@@ -786,7 +786,7 @@ export default function TicketDetailPage() {
                       removeLabel={t('common.remove')}
                     />
                   ) : (
-                    <span className="text-gray-400 dark:text-gray-500">{t('tickets.none')}</span>
+                    <span className="text-gray-400 dark:text-gray-400">{t('tickets.none')}</span>
                   )}
                 </DetailRow>
               )}
@@ -802,7 +802,7 @@ export default function TicketDetailPage() {
                 >
                   <span className="font-medium tabular-nums">{formatElapsed(elapsed.ms, t)}</span>
                   {elapsed.settled && (
-                    <span className="mt-0.5 block text-xs text-gray-400 dark:text-gray-500">
+                    <span className="mt-0.5 block text-xs text-gray-400 dark:text-gray-400">
                       {new Date(ticket.resolved_at || ticket.closed_at).toLocaleString()}
                     </span>
                   )}
@@ -813,7 +813,7 @@ export default function TicketDetailPage() {
                 {ticket.start_date ? (
                   new Date(ticket.start_date).toLocaleDateString()
                 ) : (
-                  <span className="text-gray-400 dark:text-gray-500">{t('tickets.none')}</span>
+                  <span className="text-gray-400 dark:text-gray-400">{t('tickets.none')}</span>
                 )}
               </DetailRow>
 
@@ -832,7 +832,7 @@ export default function TicketDetailPage() {
                     )}
                   </span>
                 ) : (
-                  <span className="text-gray-400 dark:text-gray-500">{t('tickets.none')}</span>
+                  <span className="text-gray-400 dark:text-gray-400">{t('tickets.none')}</span>
                 )}
               </DetailRow>
 
@@ -880,7 +880,7 @@ export default function TicketDetailPage() {
                       ))}
                     </div>
                   ) : (
-                    <span className="text-gray-400 dark:text-gray-500">{t('tickets.none')}</span>
+                    <span className="text-gray-400 dark:text-gray-400">{t('tickets.none')}</span>
                   )}
                 </DetailRow>
               )}
@@ -1105,7 +1105,7 @@ export default function TicketDetailPage() {
                         </Button>
                       </>
                     ) : (
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-gray-500 dark:text-gray-300">
                         {t('tickets.assignBeforeStatus')}
                       </p>
                     )}
@@ -1128,7 +1128,7 @@ export default function TicketDetailPage() {
                       <option value="high">{t('priority.high')}</option>
                       <option value="urgent">{t('priority.urgent')}</option>
                     </Select>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-gray-500 dark:text-gray-300">
                       {t('tickets.categoryPriorityHint')}
                     </p>
                     <Button

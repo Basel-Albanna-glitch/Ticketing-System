@@ -9,7 +9,7 @@ export default function ProgressBar({ value = 0, max = 0, label, className = '' 
     <div className={`flex flex-col gap-1 ${className}`}>
       {label && (
         <div className="flex items-center justify-between text-xs">
-          <span className="text-gray-500 dark:text-gray-400">{label}</span>
+          <span className="text-gray-500 dark:text-gray-300">{label}</span>
           <span className={`font-medium tabular-nums ${complete ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-600 dark:text-gray-300'}`}>
             {percent}%
           </span>

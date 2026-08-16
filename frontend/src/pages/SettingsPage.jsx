@@ -200,12 +200,12 @@ function PreferenceRow({ icon: Icon, label, hint, checked, disabled, onChange })
   return (
     <div className="flex items-start justify-between gap-4 py-4 first:pt-0 last:pb-0">
       <div className="flex min-w-0 gap-3">
-        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400">
+        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-300">
           <Icon className="h-4 w-4" />
         </span>
         <div className="min-w-0">
           <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{label}</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-gray-500 dark:text-gray-400">{hint}</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-gray-500 dark:text-gray-300">{hint}</p>
         </div>
       </div>
       <Toggle checked={checked} disabled={disabled} onChange={onChange} aria-label={label} />
@@ -278,7 +278,7 @@ function NotificationSection() {
         description={t('settings.notifications.description')}
         action={
           updatePrefs.isPending ? (
-            <span className="text-xs text-gray-400 dark:text-gray-500">{t('common.loading')}</span>
+            <span className="text-xs text-gray-400 dark:text-gray-400">{t('common.loading')}</span>
           ) : updatePrefs.isSuccess ? (
             <span className="text-xs text-green-600 dark:text-green-400">
               {t('settings.notifications.saved')}
@@ -293,7 +293,7 @@ function NotificationSection() {
         </p>
       )}
 
-      <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+      <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-400">
         {t('settings.notifications.emailGroup')}
       </p>
       <div className="flex flex-col divide-y divide-gray-100 dark:divide-white/10">
@@ -310,7 +310,7 @@ function NotificationSection() {
         ))}
       </div>
 
-      <p className="mt-4 border-t border-gray-100 pt-4 text-xs text-gray-500 dark:border-white/10 dark:text-gray-400">
+      <p className="mt-4 border-t border-gray-100 pt-4 text-xs text-gray-500 dark:border-white/10 dark:text-gray-300">
         {allOff && hasEmail
           ? t('settings.notifications.allOff')
           : t('settings.notifications.inAppNote')}
@@ -417,7 +417,7 @@ function CategoriesSection() {
             <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">
               <span style={{ paddingInlineStart: `${category.depth * 1.25}rem` }} className="inline-flex items-center">
                 {category.depth > 0 && (
-                  <span className="me-1 text-gray-300 dark:text-gray-600">└</span>
+                  <span className="me-1 text-gray-300 dark:text-gray-500">└</span>
                 )}
                 {category.name}
               </span>
@@ -570,7 +570,7 @@ function SoftwareTypesSection() {
         <Pagination {...softwareTypePager} onPageChange={softwareTypePager.setPage} />
         </>
       ) : (
-        <p className="text-sm text-gray-500 dark:text-gray-400">{t('settings.softwareTypes.empty')}</p>
+        <p className="text-sm text-gray-500 dark:text-gray-300">{t('settings.softwareTypes.empty')}</p>
       )}
 
       <form ref={formRef} onSubmit={handleSubmit} className="mt-6 flex max-w-sm flex-col gap-4">
@@ -640,8 +640,8 @@ function PermissionsSection() {
         {PERMISSION_GROUPS.map((group) => (
           <div key={group.titleKey}>
             <div className="mb-1 flex items-center gap-2">
-              <group.icon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+              <group.icon className="h-4 w-4 text-gray-400 dark:text-gray-400" />
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-400">
                 {t(group.titleKey)}
               </h3>
             </div>
@@ -652,7 +652,7 @@ function PermissionsSection() {
                     <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
                       {t(`settings.permissions.${f.i18n}.label`)}
                     </p>
-                    <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                    <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-400">
                       {t(`settings.permissions.${f.i18n}.hint`)}
                     </p>
                   </div>
@@ -879,7 +879,7 @@ function ArticlesSection() {
         <Pagination {...articlePager} onPageChange={articlePager.setPage} />
         </>
       ) : (
-        <p className="text-sm text-gray-500 dark:text-gray-400">{t('settings.kb.empty')}</p>
+        <p className="text-sm text-gray-500 dark:text-gray-300">{t('settings.kb.empty')}</p>
       )}
 
       <form ref={formRef} onSubmit={handleSubmit} className="mt-6 flex max-w-xl flex-col gap-4">
@@ -988,7 +988,7 @@ export default function SettingsPage() {
       <div>
         <Breadcrumbs items={[{ label: t('crumb.dashboard'), to: '/dashboard' }, { label: t('settings.title') }]} />
         <h1 className="mt-2 text-2xl font-semibold text-gray-900 dark:text-gray-100">{t('settings.title')}</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-300">
           {isAdmin ? t('settings.subtitle.admin') : t('settings.subtitle.user')}
         </p>
       </div>
@@ -1008,7 +1008,7 @@ export default function SettingsPage() {
                   className={`flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100'
                   }`}
                 >
                   <Icon className="h-4 w-4 shrink-0" />

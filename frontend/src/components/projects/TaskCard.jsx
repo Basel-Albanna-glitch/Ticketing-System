@@ -35,7 +35,7 @@ function DateRange({ startDate, dueDate, overdue }) {
       className={`flex items-center gap-1 text-xs ${
         overdue
           ? 'font-medium text-red-600 dark:text-red-400'
-          : 'text-gray-400 dark:text-gray-500'
+          : 'text-gray-400 dark:text-gray-400'
       }`}
     >
       <CalendarIcon className="h-3.5 w-3.5" />
@@ -92,13 +92,13 @@ export default function TaskCard({
       </div>
       {/* Two lines is enough to tell tasks apart; the modal has the rest. */}
       {task.description && (
-        <p className="line-clamp-2 whitespace-pre-wrap text-xs text-gray-500 dark:text-gray-400">
+        <p className="line-clamp-2 whitespace-pre-wrap text-xs text-gray-500 dark:text-gray-300">
           {task.description}
         </p>
       )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+          <span className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-300">
             <span className={`h-2 w-2 rounded-full ${STATUS_DOT[task.status] || STATUS_DOT.todo}`} />
             {t(`projects.column.${task.status}`)}
           </span>

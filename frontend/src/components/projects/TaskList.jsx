@@ -92,7 +92,7 @@ export default function TaskList({ projectId, tasks, canEdit = true }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm text-gray-500 dark:text-gray-400">
+        <span className="text-sm text-gray-500 dark:text-gray-300">
           {ordered.length} {t(ordered.length === 1 ? 'projects.taskCountSingular' : 'projects.taskCountPlural')}
         </span>
         {canEdit && (
@@ -122,7 +122,7 @@ export default function TaskList({ projectId, tasks, canEdit = true }) {
             e.preventDefault()
             handleDropAtEnd()
           }}
-          className="rounded-2xl border border-gray-200/60 bg-gray-50/60 p-6 text-center text-sm text-gray-400 dark:border-white/5 dark:bg-white/[0.03] dark:text-gray-600"
+          className="rounded-2xl border border-gray-200/60 bg-gray-50/60 p-6 text-center text-sm text-gray-400 dark:border-white/5 dark:bg-white/[0.03] dark:text-gray-500"
         >
           {t('projects.noTasks')}
         </div>
@@ -171,7 +171,7 @@ export default function TaskList({ projectId, tasks, canEdit = true }) {
               className={`rounded-xl border border-dashed py-3 text-center text-xs transition-colors ${
                 dragOverId === 'end'
                   ? 'border-indigo-400 bg-indigo-50/70 text-indigo-600 dark:border-indigo-400/50 dark:bg-indigo-500/10 dark:text-indigo-300'
-                  : 'border-gray-200 text-gray-400 dark:border-white/10 dark:text-gray-600'
+                  : 'border-gray-200 text-gray-400 dark:border-white/10 dark:text-gray-500'
               }`}
             >
               {t('projects.dropAtEnd')}

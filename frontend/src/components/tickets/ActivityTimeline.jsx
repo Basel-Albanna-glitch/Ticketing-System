@@ -3,7 +3,7 @@ import { useI18n } from '../../i18n/useI18n'
 export default function ActivityTimeline({ activities }) {
   const { t } = useI18n()
   if (!activities?.length) {
-    return <p className="text-sm text-gray-400 dark:text-gray-500">{t('tickets.noActivity')}</p>
+    return <p className="text-sm text-gray-400 dark:text-gray-400">{t('tickets.noActivity')}</p>
   }
 
   return (
@@ -16,7 +16,7 @@ export default function ActivityTimeline({ activities }) {
           <span className="relative mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-indigo-500 ring-4 ring-indigo-500/10" />
           <div className="min-w-0 flex-1 text-sm">
             <p className="text-gray-700 dark:text-gray-300">{a.description}</p>
-            <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+            <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-400">
               {a.actor?.full_name || t('tickets.system')} · {new Date(a.created_at).toLocaleString()}
             </p>
           </div>

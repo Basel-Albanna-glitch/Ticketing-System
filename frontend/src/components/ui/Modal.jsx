@@ -34,7 +34,7 @@ export default function Modal({
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/10 dark:hover:text-gray-200"
+            className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/10 dark:hover:text-gray-100"
           >
             ✕
           </button>

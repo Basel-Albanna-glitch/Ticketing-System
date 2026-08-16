@@ -36,7 +36,7 @@ export default function CommentThread({ ticketId, comments, canReply = true }) {
                 size="md"
               />
               <div className="min-w-0 flex-1">
-                <div className="mb-1 flex items-center justify-between gap-2 text-xs text-gray-400 dark:text-gray-500">
+                <div className="mb-1 flex items-center justify-between gap-2 text-xs text-gray-400 dark:text-gray-400">
                   <span className="font-medium text-gray-700 dark:text-gray-300">
                     {c.author_name || c.author?.full_name}
                   </span>
@@ -53,7 +53,7 @@ export default function CommentThread({ ticketId, comments, canReply = true }) {
           ))}
         </ul>
       ) : (
-        <p className="rounded-xl border border-dashed border-gray-200 py-6 text-center text-sm text-gray-400 dark:border-white/10 dark:text-gray-500">
+        <p className="rounded-xl border border-dashed border-gray-200 py-6 text-center text-sm text-gray-400 dark:border-white/10 dark:text-gray-400">
           {t('tickets.noComments')}
         </p>
       )}
@@ -72,7 +72,7 @@ export default function CommentThread({ ticketId, comments, canReply = true }) {
           </Button>
         </form>
       ) : (
-        <p className="border-t border-gray-100 pt-4 text-sm text-gray-400 dark:border-white/10 dark:text-gray-500">
+        <p className="border-t border-gray-100 pt-4 text-sm text-gray-400 dark:border-white/10 dark:text-gray-400">
           {t('tickets.onlyAssignedCanRespond')}
         </p>
       )}

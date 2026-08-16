@@ -83,7 +83,7 @@ export default function RatePage() {
           <form onSubmit={submit} className="flex flex-col items-center gap-5 py-2">
             {ticket && (
               <p className="text-center text-sm text-gray-600 dark:text-gray-300">
-                <span className="font-mono text-xs text-gray-400 dark:text-gray-500">
+                <span className="font-mono text-xs text-gray-400 dark:text-gray-400">
                   {ticket.reference}
                 </span>
                 <span className="mt-1 block font-medium text-gray-900 dark:text-gray-100">
@@ -101,7 +101,7 @@ export default function RatePage() {
                   onMouseEnter={() => setHover(n)}
                   aria-label={`${n} / 5`}
                   className={`transition-transform hover:scale-110 ${
-                    (hover || score) >= n ? 'text-amber-400' : 'text-gray-300 dark:text-gray-600'
+                    (hover || score) >= n ? 'text-amber-400' : 'text-gray-300 dark:text-gray-500'
                   }`}
                 >
                   <StarIcon filled={(hover || score) >= n} className="h-10 w-10" />

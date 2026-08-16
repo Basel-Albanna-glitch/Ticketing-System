@@ -31,7 +31,7 @@ function ArticleCard({ article, t }) {
         <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-gray-600 dark:text-gray-300">
           {article.excerpt}
         </p>
-        <div className="mt-4 flex items-center gap-3 border-t border-gray-100 pt-3 text-xs text-gray-400 dark:border-white/10 dark:text-gray-500">
+        <div className="mt-4 flex items-center gap-3 border-t border-gray-100 pt-3 text-xs text-gray-400 dark:border-white/10 dark:text-gray-400">
           <span>
             {t('kb.updated')} {new Date(article.updated_at).toLocaleDateString()}
           </span>
@@ -41,7 +41,7 @@ function ArticleCard({ article, t }) {
               {article.attachment_count}
             </span>
           )}
-          <ChevronRightIcon className="ms-auto h-4 w-4 text-gray-300 transition-colors group-hover:text-indigo-500 rtl:rotate-180 dark:text-gray-600" />
+          <ChevronRightIcon className="ms-auto h-4 w-4 text-gray-300 transition-colors group-hover:text-indigo-500 rtl:rotate-180 dark:text-gray-500" />
         </div>
       </Card>
     </Link>
@@ -132,9 +132,9 @@ export default function KbListPage() {
             <BookIcon className="h-5 w-5" />
           </span>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{t('kb.title')}</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('kb.subtitle')}</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-300">{t('kb.subtitle')}</p>
           <div className="relative mt-5">
-            <span className="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3.5 text-gray-400 dark:text-gray-500">
+            <span className="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3.5 text-gray-400 dark:text-gray-400">
               <SearchIcon className="h-4 w-4" />
             </span>
             <input
@@ -162,11 +162,11 @@ export default function KbListPage() {
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                   activeCategory === ALL
                     ? 'bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200/70 dark:bg-indigo-500/15 dark:text-indigo-300 dark:ring-indigo-400/20'
-                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/10'
+                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10'
                 }`}
               >
                 {t('kb.allCategories')}
-                <span className="ms-1.5 text-xs text-gray-400 dark:text-gray-500">{matches.length}</span>
+                <span className="ms-1.5 text-xs text-gray-400 dark:text-gray-400">{matches.length}</span>
               </button>
               {chips.map((chip) => (
                 <button
@@ -176,11 +176,11 @@ export default function KbListPage() {
                   className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                     activeCategory === chip.key
                       ? 'bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200/70 dark:bg-indigo-500/15 dark:text-indigo-300 dark:ring-indigo-400/20'
-                      : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/10'
+                      : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10'
                   }`}
                 >
                   {chip.label}
-                  <span className="ms-1.5 text-xs text-gray-400 dark:text-gray-500">{chip.count}</span>
+                  <span className="ms-1.5 text-xs text-gray-400 dark:text-gray-400">{chip.count}</span>
                 </button>
               ))}
             </div>
@@ -229,7 +229,7 @@ export default function KbListPage() {
                       <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         {group.label}
                       </h2>
-                      <span className="text-sm text-gray-400 dark:text-gray-500">
+                      <span className="text-sm text-gray-400 dark:text-gray-400">
                         ({group.items.length})
                       </span>
                     </div>

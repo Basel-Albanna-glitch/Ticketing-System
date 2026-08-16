@@ -44,9 +44,9 @@ export default function CustomerProjects({ customerId, branches = [] }) {
     <div className="flex flex-col gap-4">
       {groups.map((group) => (
         <div key={group.branch?.id ?? 'none'}>
-          <h4 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          <h4 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300">
             {group.branch ? group.branch.name : t('projects.noBranch')}
-            <span className="rounded-full bg-gray-100 px-1.5 text-[10px] font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">
+            <span className="rounded-full bg-gray-100 px-1.5 text-[10px] font-medium text-gray-500 dark:bg-white/10 dark:text-gray-300">
               {group.projects.length}
             </span>
           </h4>

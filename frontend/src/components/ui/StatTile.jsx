@@ -37,11 +37,11 @@ export default function StatTile({ label, value, hint, icon: IconComponent, colo
         </div>
       )}
       <div className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</span>
+        <span className="text-sm font-medium text-gray-500 dark:text-gray-300">{label}</span>
         <span className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
           {value}
         </span>
-        {hint && <span className="text-xs text-gray-400 dark:text-gray-500">{hint}</span>}
+        {hint && <span className="text-xs text-gray-400 dark:text-gray-400">{hint}</span>}
       </div>
     </div>
   )

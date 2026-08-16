@@ -87,13 +87,13 @@ export default function KbArticlePage() {
           <h1 className="text-3xl font-semibold leading-tight tracking-tight text-gray-900 dark:text-gray-100">
             {article.title}
           </h1>
-          <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+          <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-300">
             {article.author_name && (
               <>
                 <span>
                   {t('kb.by')} {article.author_name}
                 </span>
-                <span className="text-gray-300 dark:text-gray-600">·</span>
+                <span className="text-gray-300 dark:text-gray-500">·</span>
               </>
             )}
             <span>
@@ -108,7 +108,7 @@ export default function KbArticlePage() {
 
         {article.attachments?.length > 0 && (
           <div className="border-t border-gray-100 px-6 py-5 sm:px-8 dark:border-white/10">
-            <p className="mb-3 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+            <p className="mb-3 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-400">
               <PaperClipIcon className="h-3.5 w-3.5" />
               {t('kb.attachments')}
             </p>
@@ -134,12 +134,12 @@ export default function KbArticlePage() {
                       {a.title}
                     </span>
                     {a.excerpt && (
-                      <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
+                      <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-300">
                         {a.excerpt}
                       </span>
                     )}
                   </span>
-                  <ChevronRightIcon className="h-4 w-4 shrink-0 text-gray-300 transition-colors group-hover:text-indigo-500 rtl:rotate-180 dark:text-gray-600" />
+                  <ChevronRightIcon className="h-4 w-4 shrink-0 text-gray-300 transition-colors group-hover:text-indigo-500 rtl:rotate-180 dark:text-gray-500" />
                 </Link>
               </li>
             ))}

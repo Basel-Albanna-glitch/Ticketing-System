@@ -40,7 +40,7 @@ export default function TrendChart({ trend }) {
   }, [granularity, lang])
 
   if (points.length === 0) {
-    return <p className="py-10 text-center text-sm text-gray-400 dark:text-gray-500">{t('reports.noData')}</p>
+    return <p className="py-10 text-center text-sm text-gray-400 dark:text-gray-400">{t('reports.noData')}</p>
   }
 
   const max = niceMax(Math.max(1, ...points.flatMap((p) => [p.created, p.resolved])))
@@ -234,7 +234,7 @@ export default function TrendChart({ trend }) {
               left: `${Math.min(88, Math.max(12, (x(active) / W) * 100))}%`,
             }}
           >
-            <p className="mb-1 text-[11px] text-gray-500 dark:text-gray-400">
+            <p className="mb-1 text-[11px] text-gray-500 dark:text-gray-300">
               {formatDate(activePoint.date)}
             </p>
             {SERIES.map((s) => (
@@ -243,7 +243,7 @@ export default function TrendChart({ trend }) {
                 <span className="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
                   {activePoint[s.key]}
                 </span>
-                <span className="text-gray-500 dark:text-gray-400">{t(s.labelKey)}</span>
+                <span className="text-gray-500 dark:text-gray-300">{t(s.labelKey)}</span>
               </p>
             ))}
           </div>
@@ -254,7 +254,7 @@ export default function TrendChart({ trend }) {
       {showTable && (
         <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-200/70 dark:border-white/10">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-gray-50 text-xs text-gray-500 dark:bg-white/5 dark:text-gray-400">
+            <thead className="sticky top-0 bg-gray-50 text-xs text-gray-500 dark:bg-white/5 dark:text-gray-300">
               <tr>
                 <th className="px-3 py-2 text-start font-medium">{t('reports.trend.date')}</th>
                 {SERIES.map((s) => (

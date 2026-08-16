@@ -128,19 +128,19 @@ export default function TicketCreatePage() {
             <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
               {t('tickets.createdSuccess')}
             </h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-300">
               {t('tickets.keepReference')}
             </p>
           </div>
           <div className="rounded-xl border border-gray-200/70 bg-gray-50 px-6 py-4 dark:border-white/10 dark:bg-white/5">
-            <p className="text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500">
+            <p className="text-xs uppercase tracking-wide text-gray-400 dark:text-gray-400">
               {t('tickets.ticketNumber')}
             </p>
             <p className="font-mono text-3xl font-bold text-indigo-600 dark:text-indigo-400">
               #{createdTicket.id}
             </p>
             {createdTicket.reference && (
-              <p className="mt-1 break-all font-mono text-xs text-gray-400 dark:text-gray-500">
+              <p className="mt-1 break-all font-mono text-xs text-gray-400 dark:text-gray-400">
                 {createdTicket.reference}
               </p>
             )}
@@ -290,7 +290,7 @@ export default function TicketCreatePage() {
                 </div>
               )}
               {assignedAgentIds.length > 1 && (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-gray-500 dark:text-gray-300">
                   {t('tickets.primaryHint')}
                 </p>
               )}

@@ -40,7 +40,7 @@ export default function ProjectCard({ project, onEdit }) {
           type="button"
           onClick={handleEdit}
           aria-label={`${t('projects.editProject')} ${project.name}`}
-          className="rounded-lg p-1 text-gray-300 transition-colors hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-600 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
+          className="rounded-lg p-1 text-gray-300 transition-colors hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-500 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
         >
           <PencilIcon className="h-4 w-4" />
         </button>
@@ -52,7 +52,7 @@ export default function ProjectCard({ project, onEdit }) {
           type="button"
           onClick={handleDelete}
           aria-label={`${t('common.delete')} ${project.name}`}
-          className="rounded-lg p-1 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-gray-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+          className="rounded-lg p-1 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-gray-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
         >
           <TrashIcon className="h-4 w-4" />
         </button>
@@ -83,11 +83,11 @@ export default function ProjectCard({ project, onEdit }) {
             </p>
           )}
           {project.description ? (
-            <p className="mt-0.5 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
+            <p className="mt-0.5 line-clamp-2 text-sm text-gray-500 dark:text-gray-300">
               {project.description}
             </p>
           ) : (
-            <p className="mt-0.5 text-sm text-gray-400 dark:text-gray-500">{t('projects.noDescription')}</p>
+            <p className="mt-0.5 text-sm text-gray-400 dark:text-gray-400">{t('projects.noDescription')}</p>
           )}
         </div>
       </div>
@@ -120,12 +120,12 @@ export default function ProjectCard({ project, onEdit }) {
           {project.task_count} {t(project.task_count === 1 ? 'projects.taskCountSingular' : 'projects.taskCountPlural')}
         </span>
         {project.last_task_due ? (
-          <span className="inline-flex items-center gap-1 text-gray-400 dark:text-gray-500">
+          <span className="inline-flex items-center gap-1 text-gray-400 dark:text-gray-400">
             <CalendarIcon className="h-3.5 w-3.5" />
             {new Date(project.last_task_due).toLocaleDateString()}
           </span>
         ) : (
-          <span className="text-gray-400 dark:text-gray-500">{t('projects.by')} {project.created_by?.full_name}</span>
+          <span className="text-gray-400 dark:text-gray-400">{t('projects.by')} {project.created_by?.full_name}</span>
         )}
       </div>
     </Card>

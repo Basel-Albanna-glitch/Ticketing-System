@@ -17,7 +17,7 @@ export default function Input({ label, error, hint, className = '', id, icon: Ic
       )}
       <div className="relative">
         {IconComponent && (
-          <IconComponent className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+          <IconComponent className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-400" />
         )}
         <input
           id={inputId}
@@ -39,14 +39,14 @@ export default function Input({ label, error, hint, className = '', id, icon: Ic
             tabIndex={-1}
             aria-label={reveal ? 'Hide password' : 'Show password'}
             aria-pressed={reveal}
-            className="absolute end-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 transition hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 dark:text-gray-500 dark:hover:text-gray-300"
+            className="absolute end-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 transition hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 dark:text-gray-400 dark:hover:text-gray-300"
           >
             {reveal ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
           </button>
         )}
       </div>
       {hint && !error && (
-        <p id={hintId} className="text-xs text-gray-500 dark:text-gray-400">
+        <p id={hintId} className="text-xs text-gray-500 dark:text-gray-300">
           {hint}
         </p>
       )}

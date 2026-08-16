@@ -130,7 +130,7 @@ function BreakdownCard({ icon, title, rows, labelKey, format, emptyLabel }) {
           })}
         </ul>
       ) : (
-        <p className="text-sm text-gray-400 dark:text-gray-500">{t('reports.noData')}</p>
+        <p className="text-sm text-gray-400 dark:text-gray-400">{t('reports.noData')}</p>
       )}
     </Card>
   )
@@ -146,7 +146,7 @@ function Delta({ current, previous, invert = false, format }) {
   const diff = current - previous
   if (Math.abs(diff) < 0.005) {
     return (
-      <span className="text-gray-400 dark:text-gray-500">{t('reports.delta.flat')}</span>
+      <span className="text-gray-400 dark:text-gray-400">{t('reports.delta.flat')}</span>
     )
   }
   // For "lower is better" measures (resolution time), a rise is the bad direction.
@@ -182,7 +182,7 @@ function DeliveryFigure({ label, value, tone = 'default' }) {
       >
         {value}
       </span>
-      <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
+      <span className="text-xs text-gray-500 dark:text-gray-300">{label}</span>
     </div>
   )
 }
@@ -289,7 +289,7 @@ export default function ReportsPage() {
           <h1 className="mt-2 text-2xl font-semibold text-gray-900 dark:text-gray-100">
             {t('reports.title')}
           </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('reports.description')}</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-300">{t('reports.description')}</p>
         </div>
         <Button variant="secondary" onClick={handleExport} disabled={exporting}>
           {exporting ? t('common.loading') : t('reports.export')}
@@ -308,7 +308,7 @@ export default function ReportsPage() {
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 preset === option.id
                   ? 'bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200/70 dark:bg-indigo-500/15 dark:text-indigo-300 dark:ring-indigo-400/20'
-                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/10'
+                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10'
               }`}
             >
               {t(option.labelKey)}
@@ -316,7 +316,7 @@ export default function ReportsPage() {
           ))}
         </div>
         <div className="flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-400">
+          <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-300">
             {t('dashboard.from')}
             <input
               type="date"
@@ -326,7 +326,7 @@ export default function ReportsPage() {
               className="rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15 dark:border-white/10 dark:bg-white/5 dark:text-gray-100"
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-400">
+          <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-300">
             {t('dashboard.to')}
             <input
               type="date"
@@ -418,7 +418,7 @@ export default function ReportsPage() {
               />
             </div>
             {previous && (
-              <p className="-mt-3 text-xs text-gray-400 dark:text-gray-500">
+              <p className="-mt-3 text-xs text-gray-400 dark:text-gray-400">
                 {t('reports.delta.versus')} {previous.date_from} → {previous.date_to}
               </p>
             )}

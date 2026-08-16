@@ -60,7 +60,7 @@ function UserMenu() {
           <span className="block max-w-40 truncate text-sm font-medium leading-tight text-gray-700 dark:text-gray-200">
             {user?.full_name}
           </span>
-          <span className="block text-xs capitalize leading-tight text-gray-400 dark:text-gray-500">
+          <span className="block text-xs capitalize leading-tight text-gray-400 dark:text-gray-400">
             {t(`role.${user?.role}`)}
           </span>
         </span>
@@ -78,7 +78,7 @@ function UserMenu() {
               <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
                 {user?.full_name}
               </p>
-              <p className="truncate text-xs text-gray-400 dark:text-gray-500">@{user?.username}</p>
+              <p className="truncate text-xs text-gray-400 dark:text-gray-400">@{user?.username}</p>
               <span className="mt-1 inline-flex rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium capitalize text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
                 {t(`role.${user?.role}`)}
               </span>
@@ -87,12 +87,12 @@ function UserMenu() {
           <div className="p-1.5">
             {user?.role === 'customer' && (
               <button type="button" role="menuitem" onClick={() => go('/account')} className={MENU_ITEM}>
-                <UserIcon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                <UserIcon className="h-4 w-4 text-gray-400 dark:text-gray-400" />
                 {t('nav.account')}
               </button>
             )}
             <button type="button" role="menuitem" onClick={() => go('/settings')} className={MENU_ITEM}>
-              <SettingsIcon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+              <SettingsIcon className="h-4 w-4 text-gray-400 dark:text-gray-400" />
               {t('nav.settings')}
             </button>
           </div>
@@ -124,7 +124,7 @@ export default function Topbar({ onToggleSidebar, sidebarOpen = false }) {
           onClick={onToggleSidebar}
           aria-label={t('topbar.toggleSidebar')}
           aria-expanded={sidebarOpen}
-          className="rounded-xl p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200"
+          className="rounded-xl p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-gray-100"
         >
           <MenuIcon className="h-5 w-5" />
         </button>

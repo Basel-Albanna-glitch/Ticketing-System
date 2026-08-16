@@ -39,7 +39,7 @@ export default function PhaseList({ ticketId, phases, canAdd = false }) {
                   {i + 1}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="mb-1 flex items-center justify-between gap-2 text-xs text-gray-400 dark:text-gray-500">
+                  <div className="mb-1 flex items-center justify-between gap-2 text-xs text-gray-400 dark:text-gray-400">
                     <span className="inline-flex items-center gap-1.5 font-medium text-gray-700 dark:text-gray-300">
                       <Avatar name={phase.author_name} src={phase.author?.avatar} size="sm" />
                       {phase.author_name || '—'}
@@ -67,7 +67,7 @@ export default function PhaseList({ ticketId, phases, canAdd = false }) {
           })}
         </ol>
       ) : (
-        <p className="rounded-xl border border-dashed border-gray-200 py-6 text-center text-sm text-gray-400 dark:border-white/10 dark:text-gray-500">
+        <p className="rounded-xl border border-dashed border-gray-200 py-6 text-center text-sm text-gray-400 dark:border-white/10 dark:text-gray-400">
           {t('tickets.noPhases')}
         </p>
       )}

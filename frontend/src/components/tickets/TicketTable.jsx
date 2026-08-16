@@ -64,21 +64,21 @@ export default function TicketTable({ tickets, sortBy, sortDir, onSort }) {
                 : 'hover:bg-gray-50 dark:hover:bg-gray-800'
             }`}
           >
-            <td className="px-4 py-2 text-gray-500 dark:text-gray-400">
+            <td className="px-4 py-2 text-gray-500 dark:text-gray-300">
               {new Date(ticket.created_at).toLocaleDateString()}
             </td>
-            <td className="whitespace-nowrap px-4 py-2 text-gray-500 dark:text-gray-400">
+            <td className="whitespace-nowrap px-4 py-2 text-gray-500 dark:text-gray-300">
               {ticket.start_date ? new Date(ticket.start_date).toLocaleDateString() : '—'}
             </td>
             {showAssignedAgent && (
-              <td className="whitespace-nowrap px-4 py-2 text-gray-500 dark:text-gray-400">
+              <td className="whitespace-nowrap px-4 py-2 text-gray-500 dark:text-gray-300">
                 {ticket.assigned_at ? new Date(ticket.assigned_at).toLocaleDateString() : '—'}
               </td>
             )}
-            <td className="whitespace-nowrap px-4 py-2 text-gray-500 dark:text-gray-400">
+            <td className="whitespace-nowrap px-4 py-2 text-gray-500 dark:text-gray-300">
               {ticket.closed_at ? new Date(ticket.closed_at).toLocaleDateString() : '—'}
             </td>
-            <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">
+            <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-gray-500 dark:text-gray-300">
               #{ticket.id}
             </td>
             <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">
@@ -94,7 +94,7 @@ export default function TicketTable({ tickets, sortBy, sortDir, onSort }) {
               ) : (
                 <span className="inline-flex items-center gap-1.5">
                   {ticket.guest_name || t('tickets.guest')}
-                  <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 ring-1 ring-inset ring-gray-500/15 dark:bg-white/10 dark:text-gray-400 dark:ring-white/10">
+                  <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 ring-1 ring-inset ring-gray-500/15 dark:bg-white/10 dark:text-gray-300 dark:ring-white/10">
                     {t('tickets.guest')}
                   </span>
                 </span>
@@ -114,7 +114,7 @@ export default function TicketTable({ tickets, sortBy, sortDir, onSort }) {
                   {ticket.category_priority_override && (
                     <span
                       title={t('tickets.categoryPriorityHint')}
-                      className="text-xs text-gray-400 dark:text-gray-500"
+                      className="text-xs text-gray-400 dark:text-gray-400"
                     >
                       *
                     </span>

@@ -38,8 +38,8 @@ function StatusDropdown({ selected, onToggle, onClear }) {
           onClick={() => setOpen((o) => !o)}
           className="flex w-48 items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15 dark:border-white/10 dark:bg-white/5 dark:text-gray-100"
         >
-          <span className={selected.length ? '' : 'text-gray-400 dark:text-gray-500'}>{summary}</span>
-          <span className="ms-2 text-gray-400 dark:text-gray-500">▾</span>
+          <span className={selected.length ? '' : 'text-gray-400 dark:text-gray-400'}>{summary}</span>
+          <span className="ms-2 text-gray-400 dark:text-gray-400">▾</span>
         </button>
         {open && (
           <div className="absolute z-50 mt-1 w-48 overflow-hidden rounded-xl border border-gray-200/70 bg-white shadow-soft-lg dark:border-white/10 dark:bg-gray-900">
@@ -63,7 +63,7 @@ function StatusDropdown({ selected, onToggle, onClear }) {
               <button
                 type="button"
                 onClick={onClear}
-                className="w-full border-t border-gray-100 px-3 py-1.5 text-start text-xs text-gray-500 hover:bg-gray-50 dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/5"
+                className="w-full border-t border-gray-100 px-3 py-1.5 text-start text-xs text-gray-500 hover:bg-gray-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5"
               >
                 {t('tickets.clear')}
               </button>

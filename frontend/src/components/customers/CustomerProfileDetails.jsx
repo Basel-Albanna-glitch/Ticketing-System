@@ -18,7 +18,7 @@ import { useI18n } from '../../i18n/useI18n'
 function Detail({ label, value, full }) {
   return (
     <div className={full ? 'sm:col-span-2' : ''}>
-      <dt className="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+      <dt className="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-400">
         {label}
       </dt>
       <dd className="mt-0.5 whitespace-pre-wrap text-sm text-gray-900 dark:text-gray-100">
@@ -51,7 +51,7 @@ function formatSize(bytes) {
 function LicenseStatusBadge({ endDate }) {
   const { t } = useI18n()
   const status = licenseStatus(endDate)
-  if (!status) return <span className="text-gray-400 dark:text-gray-500">—</span>
+  if (!status) return <span className="text-gray-400 dark:text-gray-400">—</span>
 
   const label =
     status.state === 'expired'
@@ -211,7 +211,7 @@ export default function CustomerProfileDetails({ customer, customerId }) {
                   >
                     {att.original_filename}
                   </a>
-                  <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                  <span className="shrink-0 text-xs text-gray-400 dark:text-gray-400">
                     {formatSize(att.size)}
                   </span>
                 </li>

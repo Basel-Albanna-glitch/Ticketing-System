@@ -30,7 +30,7 @@ export default function Stepper({ steps = [], value, onChange, label, disabled =
                       ? 'border-indigo-500 bg-indigo-500 text-white'
                       : done
                         ? 'border-indigo-500 bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300'
-                        : 'border-gray-300 bg-white text-gray-400 hover:border-indigo-400 hover:text-indigo-500 dark:border-white/15 dark:bg-gray-900 dark:text-gray-500'
+                        : 'border-gray-300 bg-white text-gray-400 hover:border-indigo-400 hover:text-indigo-500 dark:border-white/15 dark:bg-gray-900 dark:text-gray-400'
                   }`}
                 >
                   {done ? '✓' : index + 1}
@@ -48,7 +48,7 @@ export default function Stepper({ steps = [], value, onChange, label, disabled =
                 className={`mt-1.5 px-1 text-center text-[11px] leading-tight transition-colors ${
                   current
                     ? 'font-semibold text-indigo-600 dark:text-indigo-400'
-                    : 'text-gray-500 hover:text-indigo-500 dark:text-gray-400'
+                    : 'text-gray-500 hover:text-indigo-500 dark:text-gray-300'
                 }`}
               >
                 {step.label}

@@ -98,7 +98,7 @@ function ProgressTrail({ status }) {
             ? paused
               ? 'border-amber-500 bg-white text-amber-600 dark:bg-gray-900 dark:text-amber-400'
               : 'border-indigo-500 bg-white text-indigo-600 dark:bg-gray-900 dark:text-indigo-400'
-            : 'border-gray-200 bg-white text-gray-300 dark:border-white/10 dark:bg-gray-900 dark:text-gray-600'
+            : 'border-gray-200 bg-white text-gray-300 dark:border-white/10 dark:bg-gray-900 dark:text-gray-500'
         const line = (filled) => (filled ? 'bg-indigo-500' : 'bg-gray-200 dark:bg-white/10')
 
         return (
@@ -122,7 +122,7 @@ function ProgressTrail({ status }) {
               className={`px-1 text-center text-[11px] font-medium leading-tight ${
                 done || active
                   ? 'text-gray-700 dark:text-gray-200'
-                  : 'text-gray-400 dark:text-gray-500'
+                  : 'text-gray-400 dark:text-gray-400'
               }`}
             >
               {paused && active ? t('status.on_hold') : t(step.labelKey)}
@@ -138,7 +138,7 @@ function ProgressTrail({ status }) {
 function MetaCell({ icon: Icon, label, value, title }) {
   return (
     <div className="bg-white p-4 dark:bg-gray-900/70">
-      <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+      <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-400">
         <Icon className="h-3.5 w-3.5" />
         {label}
       </div>
@@ -280,7 +280,7 @@ export default function GuestTrackPage() {
         // Once a ticket is on screen the lookup form collapses to a single line so the
         // ticket itself gets the page.
         <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200/70 bg-white px-4 py-2.5 text-sm shadow-soft dark:border-white/10 dark:bg-gray-900/70">
-          <span className="min-w-0 truncate text-gray-500 dark:text-gray-400">
+          <span className="min-w-0 truncate text-gray-500 dark:text-gray-300">
             {t('guest.track.tracking')}{' '}
             <span className="font-mono font-semibold text-gray-800 dark:text-gray-200">
               {ticket.reference || `#${ticket.id}`}
@@ -377,7 +377,7 @@ export default function GuestTrackPage() {
                   </span>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3 text-xs text-gray-500 dark:border-white/10 dark:text-gray-400">
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3 text-xs text-gray-500 dark:border-white/10 dark:text-gray-300">
                   <span className="inline-flex items-center gap-1.5">
                     <UserIcon className="h-3.5 w-3.5" />
                     {ticket.assigned_agent_name
@@ -416,7 +416,7 @@ export default function GuestTrackPage() {
 
               {/* Description */}
               <div className="p-5">
-                <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-400">
                   {t('field.description')}
                 </p>
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
@@ -424,7 +424,7 @@ export default function GuestTrackPage() {
                 </p>
                 {ticket.attachments?.length > 0 && (
                   <div className="mt-4">
-                    <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                    <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-400">
                       {t('guest.track.attachments')}
                     </p>
                     <AttachmentList attachments={ticket.attachments} />
@@ -451,7 +451,7 @@ export default function GuestTrackPage() {
                         <StarIcon key={n} filled={n <= ticket.rating} className="h-7 w-7" />
                       ))}
                     </div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{t('rate.thanks')}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-300">{t('rate.thanks')}</p>
                   </div>
                 ) : (
                   <form onSubmit={handleRate} className="flex flex-col items-center gap-4 py-2">
@@ -469,7 +469,7 @@ export default function GuestTrackPage() {
                           className={`rounded-lg transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
                             (ratingHover || ratingScore) >= n
                               ? 'text-amber-400'
-                              : 'text-gray-300 dark:text-gray-600'
+                              : 'text-gray-300 dark:text-gray-500'
                           }`}
                         >
                           <StarIcon filled={(ratingHover || ratingScore) >= n} className="h-9 w-9" />
@@ -510,7 +510,7 @@ export default function GuestTrackPage() {
                       key={c.id}
                       className={`flex max-w-[85%] flex-col gap-1 ${staff ? 'self-start' : 'self-end'}`}
                     >
-                      <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+                      <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-400">
                         {staff && (
                           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
                             {initials(c.author_name)}
@@ -544,7 +544,7 @@ export default function GuestTrackPage() {
                 })}
               </ul>
             ) : (
-              <p className="shrink-0 rounded-xl border border-dashed border-gray-200 py-6 text-center text-sm text-gray-400 dark:border-white/10 dark:text-gray-500">
+              <p className="shrink-0 rounded-xl border border-dashed border-gray-200 py-6 text-center text-sm text-gray-400 dark:border-white/10 dark:text-gray-400">
                 {t('guest.track.noReplies')}
               </p>
             )}
@@ -570,7 +570,7 @@ export default function GuestTrackPage() {
                 </Button>
               </form>
             ) : (
-              <p className="mt-4 shrink-0 border-t border-gray-100 pt-4 text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
+              <p className="mt-4 shrink-0 border-t border-gray-100 pt-4 text-sm text-gray-500 dark:border-white/10 dark:text-gray-300">
                 {t('guest.track.closedNotice')}{' '}
                 <Link to="/guest/new" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
                   {t('guest.submitTicket')}

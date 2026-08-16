@@ -138,7 +138,7 @@ export default function DashboardPage() {
     <div>
       <div className="mb-6 min-w-0">
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{t('dashboard.title')}</h1>
-        <p className="mt-1 truncate text-gray-500 dark:text-gray-400">{t('dashboard.welcome')}{user?.full_name}.</p>
+        <p className="mt-1 truncate text-gray-500 dark:text-gray-300">{t('dashboard.welcome')}{user?.full_name}.</p>
       </div>
 
       {isLoading && !data && (
@@ -208,7 +208,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-400">
+              <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-300">
                 {t('dashboard.from')}
                 <input
                   type="date"
@@ -218,7 +218,7 @@ export default function DashboardPage() {
                   className="rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15 dark:border-white/10 dark:bg-white/5 dark:text-gray-100"
                 />
               </label>
-              <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-400">
+              <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-300">
                 {t('dashboard.to')}
                 <input
                   type="date"

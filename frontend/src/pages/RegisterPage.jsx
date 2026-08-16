@@ -101,7 +101,7 @@ export default function RegisterPage() {
           <Logo className="mb-8 lg:hidden" />
 
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{t('register.title')}</h1>
-          <p className="mt-1 mb-8 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-1 mb-8 text-sm text-gray-500 dark:text-gray-300">
             {t('register.subtitle')}
           </p>
 
@@ -155,7 +155,7 @@ export default function RegisterPage() {
             </Button>
           </form>
 
-          <p className="mt-6 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-6 text-sm text-gray-500 dark:text-gray-300">
             {t('register.haveAccount')}{' '}
             <Link to="/login" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
               {t('login.signIn')}

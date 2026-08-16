@@ -174,7 +174,7 @@ export default function ProjectsListPage() {
       <div className="mb-6 mt-2 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{t('projects.title')}</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-300">
             {t('projects.listSubtitle')}
           </p>
         </div>
@@ -329,7 +329,7 @@ export default function ProjectsListPage() {
               .map((agent) => ({ value: agent.id, label: agent.full_name }))}
           />
           {!canAssignOthers && (
-            <p className="-mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <p className="-mt-2 text-xs text-gray-500 dark:text-gray-300">
               {t('projects.selfAssignOnly')}
             </p>
           )}

@@ -46,7 +46,7 @@ export default function TaskTemplates({ usedTitles = [], onAdd, onDragStart, onD
               // palette stays a stable checklist of the standard steps.
               className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${
                 alreadyAdded
-                  ? 'cursor-default border-gray-200 bg-gray-100 text-gray-400 line-through dark:border-white/10 dark:bg-white/5 dark:text-gray-600'
+                  ? 'cursor-default border-gray-200 bg-gray-100 text-gray-400 line-through dark:border-white/10 dark:bg-white/5 dark:text-gray-500'
                   : 'cursor-grab border-indigo-200 bg-white text-indigo-700 hover:border-indigo-400 hover:bg-indigo-50 active:cursor-grabbing dark:border-indigo-400/30 dark:bg-gray-900/60 dark:text-indigo-300 dark:hover:bg-indigo-500/10'
               } ${draggingTitle === title ? 'opacity-40' : ''}`}
             >

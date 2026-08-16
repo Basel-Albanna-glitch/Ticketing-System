@@ -8,11 +8,11 @@ export default function Breadcrumbs({ items = [] }) {
         const isLast = i === items.length - 1
         return (
           <span key={i} className="flex items-center gap-1.5">
-            {i > 0 && <span className="text-gray-300 dark:text-gray-600">/</span>}
+            {i > 0 && <span className="text-gray-300 dark:text-gray-500">/</span>}
             {item.to && !isLast ? (
               <Link
                 to={item.to}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100"
               >
                 {item.label}
               </Link>
@@ -21,7 +21,7 @@ export default function Breadcrumbs({ items = [] }) {
                 className={
                   isLast
                     ? 'font-medium text-gray-700 dark:text-gray-200'
-                    : 'text-gray-500 dark:text-gray-400'
+                    : 'text-gray-500 dark:text-gray-300'
                 }
               >
                 {item.label}

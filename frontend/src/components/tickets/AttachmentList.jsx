@@ -11,7 +11,7 @@ export default function AttachmentList({ attachments }) {
   const [lightboxIndex, setLightboxIndex] = useState(null)
 
   if (!attachments?.length) {
-    return <p className="text-sm text-gray-400 dark:text-gray-500">{t('tickets.noAttachments')}</p>
+    return <p className="text-sm text-gray-400 dark:text-gray-400">{t('tickets.noAttachments')}</p>
   }
 
   const images = attachments.filter((a) => isImageAttachment(a) && !broken.includes(a.id))
@@ -52,7 +52,7 @@ export default function AttachmentList({ attachments }) {
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200/70 bg-white px-2.5 py-1.5 text-sm text-gray-700 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/40 dark:hover:text-indigo-300"
               >
-                <PaperClipIcon className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
+                <PaperClipIcon className="h-3.5 w-3.5 text-gray-400 dark:text-gray-400" />
                 {a.original_filename}
               </a>
             </li>

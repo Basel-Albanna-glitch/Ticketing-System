@@ -283,7 +283,7 @@ export default function CustomerFormModal({ open, onClose, onCreated, customer =
             </Button>
           </div>
           {licenses.length === 0 ? (
-            <p className="text-xs text-gray-500 dark:text-gray-400">{t('customers.noLicensesYet')}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-300">{t('customers.noLicensesYet')}</p>
           ) : (
             <Table columns={[t('customers.licenseName'), t('customers.startDate'), t('customers.endDate'), '']}>
               {licenses.map((lic, index) => (
@@ -336,7 +336,7 @@ export default function CustomerFormModal({ open, onClose, onCreated, customer =
             </Button>
           </div>
           {branches.length === 0 ? (
-            <p className="text-xs text-gray-500 dark:text-gray-400">{t('customers.noBranchesYet')}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-300">{t('customers.noBranchesYet')}</p>
           ) : (
             <Table columns={[t('customers.branchName'), t('field.address'), '']}>
               {branches.map((b, index) => (
@@ -378,7 +378,7 @@ export default function CustomerFormModal({ open, onClose, onCreated, customer =
           onChange={setAttachments}
         />
         {isEdit && (
-          <p className="-mt-2 text-xs text-gray-500 dark:text-gray-400">
+          <p className="-mt-2 text-xs text-gray-500 dark:text-gray-300">
             {t('customers.attachmentsNote')}
           </p>
         )}

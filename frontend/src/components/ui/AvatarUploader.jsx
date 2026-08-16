@@ -106,7 +106,7 @@ export default function AvatarUploader({
             </Button>
           )}
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-gray-500 dark:text-gray-300">
           {onSelect ? t('settings.avatar.hintOnCreate') : t('settings.avatar.hint')}
         </p>
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}

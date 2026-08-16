@@ -9,6 +9,21 @@
   --shadow-soft-lg: 0 4px 10px -2px rgb(16 24 40 / 0.06), 0 22px 48px -12px rgb(16 24 40 / 0.20);
 }
 
+/* ---- Ink ramp ----
+   Dark mode sits on gray-950, where the grey text scale reads far dimmer than the same
+   numbers do on white — gray-500 lands around 4:1 against it, under the 4.5:1 that small
+   text needs. So the dark ramp runs one step lighter than the light one throughout:
+
+     role         light            dark
+     primary      gray-900         gray-100
+     strong       gray-800         gray-200
+     secondary    gray-600/700     gray-300
+     muted        gray-500         gray-400
+     faint        gray-400/300     gray-500   — separators, chevrons, empty stars only
+
+   Nothing that has to be read lives in the faint tier. Hover on muted text goes to
+   gray-100 rather than gray-200, so the change is actually visible from gray-300. */
+
 /* Subtle app background wash so surfaces read as elevated */
 body {
   background-image: radial-gradient(60rem 60rem at 110% -10%, rgb(99 102 241 / 0.06), transparent 60%);

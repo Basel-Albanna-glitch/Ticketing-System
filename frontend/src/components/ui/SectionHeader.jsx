@@ -11,7 +11,7 @@ export default function SectionHeader({ icon: Icon, title, description, action, 
       <div className="min-w-0">
         <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
         {description && (
-          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{description}</p>
+          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-300">{description}</p>
         )}
       </div>
       {action && <div className="ms-auto shrink-0 self-center">{action}</div>}

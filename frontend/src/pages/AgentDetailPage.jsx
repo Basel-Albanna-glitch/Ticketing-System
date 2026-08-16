@@ -68,7 +68,7 @@ export default function AgentDetailPage() {
               </Badge>
               {agent?.is_available && <Badge color="blue">{t('agents.available')}</Badge>}
             </div>
-            <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+            <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-300">
               <span className="inline-flex items-center gap-1.5">
                 <UserIcon className="h-4 w-4" />@{agent?.username}
               </span>
@@ -126,7 +126,7 @@ export default function AgentDetailPage() {
                   </Badge>
                 </div>
                 {project.customer && (
-                  <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-300">
                     {project.customer.full_name}
                     {project.branch ? ` · ${project.branch.name}` : ''}
                   </p>
@@ -163,7 +163,7 @@ export default function AgentDetailPage() {
                     >
                       {ticket.subject}
                     </Link>
-                    <span className="ms-2 font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                    <span className="ms-2 font-mono text-[11px] text-gray-400 dark:text-gray-400">
                       {ticket.reference}
                     </span>
                   </td>

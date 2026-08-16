@@ -84,7 +84,7 @@ function RoleFormModal({ open, onClose, role }) {
         />
 
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-gray-500 dark:text-gray-300">
             {t('settings.roles.permissionsHint')}
           </p>
           {PERMISSION_GROUPS.map((group) => (
@@ -113,7 +113,7 @@ function RoleFormModal({ open, onClose, role }) {
 
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <div className="flex items-center justify-between gap-3">
-          <span className="text-sm text-gray-500 dark:text-gray-400">
+          <span className="text-sm text-gray-500 dark:text-gray-300">
             {t('settings.roles.grantedCount').replace('{n}', granted)}
           </span>
           <div className="flex gap-3">
@@ -167,7 +167,7 @@ export default function RolesSection() {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {t('settings.roles.title')}
           </h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-300">
             {t('settings.roles.subtitle')}
           </p>
         </div>
@@ -179,10 +179,10 @@ export default function RolesSection() {
         </Button>
       </div>
 
-      {isLoading && <p className="text-sm text-gray-500 dark:text-gray-400">{t('common.loading')}</p>}
+      {isLoading && <p className="text-sm text-gray-500 dark:text-gray-300">{t('common.loading')}</p>}
 
       {!isLoading && (roles || []).length === 0 && (
-        <p className="rounded-xl border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
+        <p className="rounded-xl border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500 dark:border-white/10 dark:text-gray-300">
           {t('settings.roles.empty')}
         </p>
       )}
@@ -199,9 +199,9 @@ export default function RolesSection() {
                 <div className="min-w-0">
                   <p className="font-medium text-gray-900 dark:text-gray-100">{role.name}</p>
                   {role.description && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{role.description}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-300">{role.description}</p>
                   )}
-                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-400">
                     {t('settings.roles.userCount').replace('{n}', role.user_count ?? 0)}
                   </p>
                 </div>
@@ -221,7 +221,7 @@ export default function RolesSection() {
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {granted.length === 0 ? (
-                  <span className="text-xs text-gray-400 dark:text-gray-500">
+                  <span className="text-xs text-gray-400 dark:text-gray-400">
                     {t('settings.roles.noPermissions')}
                   </span>
                 ) : (

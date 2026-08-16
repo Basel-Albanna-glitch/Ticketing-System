@@ -84,7 +84,7 @@ export default function CustomersPage() {
       <div className="mb-6 mt-2 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{t('customers.title')}</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-300">
             {t('customers.subtitle')}
           </p>
         </div>
@@ -119,7 +119,7 @@ export default function CustomersPage() {
         <Table columns={columns} sortBy={sortBy} sortDir={sortDir} onSort={onSort}>
           {pageRows.map((customer) => (
             <tr key={customer.id}>
-              <td className="px-4 py-2 text-gray-500 dark:text-gray-400">@{customer.username}</td>
+              <td className="px-4 py-2 text-gray-500 dark:text-gray-300">@{customer.username}</td>
               <td className="px-4 py-2">
                 <div className="flex items-center gap-2.5">
                   <Avatar name={customer.full_name} src={customer.avatar} />

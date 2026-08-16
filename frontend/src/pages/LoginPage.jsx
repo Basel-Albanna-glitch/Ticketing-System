@@ -115,7 +115,7 @@ export default function LoginPage() {
               <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
                 {t('login.welcome')}
               </h1>
-              <p className="mb-6 mt-1 text-sm text-gray-500 dark:text-gray-400">
+              <p className="mb-6 mt-1 text-sm text-gray-500 dark:text-gray-300">
                 {t('login.subtitle')}
               </p>
 
@@ -146,12 +146,12 @@ export default function LoginPage() {
             </div>
 
             <div className="mt-6 text-center text-sm">
-              <p className="text-gray-500 dark:text-gray-400">{t('login.noAccount')}</p>
+              <p className="text-gray-500 dark:text-gray-300">{t('login.noAccount')}</p>
               <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1">
                 <Link to="/guest/new" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
                   {t('login.guestSubmit')}
                 </Link>
-                <span className="text-gray-300 dark:text-gray-600">·</span>
+                <span className="text-gray-300 dark:text-gray-500">·</span>
                 <Link to="/guest/track" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
                   {t('login.guestTrack')}
                 </Link>

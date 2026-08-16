@@ -72,12 +72,12 @@ export default function GuestTicketPage() {
               <CheckCircleIcon className="h-7 w-7" />
             </span>
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{t('guest.success.refIs')}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-300">{t('guest.success.refIs')}</p>
               <p className="font-mono text-3xl font-bold text-indigo-600 dark:text-indigo-400">
                 #{created.id}
               </p>
               {created.reference && (
-                <p className="mt-1 break-all font-mono text-xs text-gray-400 dark:text-gray-500">
+                <p className="mt-1 break-all font-mono text-xs text-gray-400 dark:text-gray-400">
                   {created.reference}
                 </p>
               )}

@@ -37,11 +37,11 @@ import { useI18n } from '../i18n/useI18n'
 function DetailRow({ icon: Icon, label, children }) {
   return (
     <div className="flex items-start gap-3 py-2.5">
-      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400">
+      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-300">
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-xs text-gray-400 dark:text-gray-500">{label}</p>
+        <p className="text-xs text-gray-400 dark:text-gray-400">{label}</p>
         <div className="mt-0.5 text-sm text-gray-800 dark:text-gray-200">{children}</div>
       </div>
     </div>
@@ -144,7 +144,7 @@ export default function ProjectBoardPage() {
                 </Badge>
               </div>
               {project?.description && (
-                <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
+                <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-300">
                   {project.description}
                 </p>
               )}
@@ -231,7 +231,7 @@ export default function ProjectBoardPage() {
                 {project?.customer ? (
                   project.customer.full_name
                 ) : (
-                  <span className="text-gray-400 dark:text-gray-500">{t('projects.noCustomer')}</span>
+                  <span className="text-gray-400 dark:text-gray-400">{t('projects.noCustomer')}</span>
                 )}
               </DetailRow>
               <DetailRow icon={UsersIcon} label={t('projects.assignees')}>
@@ -248,7 +248,7 @@ export default function ProjectBoardPage() {
                     ))}
                   </div>
                 ) : (
-                  <span className="text-gray-400 dark:text-gray-500">{t('projects.unassigned')}</span>
+                  <span className="text-gray-400 dark:text-gray-400">{t('projects.unassigned')}</span>
                 )}
               </DetailRow>
               <DetailRow icon={CalendarIcon} label={t('projects.dateRange')}>
@@ -259,7 +259,7 @@ export default function ProjectBoardPage() {
                     {project.end_date ? new Date(project.end_date).toLocaleDateString() : '—'}
                   </>
                 ) : (
-                  <span className="text-gray-400 dark:text-gray-500">{t('common.none')}</span>
+                  <span className="text-gray-400 dark:text-gray-400">{t('common.none')}</span>
                 )}
               </DetailRow>
               <DetailRow icon={ClockIcon} label={t('projects.lastTaskDue')}>
@@ -270,7 +270,7 @@ export default function ProjectBoardPage() {
                     {overrunsEnd && ` · ${t('projects.pastEndDate')}`}
                   </span>
                 ) : (
-                  <span className="text-gray-400 dark:text-gray-500">{t('common.none')}</span>
+                  <span className="text-gray-400 dark:text-gray-400">{t('common.none')}</span>
                 )}
               </DetailRow>
               <DetailRow icon={UserIcon} label={t('projects.by')}>

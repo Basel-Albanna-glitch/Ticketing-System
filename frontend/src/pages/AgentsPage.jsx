@@ -167,7 +167,7 @@ export default function AgentsPage() {
       <div className="mb-6 mt-2 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{t('agents.title')}</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-300">
             {t('agents.subtitle')}
           </p>
         </div>
@@ -191,7 +191,7 @@ export default function AgentsPage() {
         <Table columns={columns} sortBy={sortBy} sortDir={sortDir} onSort={onSort}>
           {pageRows.map((agent) => (
             <tr key={agent.id}>
-              <td className="px-4 py-2 text-gray-500 dark:text-gray-400">@{agent.username}</td>
+              <td className="px-4 py-2 text-gray-500 dark:text-gray-300">@{agent.username}</td>
               <td className="px-4 py-2">
                 <Link
                   to={`/agents/${agent.id}`}
@@ -209,7 +209,7 @@ export default function AgentsPage() {
                 {agent.staff_role_name ? (
                   <Badge color="purple">{agent.staff_role_name}</Badge>
                 ) : (
-                  <span className="text-xs text-gray-400 dark:text-gray-500">{t('agents.noRole')}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-400">{t('agents.noRole')}</span>
                 )}
               </td>
               <td className="px-4 py-2 tabular-nums text-gray-600 dark:text-gray-300">{agent.assigned_count}</td>

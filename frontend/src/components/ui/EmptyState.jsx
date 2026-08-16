@@ -9,7 +9,7 @@ export default function EmptyState({ title, description, action }) {
       <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
         {title ?? t('ui.emptyState')}
       </p>
-      {description && <p className="mt-1 text-sm text-gray-400 dark:text-gray-500">{description}</p>}
+      {description && <p className="mt-1 text-sm text-gray-400 dark:text-gray-400">{description}</p>}
       {action && <div className="mt-3">{action}</div>}
     </div>
   )
