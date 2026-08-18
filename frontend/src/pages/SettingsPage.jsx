@@ -339,7 +339,14 @@ function CategoriesSection() {
   const { pageRows: categoryRows, ...categoryPager } = usePagedRows(tree)
   // When editing, a category can't be parented to itself or any of its descendants.
   const excludedIds = editingId ? getSelfAndDescendantIds(categories || [], editingId) : new Set()
-  const parentOptions = tree.filter((c) => !excludedIds.has(c.id))
+  // Only top-level categories are offered. The field asks which group this belongs to,
+  // and a group is a heading, not another leaf hanging off one. A deeper category stays
+  // selectable while it is the current answer, so editing a row that was nested before
+  // this rule shows its real parent rather than an empty box that silently disagrees
+  // with what is stored.
+  const parentOptions = tree.filter(
+    (c) => !excludedIds.has(c.id) && (c.depth === 0 || String(c.id) === String(parentId))
+  )
   const selectedParent = parentId
     ? (categories || []).find((c) => String(c.id) === String(parentId))
     : null
