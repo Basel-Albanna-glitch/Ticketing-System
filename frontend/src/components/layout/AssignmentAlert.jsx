@@ -2,14 +2,20 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
-import { TicketIcon } from '../ui/icons'
+import { CheckCircleIcon, TicketIcon } from '../ui/icons'
 import { useAuth } from '../../auth/useAuth'
 import { useMarkNotificationRead, useNotifications } from '../../hooks/useNotifications'
 import { useI18n } from '../../i18n/useI18n'
 
 // The notifications that interrupt instead of waiting in the bell: a ticket handed to someone,
 // and someone added to a ticket as a collaborator.
-const ALERT_KINDS = new Set(['assigned', 'collaborator_added'])
+// Each maps to its dialog title. A to-do handed to someone interrupts the same way.
+const ALERT_TITLES = {
+  assigned: 'notifications.assignedTitle',
+  collaborator_added: 'notifications.collaboratorTitle',
+  todo_assigned: 'notifications.todoAssignedTitle',
+}
+const ALERT_KINDS = new Set(Object.keys(ALERT_TITLES))
 
 // Interrupts an agent or admin when a ticket has been handed to them, or they've been added to
 // one as a collaborator, instead of leaving it as one more line in the bell. It reads the same
@@ -32,10 +38,12 @@ export default function AssignmentAlert() {
   // The list arrives newest first; take the oldest so a backlog reads in the order it happened.
   const current = pending[pending.length - 1]
 
-  function answer(openTicket) {
+  function answer(openIt) {
     setHandled((prev) => new Set(prev).add(current.id))
     markRead.mutate(current.id)
-    if (openTicket && current.ticket) navigate(`/tickets/${current.ticket}`)
+    if (!openIt) return
+    if (current.todo) navigate(`/todo/${current.todo}/edit`)
+    else if (current.ticket) navigate(`/tickets/${current.ticket}`)
   }
 
   if (!current) return null
@@ -46,17 +54,17 @@ export default function AssignmentAlert() {
       // The ✕ counts as confirming: an alert that could be closed without being answered
       // would simply pop up again on the next poll.
       onClose={() => answer(false)}
-      title={t(
-        current.kind === 'collaborator_added'
-          ? 'notifications.collaboratorTitle'
-          : 'notifications.assignedTitle'
-      )}
+      title={t(ALERT_TITLES[current.kind])}
       dismissOnBackdrop={false}
     >
       <div className="flex flex-col gap-5">
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
-            <TicketIcon className="h-5 w-5" />
+            {current.todo ? (
+              <CheckCircleIcon className="h-5 w-5" />
+            ) : (
+              <TicketIcon className="h-5 w-5" />
+            )}
           </span>
           <p className="pt-2 text-sm text-gray-700 dark:text-gray-300">{current.message}</p>
         </div>
@@ -69,8 +77,10 @@ export default function AssignmentAlert() {
           <Button variant="secondary" onClick={() => answer(false)}>
             {t('notifications.confirm')}
           </Button>
-          {current.ticket && (
-            <Button onClick={() => answer(true)}>{t('notifications.viewTicket')}</Button>
+          {(current.todo || current.ticket) && (
+            <Button onClick={() => answer(true)}>
+              {t(current.todo ? 'notifications.viewTodo' : 'notifications.viewTicket')}
+            </Button>
           )}
         </div>
       </div>

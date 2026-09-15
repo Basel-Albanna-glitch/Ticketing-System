@@ -349,7 +349,7 @@ class TodoItemViewSet(viewsets.ModelViewSet):
         # delete goes through here, so an item you cannot see is unreachable by id too —
         # not merely hidden from the list.
         base = TodoItem.objects.prefetch_related(
-            'assignees', 'attachments', 'assignee_completions'
+            'assignees', 'attachments', 'assignee_completions', 'reminders'
         ).select_related('created_by', 'customer', 'folder')
         # distinct(): the assignees join inside the rule multiplies rows.
         return base.filter(visible_todo_q(self.request.user)).distinct()
@@ -488,6 +488,11 @@ class TodoItemViewSet(viewsets.ModelViewSet):
         open_rows = [t for t in rows if not t.done]
         done_rows = [t for t in rows if t.done]
         overdue = [t for t in open_rows if t.due_at and t.due_at < now]
+        # Finishing late doesn't make a to-do on time — the list keeps its overdue tag, and
+        # the file says so too.
+        done_late = [
+            t for t in done_rows if t.due_at and t.completed_at and t.completed_at > t.due_at
+        ]
         due_today = [t for t in open_rows if t.due_at and now <= t.due_at <= today_end]
 
         # Only completed work with both ends recorded can be timed; items finished before
@@ -506,6 +511,7 @@ class TodoItemViewSet(viewsets.ModelViewSet):
             ['Total to-dos', len(rows)],
             ['Open', len(open_rows)],
             ['Done', len(done_rows)],
+            ['Done late', len(done_late)],
             ['Overdue', len(overdue)],
             ['Due today', len(due_today)],
             ['Nobody assigned', len([t for t in open_rows if not t.assignees.all()])],
@@ -526,7 +532,9 @@ class TodoItemViewSet(viewsets.ModelViewSet):
             [
                 [
                     t.title,
-                    'Done' if t.done else ('Overdue' if t in overdue else 'Open'),
+                    ('Done late' if t in done_late else 'Done')
+                    if t.done
+                    else ('Overdue' if t in overdue else 'Open'),
                     t.get_priority_display(),
                     t.folder.name if t.folder_id else 'Unfiled',
                     'Private' if t.is_private else 'Shared',

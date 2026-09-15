@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -200,16 +202,6 @@ class TodoItem(models.Model):
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, related_name='todo_items_created', on_delete=models.PROTECT
     )
-    # How long before the due date to nudge whoever is carrying this — "three days
-    # before" rather than a fixed moment, so moving the deadline carries the reminder
-    # with it. Null means no reminder; 0 means at the deadline itself.
-    remind_offset_minutes = models.PositiveIntegerField(null=True, blank=True)
-    # The moment the reminder is due, derived from due_at and the offset. Stored rather
-    # than computed on read so the sweep can find it with an indexed query.
-    remind_at = models.DateTimeField(null=True, blank=True)
-    # Stamped when the reminder actually goes out. Doubles as the guard that stops a
-    # second one — there is no task queue here, so the sweep can run more than once.
-    reminder_sent_at = models.DateTimeField(null=True, blank=True)
     # Manual rank, same idea as Task.position — the list is drag-ordered.
     position = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -223,12 +215,57 @@ class TodoItem(models.Model):
             models.Index(fields=['done', 'position']),
             # Every list read filters on visibility first.
             models.Index(fields=['is_private', 'created_by']),
-            # The reminder sweep asks exactly this: what is due and not yet sent.
-            models.Index(fields=['remind_at', 'reminder_sent_at']),
         ]
 
     def __str__(self):
         return self.title
+
+    # --- Reminders ---------------------------------------------------------------------
+
+    def sync_reminders(self, wanted=None):
+        """Bring this to-do's reminders in line with its due date, and with `wanted` if given.
+
+        `wanted` is the list a save sent — dicts holding `offset_minutes` or `remind_at` —
+        and replaces what is stored. A reminder the list keeps, same kind and same moment,
+        keeps its row and so its `sent_at`: re-saving a to-do must not re-send reminders
+        that have already gone out. Repeats in the list collapse into one.
+
+        With no list, only the reminders measured from the due date are re-derived, since
+        the save may have moved it: one whose moment changes is armed again, and one with
+        no due date left to hang on is dropped rather than blocking the edit.
+        """
+        existing = list(self.reminders.all())
+        if wanted is None:
+            for reminder in existing:
+                if reminder.offset_minutes is None:
+                    continue
+                if self.due_at is None:
+                    reminder.delete()
+                    continue
+                moment = self.due_at - timedelta(minutes=reminder.offset_minutes)
+                if moment != reminder.remind_at:
+                    reminder.remind_at = moment
+                    reminder.sent_at = None
+                    reminder.save(update_fields=['remind_at', 'sent_at'])
+            return
+
+        rows = list(existing)
+        kept = set()
+        for item in wanted:
+            offset = item.get('offset_minutes')
+            moment = (
+                self.due_at - timedelta(minutes=offset) if offset is not None else item['remind_at']
+            )
+            match = next(
+                (r for r in rows if r.offset_minutes == offset and r.remind_at == moment), None
+            )
+            if match is None:
+                match = TodoReminder.objects.create(
+                    todo=self, offset_minutes=offset, remind_at=moment
+                )
+                rows.append(match)
+            kept.add(match.pk)
+        self.reminders.exclude(pk__in=kept).delete()
 
     # --- Per-assignee completion -------------------------------------------------
     #
@@ -277,6 +314,35 @@ class TodoItem(models.Model):
         self.assignee_completions.exclude(user_id__in=assignee_ids).delete()
         if self.done:
             self.apply_done_to_assignees(actor)
+
+
+class TodoReminder(models.Model):
+    """One reminder on a to-do; a to-do can carry several.
+
+    Each is either an exact moment, or an amount of time before the to-do's due date —
+    "three days before" rather than a fixed moment, so moving the deadline carries it
+    along. `remind_at` holds the moment either way: derived for a relative reminder (see
+    TodoItem.sync_reminders), and stored rather than computed on read so the sweep can
+    find what is due with an indexed query.
+    """
+
+    todo = models.ForeignKey(TodoItem, related_name='reminders', on_delete=models.CASCADE)
+    # Null for an exact-time reminder; otherwise minutes before due_at (0 = at the deadline).
+    offset_minutes = models.PositiveIntegerField(null=True, blank=True)
+    remind_at = models.DateTimeField()
+    # Stamped when the reminder goes out. Doubles as the guard that stops a second one —
+    # there is no task queue here, so the sweep can run more than once.
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['remind_at', 'id']
+        indexes = [
+            # The sweep asks exactly this: what is still unsent and has come due.
+            models.Index(fields=['sent_at', 'remind_at'], name='projects_todoreminder_due_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.todo} @ {self.remind_at}'
 
 
 class TodoAssigneeCompletion(models.Model):

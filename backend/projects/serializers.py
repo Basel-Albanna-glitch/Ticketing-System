@@ -1,11 +1,10 @@
-from datetime import timedelta
-
 from accounts.models import CustomerBranch, User
 from accounts.serializers import CustomerBranchSerializer, UserSerializer
+from notifications.models import Notification, notify
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Project, Task, TodoAttachment, TodoFolder, TodoItem
+from .models import Project, Task, TodoAttachment, TodoFolder, TodoItem, TodoReminder
 
 
 def _can_edit(request, obj):
@@ -296,6 +295,38 @@ class TodoFolderSerializer(serializers.ModelSerializer):
         return value
 
 
+# Room for a week's, a day's and an hour's warning plus a fixed time or two, without letting
+# one to-do turn into a mailing list. The form offers no more than this either.
+MAX_REMINDERS_PER_TODO = 10
+
+
+class TodoReminderSerializer(serializers.ModelSerializer):
+    """One reminder, written as either `offset_minutes` (that long before the due date) or
+    `remind_at` (an exact moment). `remind_at` is reported for both, so a client can show
+    when each will actually land."""
+
+    offset_minutes = serializers.IntegerField(
+        required=False, allow_null=True, min_value=0, max_value=366 * 24 * 60
+    )
+    remind_at = serializers.DateTimeField(required=False, allow_null=True)
+
+    class Meta:
+        model = TodoReminder
+        fields = ['id', 'offset_minutes', 'remind_at', 'sent_at']
+        read_only_fields = ['id', 'sent_at']
+
+    def validate(self, attrs):
+        if attrs.get('offset_minutes') is None and attrs.get('remind_at') is None:
+            raise serializers.ValidationError(
+                'Give each reminder either an exact time or an amount before the due date.'
+            )
+        # A relative reminder's moment is worked out from the due date when it is saved, so
+        # a remind_at echoed back from a previous read is ignored rather than trusted.
+        if attrs.get('offset_minutes') is not None:
+            attrs['remind_at'] = None
+        return attrs
+
+
 class TodoItemSerializer(serializers.ModelSerializer):
     customer = UserSerializer(read_only=True)
     customer_id = serializers.PrimaryKeyRelatedField(
@@ -321,22 +352,23 @@ class TodoItemSerializer(serializers.ModelSerializer):
         source='folder', queryset=TodoFolder.objects.all(),
         allow_null=True, required=False, write_only=True,
     )
+    # Sent, the list replaces the to-do's reminders; left out, they stay as they are (bar
+    # re-deriving the ones measured from a due date this save moves).
+    reminders = TodoReminderSerializer(many=True, required=False)
 
     class Meta:
         model = TodoItem
         fields = [
             'id', 'title', 'notes', 'done', 'is_private', 'priority',
             'folder', 'folder_id', 'attachments',
-            'start_at', 'due_at', 'remind_offset_minutes', 'remind_at', 'reminder_sent_at',
+            'start_at', 'due_at', 'reminders',
             'duration_minutes',
             'customer', 'customer_id',
             'assignees', 'assignee_ids', 'assignee_completions', 'created_by', 'position',
             'completed_at', 'created_at', 'updated_at',
         ]
-        # Order belongs to the reorder endpoint; completion and reminder delivery are
-        # stamped by the server. remind_at is derived from due_at and the offset, so it
-        # is reported rather than accepted — the two could otherwise disagree.
-        read_only_fields = ['position', 'completed_at', 'reminder_sent_at', 'remind_at']
+        # Order belongs to the reorder endpoint; completion is stamped by the server.
+        read_only_fields = ['position', 'completed_at']
 
     def get_duration_minutes(self, obj):
         if not obj.start_at or not obj.due_at:
@@ -372,27 +404,18 @@ class TodoItemSerializer(serializers.ModelSerializer):
                 {'start_at': 'Start must be at or before the due time.'}
             )
 
-        # The reminder is an offset from the due date, so recompute whenever either end
-        # moves: pushing a deadline back should take its reminder along, not leave it
-        # firing on the old schedule.
-        if 'remind_offset_minutes' in attrs or 'due_at' in attrs:
-            offset = attrs.get(
-                'remind_offset_minutes',
-                getattr(self.instance, 'remind_offset_minutes', None),
-            )
-            if offset is None:
-                attrs['remind_at'] = None
-            elif due is None:
-                if 'remind_offset_minutes' in attrs:
-                    raise serializers.ValidationError(
-                        {'remind_offset_minutes': 'Set a due date before choosing a reminder.'}
-                    )
-                # The due date was removed. A relative reminder has nothing left to hang
-                # on, so it goes with it rather than blocking the edit.
-                attrs['remind_offset_minutes'] = None
-                attrs['remind_at'] = None
-            else:
-                attrs['remind_at'] = due - timedelta(minutes=offset)
+        # A reminder measured from the due date needs one. Checked against the due date this
+        # save leaves behind, so a due date and its reminders can arrive in one request.
+        if 'reminders' in attrs:
+            reminders = attrs['reminders']
+            if len(reminders) > MAX_REMINDERS_PER_TODO:
+                raise serializers.ValidationError(
+                    {'reminders': f'A to-do can have at most {MAX_REMINDERS_PER_TODO} reminders.'}
+                )
+            if due is None and any(r.get('offset_minutes') is not None for r in reminders):
+                raise serializers.ValidationError(
+                    {'reminders': 'Set a due date before adding a reminder relative to it.'}
+                )
 
         # A folder settles which side its items sit on, so the folder wins over any
         # is_private in the same payload — the two can never end up disagreeing.
@@ -461,16 +484,48 @@ class TodoItemSerializer(serializers.ModelSerializer):
                 )
         return value
 
+    def _alert_new_assignees(self, todo, previous):
+        """Tell people a to-do was just handed to them: only those newly on it, and never
+        whoever made the change. The web app raises it as an alert with a way to open it."""
+        request = self.context.get('request')
+        actor = request.user if request else None
+        added = todo.assignees.exclude(pk__in=previous)
+        if actor is not None:
+            added = added.exclude(pk=actor.pk)
+        if not added.exists():
+            return
+        by = f' by {actor.full_name}' if actor is not None else ''
+        notify(
+            added,
+            f'To-do "{todo.title}" was assigned to you{by}'[:255],
+            kind=Notification.Kind.TODO_ASSIGNED,
+            todo=todo,
+        )
+
+    def create(self, validated_data):
+        reminders = validated_data.pop('reminders', None)
+        instance = super().create(validated_data)
+        if reminders:
+            instance.sync_reminders(reminders)
+        self._alert_new_assignees(instance, previous=set())
+        return instance
+
     def update(self, instance, validated_data):
         was_done = instance.done
         # Stamp the moment work was finished, and clear it if the box is unticked.
         if 'done' in validated_data and validated_data['done'] != instance.done:
             validated_data['completed_at'] = timezone.now() if validated_data['done'] else None
-        # Moving the reminder arms it again. Without this, pushing a reminder you have
-        # already had back to tomorrow would silently never fire.
-        if 'remind_at' in validated_data and validated_data['remind_at'] != instance.remind_at:
-            validated_data['reminder_sent_at'] = None
+        reminders = validated_data.pop('reminders', None)
+        # Who was on it before this save, so only people it adds are alerted.
+        previous = (
+            set(instance.assignees.values_list('pk', flat=True))
+            if 'assignees' in validated_data
+            else None
+        )
         instance = super().update(instance, validated_data)
+        # Always, not only when reminders were sent: a moved due date takes the reminders
+        # measured from it along, and re-arms any whose moment changed.
+        instance.sync_reminders(reminders)
 
         # Both after the save, since each reads the assignee list this update just wrote.
         # Order matters: clear out ticks for people who have left before deciding whether
@@ -481,4 +536,6 @@ class TodoItemSerializer(serializers.ModelSerializer):
             instance.reconcile_assignee_completions(actor)
         if instance.done != was_done:
             instance.apply_done_to_assignees(actor)
+        if previous is not None:
+            self._alert_new_assignees(instance, previous)
         return instance

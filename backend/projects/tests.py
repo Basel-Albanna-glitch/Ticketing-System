@@ -1,9 +1,17 @@
+from datetime import timedelta
+from io import BytesIO
+from unittest import mock
+
 from django.test import TestCase
+from django.utils import timezone
+from openpyxl import load_workbook
 from rest_framework.test import APIClient
 
 from accounts.models import User
+from notifications.models import Notification
 
-from .models import Project, Task, TodoItem
+from .models import Project, Task, TodoFolder, TodoItem, TodoReminder
+from .reminders import sweep_todo_reminders
 
 
 class ClosedProjectTests(TestCase):
@@ -147,6 +155,222 @@ class MinimalTaskCreationTests(TestCase):
         response = self.post(start_date='2026-09-10', due_date='2026-09-01')
         self.assertEqual(response.status_code, 400)
         self.assertIn('start_date', response.json())
+
+
+class TodoReminderTests(TestCase):
+    """A to-do can carry several reminders, each either an exact moment or an amount
+    before the due date."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            username='radmin', full_name='Admin', password='testpass123', role=User.Role.ADMIN
+        )
+        self.client.force_authenticate(user=self.admin)
+        self.due = (timezone.now() + timedelta(days=10)).replace(microsecond=0)
+        self.moment = (timezone.now() + timedelta(days=2)).replace(microsecond=0)
+
+    def create(self, **payload):
+        return self.client.post(
+            '/api/todos/', {'title': 'Renew certificate', **payload}, format='json'
+        )
+
+    def create_both_kinds(self, offset=1440):
+        response = self.create(
+            due_at=self.due.isoformat(),
+            reminders=[{'offset_minutes': offset}, {'remind_at': self.moment.isoformat()}],
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        return response.json()['id']
+
+    def test_a_todo_takes_several_reminders_of_either_kind(self):
+        todo_id = self.create_both_kinds()
+        moments = sorted(TodoReminder.objects.filter(todo_id=todo_id).values_list('remind_at', flat=True))
+        self.assertEqual(moments, sorted([self.due - timedelta(days=1), self.moment]))
+        self.assertEqual(len(self.client.get(f'/api/todos/{todo_id}/').json()['reminders']), 2)
+
+    def test_a_reminder_before_the_due_date_needs_one(self):
+        self.assertEqual(self.create(reminders=[{'offset_minutes': 60}]).status_code, 400)
+
+    def test_an_exact_reminder_needs_no_due_date(self):
+        response = self.create(reminders=[{'remind_at': self.moment.isoformat()}])
+        self.assertEqual(response.status_code, 201)
+
+    def test_a_reminder_needs_a_time_of_some_kind(self):
+        response = self.create(due_at=self.due.isoformat(), reminders=[{}])
+        self.assertEqual(response.status_code, 400)
+
+    def test_moving_the_due_date_carries_relative_reminders_and_rearms_them(self):
+        todo_id = self.create_both_kinds(offset=60)
+        TodoReminder.objects.filter(todo_id=todo_id).update(sent_at=timezone.now())
+        later = self.due + timedelta(days=3)
+        self.client.patch(f'/api/todos/{todo_id}/', {'due_at': later.isoformat()}, format='json')
+
+        relative = TodoReminder.objects.get(todo_id=todo_id, offset_minutes=60)
+        self.assertEqual(relative.remind_at, later - timedelta(hours=1))
+        self.assertIsNone(relative.sent_at)
+        exact = TodoReminder.objects.get(todo_id=todo_id, offset_minutes__isnull=True)
+        self.assertEqual(exact.remind_at, self.moment)
+        self.assertIsNotNone(exact.sent_at, 'a fixed reminder does not move with the due date')
+
+    def test_resaving_the_same_reminders_does_not_send_them_again(self):
+        todo_id = self.create_both_kinds()
+        TodoReminder.objects.filter(todo_id=todo_id).update(sent_at=timezone.now())
+        self.client.patch(
+            f'/api/todos/{todo_id}/',
+            {
+                'title': 'Renew the certificate',
+                'reminders': [{'offset_minutes': 1440}, {'remind_at': self.moment.isoformat()}],
+            },
+            format='json',
+        )
+        self.assertEqual(TodoReminder.objects.filter(todo_id=todo_id).count(), 2)
+        self.assertFalse(TodoReminder.objects.filter(todo_id=todo_id, sent_at__isnull=True).exists())
+
+    def test_removing_the_due_date_drops_only_relative_reminders(self):
+        todo_id = self.create_both_kinds(offset=60)
+        self.client.patch(f'/api/todos/{todo_id}/', {'due_at': None}, format='json')
+        kinds = list(TodoReminder.objects.filter(todo_id=todo_id).values_list('offset_minutes', flat=True))
+        self.assertEqual(kinds, [None])
+
+    @mock.patch('projects.reminders.email_users')
+    def test_reminders_due_together_go_out_as_one_alert(self, _email_users):
+        todo = TodoItem.objects.create(title='Order hardware', created_by=self.admin)
+        past = timezone.now() - timedelta(minutes=5)
+        TodoReminder.objects.create(todo=todo, remind_at=past)
+        TodoReminder.objects.create(todo=todo, remind_at=past - timedelta(minutes=1))
+        TodoReminder.objects.create(todo=todo, remind_at=timezone.now() + timedelta(days=1))
+
+        self.assertEqual(sweep_todo_reminders(), 1)
+        self.assertEqual(Notification.objects.filter(recipient=self.admin).count(), 1)
+        self.assertEqual(TodoReminder.objects.filter(todo=todo, sent_at__isnull=False).count(), 2)
+        self.assertEqual(sweep_todo_reminders(), 0, 'each reminder goes out once')
+
+
+class TodoExportLatenessTests(TestCase):
+    """A to-do finished after its due time stays marked as late in the export."""
+
+    def test_finishing_after_the_due_time_is_marked_done_late(self):
+        client = APIClient()
+        admin = User.objects.create_user(
+            username='xadmin', full_name='Admin', password='testpass123', role=User.Role.ADMIN
+        )
+        client.force_authenticate(user=admin)
+        due = timezone.now() - timedelta(days=2)
+        TodoItem.objects.create(
+            title='Late one', created_by=admin, due_at=due, done=True,
+            completed_at=due + timedelta(hours=5),
+        )
+        TodoItem.objects.create(
+            title='On time', created_by=admin, due_at=due, done=True,
+            completed_at=due - timedelta(hours=1),
+        )
+
+        response = client.get('/api/todos/export/')
+        self.assertEqual(response.status_code, 200)
+        workbook = load_workbook(BytesIO(response.content))
+        statuses = {
+            row[0]: row[1] for row in workbook['To-dos'].iter_rows(min_row=2, values_only=True)
+        }
+        self.assertEqual(statuses['Late one'], 'Done late')
+        self.assertEqual(statuses['On time'], 'Done')
+        summary = dict(workbook['Summary'].iter_rows(min_row=2, values_only=True))
+        self.assertEqual(summary['Done late'], 1)
+
+
+class ShareTodoByDragTests(TestCase):
+    """Dragging a private to-do onto the shared list saves is_private and folder_id together.
+    Its author can make that move, out of a private folder included; nobody else can."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.author = User.objects.create_user(
+            username='sauthor', full_name='Author', password='testpass123', role=User.Role.AGENT
+        )
+        self.colleague = User.objects.create_user(
+            username='scolleague', full_name='Colleague', password='testpass123',
+            role=User.Role.ADMIN,
+        )
+        private_folder = TodoFolder.objects.create(
+            name='Mine', is_private=True, created_by=self.author
+        )
+        self.shared_folder = TodoFolder.objects.create(
+            name='Team', is_private=False, created_by=self.colleague
+        )
+        self.todo = TodoItem.objects.create(
+            title='Draft plan', created_by=self.author, is_private=True, folder=private_folder
+        )
+
+    def share(self, user, folder_id):
+        self.client.force_authenticate(user=user)
+        return self.client.patch(
+            f'/api/todos/{self.todo.pk}/',
+            {'is_private': False, 'folder_id': folder_id},
+            format='json',
+        )
+
+    def test_the_author_can_share_it_unfiled(self):
+        self.assertEqual(self.share(self.author, None).status_code, 200)
+        self.todo.refresh_from_db()
+        self.assertFalse(self.todo.is_private)
+        self.assertIsNone(self.todo.folder_id)
+
+    def test_the_author_can_share_it_into_a_shared_folder(self):
+        self.assertEqual(self.share(self.author, self.shared_folder.pk).status_code, 200)
+        self.todo.refresh_from_db()
+        self.assertFalse(self.todo.is_private)
+        self.assertEqual(self.todo.folder_id, self.shared_folder.pk)
+
+    def test_nobody_else_can_share_it(self):
+        # Someone else's private item is out of reach altogether, admins included.
+        self.assertIn(self.share(self.colleague, None).status_code, (400, 403, 404))
+        self.todo.refresh_from_db()
+        self.assertTrue(self.todo.is_private)
+
+
+class TodoAssignmentAlertTests(TestCase):
+    """Someone a to-do is assigned to gets an alert for it — once, and not for assigning
+    themselves."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            username='aadmin', full_name='Admin', password='testpass123', role=User.Role.ADMIN
+        )
+        self.ann = User.objects.create_user(
+            username='aann', full_name='Ann', password='testpass123', role=User.Role.AGENT
+        )
+        self.bob = User.objects.create_user(
+            username='abob', full_name='Bob', password='testpass123', role=User.Role.AGENT
+        )
+        self.client.force_authenticate(user=self.admin)
+
+    def alerts_for(self, user):
+        return Notification.objects.filter(recipient=user, kind=Notification.Kind.TODO_ASSIGNED)
+
+    def create(self, title, assignees):
+        response = self.client.post(
+            '/api/todos/', {'title': title, 'assignee_ids': [u.pk for u in assignees]},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        return response.json()['id']
+
+    def test_assignees_are_alerted_when_the_todo_is_created(self):
+        todo_id = self.create('Order hardware', [self.ann, self.admin])
+        self.assertEqual(self.alerts_for(self.ann).get().todo_id, todo_id)
+        self.assertFalse(self.alerts_for(self.admin).exists(), 'assigning yourself raises none')
+
+    def test_only_people_newly_added_are_alerted(self):
+        todo_id = self.create('Chase supplier', [self.ann])
+        self.client.patch(
+            f'/api/todos/{todo_id}/', {'assignee_ids': [self.ann.pk, self.bob.pk]}, format='json'
+        )
+        self.assertEqual(self.alerts_for(self.ann).count(), 1)
+        self.assertEqual(self.alerts_for(self.bob).count(), 1)
+        # An edit that leaves the assignees alone alerts nobody.
+        self.client.patch(f'/api/todos/{todo_id}/', {'title': 'Chase the supplier'}, format='json')
+        self.assertEqual(self.alerts_for(self.bob).count(), 1)
 
 
 class TodoAssigneeCompletionTests(TestCase):

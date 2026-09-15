@@ -9,7 +9,7 @@ import Textarea from '../ui/Textarea'
 import Toggle from '../ui/Toggle'
 import Avatar from '../ui/Avatar'
 import Spinner from '../ui/Spinner'
-import { CheckCircleIcon, PaperClipIcon, TrashIcon } from '../ui/icons'
+import { CheckCircleIcon, PaperClipIcon, PlusIcon, TrashIcon } from '../ui/icons'
 import { formatBytes, formatDuration } from './format'
 import { useAuth } from '../../auth/useAuth'
 import { useAgents } from '../../hooks/useAgents'
@@ -24,23 +24,56 @@ import {
 } from '../../hooks/useTodos'
 import { useI18n } from '../../i18n/useI18n'
 
-// Reminder offsets, in minutes before the due date. Coarse on purpose: a to-do list
-// wants "a few days' warning", not a time picker.
-const REMINDER_OFFSETS = [
-  { minutes: 0, labelKey: 'todo.remindAtDue' },
-  { minutes: 60, labelKey: 'todo.remind1h' },
-  { minutes: 1440, labelKey: 'todo.remind1d' },
-  { minutes: 4320, labelKey: 'todo.remind3d' },
-  { minutes: 10080, labelKey: 'todo.remind7d' },
-  { minutes: 20160, labelKey: 'todo.remind14d' },
+// Units a "before the due date" reminder can be typed in, as minutes.
+const REMINDER_UNITS = [
+  { value: 'minutes', minutes: 1, labelKey: 'todo.unitMinutes' },
+  { value: 'hours', minutes: 60, labelKey: 'todo.unitHours' },
+  { value: 'days', minutes: 1440, labelKey: 'todo.unitDays' },
 ]
 
-// What the chosen offset works out to, so nobody has to do the arithmetic to find out
-// their "7 days before" already fell in the past.
-function remindPreview(form, t) {
-  const due = new Date(form.due_at)
-  if (Number.isNaN(due.getTime())) return ''
-  const when = new Date(due.getTime() - Number(form.remind_offset_minutes) * 60000)
+// Room for a week's, a day's and an hour's warning plus a fixed time or two. Mirrors
+// MAX_REMINDERS_PER_TODO on the server.
+const MAX_REMINDERS = 10
+
+const CELL_INPUT =
+  'rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/15 dark:border-white/10 dark:bg-white/5 dark:text-gray-100'
+
+// A stored reminder as a row the form edits: an amount before the due date in the largest
+// whole unit it fits ("2 days", not "2880 minutes"), or an exact moment in the
+// datetime-local shape. Both shapes are kept on every row so switching kind loses nothing.
+function reminderRow(reminder) {
+  if (reminder.offset_minutes == null) {
+    return { kind: 'at', at: toLocalInput(reminder.remind_at), amount: '1', unit: 'days' }
+  }
+  const unit =
+    [...REMINDER_UNITS].reverse().find((u) => reminder.offset_minutes % u.minutes === 0) ||
+    REMINDER_UNITS[0]
+  return {
+    kind: 'before',
+    amount: String(reminder.offset_minutes / unit.minutes),
+    unit: unit.value,
+    at: '',
+  }
+}
+
+// Minutes before the due date a row asks for, or null while its amount isn't a whole number.
+function rowOffset(row) {
+  if (!/^\d+$/.test(String(row.amount))) return null
+  const unit = REMINDER_UNITS.find((u) => u.value === row.unit) || REMINDER_UNITS[0]
+  return Number(row.amount) * unit.minutes
+}
+
+// When a row will actually land, so nobody has to do the arithmetic to find out their
+// "7 days before" already fell in the past.
+function rowPreview(row, dueAt, t) {
+  let when = null
+  if (row.kind === 'at') {
+    when = row.at ? new Date(row.at) : null
+  } else {
+    const offset = rowOffset(row)
+    when = offset != null && dueAt ? new Date(new Date(dueAt).getTime() - offset * 60000) : null
+  }
+  if (!when || Number.isNaN(when.getTime())) return ''
   const stamp = when.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
   return when.getTime() <= Date.now() ? `${stamp} — ${t('todo.remindInPast')}` : stamp
 }
@@ -55,7 +88,7 @@ const EMPTY_FORM = {
   folder_id: '',
   start_at: '',
   due_at: '',
-  remind_offset_minutes: '',
+  reminders: [],
   customer_id: '',
   assignee_ids: [],
 }
@@ -93,8 +126,7 @@ function formFromTodo(todo, initialDue, initialPrivate) {
     folder_id: todo.folder?.id ?? '',
     start_at: toLocalInput(todo.start_at),
     due_at: toLocalInput(todo.due_at),
-    remind_offset_minutes:
-      todo.remind_offset_minutes == null ? '' : String(todo.remind_offset_minutes),
+    reminders: (todo.reminders || []).map(reminderRow),
     customer_id: todo.customer?.id ?? '',
     assignee_ids: (todo.assignees || []).map((a) => a.id),
   }
@@ -241,6 +273,32 @@ export default function TodoForm({
   // folder — only your own, which is all the server sends anyway.
   const folderOptions = (folders || []).filter((f) => f.is_private === form.is_private)
 
+  // A new reminder starts as "1 day before" when there is a due date to count back from,
+  // and as an exact time otherwise.
+  function addReminder() {
+    setForm((current) => ({
+      ...current,
+      reminders: [
+        ...current.reminders,
+        { kind: current.due_at ? 'before' : 'at', amount: '1', unit: 'days', at: '' },
+      ],
+    }))
+  }
+
+  function updateReminder(index, changes) {
+    setForm((current) => ({
+      ...current,
+      reminders: current.reminders.map((row, i) => (i === index ? { ...row, ...changes } : row)),
+    }))
+  }
+
+  function removeReminder(index) {
+    setForm((current) => ({
+      ...current,
+      reminders: current.reminders.filter((_, i) => i !== index),
+    }))
+  }
+
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
@@ -249,9 +307,16 @@ export default function TodoForm({
       ...form,
       start_at: fromLocalInput(form.start_at),
       due_at: fromLocalInput(form.due_at),
-      // '' means no reminder; the server derives remind_at from this and the due date.
-      remind_offset_minutes:
-        form.remind_offset_minutes === '' ? null : Number(form.remind_offset_minutes),
+      // Each row becomes an amount before the due date or an exact moment. A row left
+      // incomplete is dropped rather than refused; the server works out when relative
+      // ones land.
+      reminders: form.reminders
+        .map((row) => {
+          if (row.kind === 'at') return row.at ? { remind_at: fromLocalInput(row.at) } : null
+          const offset = rowOffset(row)
+          return offset != null && form.due_at ? { offset_minutes: offset } : null
+        })
+        .filter(Boolean),
       customer_id: form.customer_id || null,
       folder_id: form.folder_id || null,
     }
@@ -345,35 +410,100 @@ export default function TodoForm({
           disabled
         />
       </div>
-      <div>
-        <Select
-          label={t('todo.remindAt')}
-          value={form.remind_offset_minutes}
-          disabled={!form.due_at}
-          onChange={(e) => setForm({ ...form, remind_offset_minutes: e.target.value })}
-        >
-          <option value="">{t('todo.remindNone')}</option>
-          {REMINDER_OFFSETS.map((o) => (
-            <option key={o.minutes} value={o.minutes}>
-              {t(o.labelKey)}
-            </option>
-          ))}
-        </Select>
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-300">
-          {/* Three things a reader needs: that it hangs off the due date, when it
-              will actually land, and who gets it — "remind me" is the natural
-              reading and on a shared item it is wrong. */}
-          {!form.due_at
-            ? t('todo.remindNeedsDueDate')
-            : form.remind_offset_minutes === ''
-              ? t('todo.remindNoneHint')
-              : `${remindPreview(form, t)} · ${
-                  form.is_private
-                    ? t('todo.remindAtHintPrivate')
-                    : form.assignee_ids.length
-                      ? t('todo.remindAtHintAssigned')
-                      : t('todo.remindAtHintUnassigned')
-                }`}
+      <div className="flex flex-col gap-2">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          {t('todo.reminders')}
+        </span>
+        {form.reminders.length > 0 && (
+          <ul className="flex flex-col gap-2">
+            {form.reminders.map((row, index) => (
+              <li
+                key={index}
+                className="flex flex-col gap-1 rounded-xl border border-gray-200/70 p-2 dark:border-white/10"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    aria-label={t('todo.reminderKind')}
+                    className={CELL_INPUT}
+                    value={row.kind}
+                    onChange={(e) => updateReminder(index, { kind: e.target.value })}
+                  >
+                    {/* Counting back needs something to count back from. */}
+                    <option value="before" disabled={!form.due_at}>
+                      {t('todo.reminderBefore')}
+                    </option>
+                    <option value="at">{t('todo.reminderAt')}</option>
+                  </select>
+                  {row.kind === 'before' ? (
+                    <>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        aria-label={t('todo.reminderAmount')}
+                        className={`${CELL_INPUT} w-20`}
+                        value={row.amount}
+                        onChange={(e) => updateReminder(index, { amount: e.target.value })}
+                      />
+                      <select
+                        aria-label={t('todo.reminderUnit')}
+                        className={CELL_INPUT}
+                        value={row.unit}
+                        onChange={(e) => updateReminder(index, { unit: e.target.value })}
+                      >
+                        {REMINDER_UNITS.map((u) => (
+                          <option key={u.value} value={u.value}>
+                            {t(u.labelKey)}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-sm text-gray-500 dark:text-gray-300">
+                        {t('todo.beforeDue')}
+                      </span>
+                    </>
+                  ) : (
+                    <input
+                      type="datetime-local"
+                      aria-label={t('todo.reminderAt')}
+                      className={CELL_INPUT}
+                      value={row.at}
+                      onChange={(e) => updateReminder(index, { at: e.target.value })}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeReminder(index)}
+                    aria-label={t('todo.removeReminder')}
+                    className="ms-auto shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-300">
+                  {row.kind === 'before' && !form.due_at
+                    ? t('todo.remindBeforeNeedsDue')
+                    : rowPreview(row, form.due_at, t)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+        {form.reminders.length < MAX_REMINDERS && (
+          <Button type="button" variant="secondary" onClick={addReminder} className="self-start">
+            <PlusIcon className="h-4 w-4" />
+            {t('todo.addReminder')}
+          </Button>
+        )}
+        <p className="text-xs text-gray-500 dark:text-gray-300">
+          {/* Who gets them matters: "remind me" is the natural reading, and on a shared
+              item it is wrong. */}
+          {form.reminders.length === 0
+            ? t('todo.remindNoneHint')
+            : form.is_private
+              ? t('todo.remindersHintPrivate')
+              : form.assignee_ids.length
+                ? t('todo.remindersHintAssigned')
+                : t('todo.remindersHintUnassigned')}
         </p>
       </div>
       <Select

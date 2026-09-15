@@ -380,19 +380,44 @@ function folderError(err, fallback) {
 //
 // Only the grip is draggable. The row body is a button that opens the item, and a region
 // that is simultaneously "click to edit" and "drag to move" resolves to neither.
+// A to-do is overdue while it is still open past its due time — and stays so once it is
+// finished, if it was finished after that time. Ticking a late item off doesn't make it
+// on time, so the tag doesn't disappear with the checkbox.
+// Higher is more urgent. Sorting by priority puts open work above finished work first, then
+// the most urgent at the top; equal priorities keep their manual order (the sort is stable).
+const PRIORITY_RANK = { urgent: 4, high: 3, medium: 2, low: 1 }
+
+function byPriority(a, b) {
+  if (a.done !== b.done) return a.done ? 1 : -1
+  return (PRIORITY_RANK[b.priority] || 0) - (PRIORITY_RANK[a.priority] || 0)
+}
+
+function isOverdueItem(item, now = Date.now()) {
+  if (!item.due_at) return false
+  const due = new Date(item.due_at).getTime()
+  if (!item.done) return due < now
+  return Boolean(item.completed_at) && new Date(item.completed_at).getTime() > due
+}
+
 function TodoRow({ item, drag, t, isOverdue, onToggleDone, onEdit, onDelete, deletingId, rows, dense }) {
   const overdue = isOverdue(item)
+  // Reminders still to go out, soonest first (the API orders them).
+  const pendingReminders = (item.reminders || []).filter((r) => !r.sent_at)
   return (
     <div
+      // A row that takes the drop keeps it: the folder and section around it also accept a
+      // to-do being shared, and must not act on the same drop a second time.
       onDragOver={(e) => {
         if (!drag.canDrop(item)) return
         e.preventDefault()
+        e.stopPropagation()
         if (item.id !== drag.draggingId) drag.onOver(item.id)
       }}
       onDragLeave={() => drag.onLeave(item.id)}
       onDrop={(e) => {
         if (!drag.canDrop(item)) return
         e.preventDefault()
+        e.stopPropagation()
         drag.onDrop(item, rows)
       }}
       className={`group relative flex items-start gap-2.5 rounded-lg ${
@@ -450,6 +475,13 @@ function TodoRow({ item, drag, t, isOverdue, onToggleDone, onEdit, onDelete, del
                 : new Date(item.due_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
             </span>
           )}
+          {/* Said in words as well as by the red accent, so it survives the item being
+              ticked off: a to-do finished after its due time was still late. */}
+          {overdue && (
+            <span className="rounded-full bg-red-50 px-1.5 py-0.5 font-medium text-red-700 ring-1 ring-inset ring-red-600/15 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-400/20">
+              {t('todo.overdue')}
+            </span>
+          )}
           {item.duration_minutes != null && <span>{formatDuration(item.duration_minutes, t)}</span>}
           {item.attachments?.length > 0 && (
             <span className="inline-flex items-center gap-0.5" title={t('todo.attachments')}>
@@ -457,15 +489,18 @@ function TodoRow({ item, drag, t, isOverdue, onToggleDone, onEdit, onDelete, del
               {item.attachments.length}
             </span>
           )}
-          {/* Only while it is still pending: once sent, the bell would claim a reminder
-              is coming that already went. */}
-          {item.remind_at && !item.reminder_sent_at && !item.done && (
+          {/* The next reminder still to go out, and how many follow it. Sent ones are left
+              out: the bell would otherwise claim a reminder is coming that already went. */}
+          {!item.done && pendingReminders.length > 0 && (
             <span
               className="inline-flex items-center gap-1"
-              title={`${t('todo.remindAt')}: ${new Date(item.remind_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}`}
+              title={`${t('todo.reminders')}:\n${pendingReminders
+                .map((r) => new Date(r.remind_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }))
+                .join('\n')}`}
             >
               <BellIcon className="h-3.5 w-3.5" />
-              {new Date(item.remind_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+              {new Date(pendingReminders[0].remind_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+              {pendingReminders.length > 1 && ` +${pendingReminders.length - 1}`}
             </span>
           )}
           {item.customer && (
@@ -519,9 +554,35 @@ function TodoRow({ item, drag, t, isOverdue, onToggleDone, onEdit, onDelete, del
 
 // A folder as a heading over its rows, not a box around them. `folder` is null for the
 // Inbox pile.
-function FolderGroup({ folder, rows, collapsed, onToggleCollapse, onRename, onDeleteFolder, t, rowProps }) {
+function FolderGroup({
+  folder,
+  isPrivateSection,
+  rows,
+  collapsed,
+  onToggleCollapse,
+  onRename,
+  onDeleteFolder,
+  t,
+  rowProps,
+}) {
+  const { drag } = rowProps
   return (
-    <div className="group/folder">
+    <div
+      className="group/folder"
+      // Dropping a to-do being shared onto the folder — its heading, or around its rows —
+      // files it here.
+      onDragOver={(e) => {
+        if (!drag.canDropInto(isPrivateSection)) return
+        e.preventDefault()
+        e.stopPropagation()
+      }}
+      onDrop={(e) => {
+        if (!drag.canDropInto(isPrivateSection)) return
+        e.preventDefault()
+        e.stopPropagation()
+        drag.onDropInto(folder?.id ?? null)
+      }}
+    >
       <div className="flex items-center gap-1.5 border-b border-gray-100 pb-1.5 dark:border-white/10">
         <button
           type="button"
@@ -576,10 +637,12 @@ function FolderGroup({ folder, rows, collapsed, onToggleCollapse, onRename, onDe
   )
 }
 
-// One side of the divide: its folders, then whatever is loose. Drag reordering is confined
-// to a single group — moving a row across would silently change who can see it.
+// One side of the divide: its folders, then whatever is loose. Reordering stays inside a
+// section. The one move across is a private to-do its author drops onto the shared side —
+// never the other way, which would quietly hide the team's work from the team.
 function TodoSection({
   icon,
+  isPrivate = false,
   title,
   description,
   rows,
@@ -600,53 +663,78 @@ function TodoSection({
   // An empty Inbox heading is pure noise when folders are carrying everything; it
   // only earns its place when there is loose work, or when there are no folders at all.
   const showLoose = loose.length > 0 || folders.length === 0
+  const { drag } = rowProps
+  // While a private to-do its author may share is being dragged, the shared side says it
+  // will take it.
+  const sharing = !isPrivate && drag.canDropInto(false)
   return (
-    <Card>
-      <SectionHeader
-        icon={icon}
-        title={`${title} (${rows.length})`}
-        description={description}
-        // Omitted in the Inbox, where a new folder would appear to do nothing: the
-        // Inbox shows only what is unfiled, so the folder lands out of sight.
-        action={
-          onAddFolder ? (
-            <Button variant="ghost" onClick={onAddFolder} loading={addingFolder}>
-              <PlusIcon className="h-4 w-4" />
-              {t('todo.newFolder')}
-            </Button>
-          ) : null
-        }
-      />
-      {rows.length === 0 && folders.length === 0 ? (
-        <EmptyState title={emptyTitle} description={emptyHint} />
-      ) : (
-        <div className={`flex flex-col ${dense ? 'gap-3' : 'gap-5'}`}>
-          {folders.map((folder) => (
-            <FolderGroup
-              key={folder.id}
-              folder={folder}
-              rows={rows.filter((item) => item.folder?.id === folder.id)}
-              collapsed={collapsedIds.has(folder.id)}
-              onToggleCollapse={() => onToggleCollapse(folder.id)}
-              onRename={onRename}
-              onDeleteFolder={onDeleteFolder}
-              t={t}
-              rowProps={rowProps}
-            />
-          ))}
-          {showLoose && (
-            <FolderGroup
-              folder={null}
-              rows={loose}
-              collapsed={collapsedIds.has(`loose-${title}`)}
-              onToggleCollapse={() => onToggleCollapse(`loose-${title}`)}
-              t={t}
-              rowProps={rowProps}
-            />
-          )}
-        </div>
-      )}
-    </Card>
+    <div
+      className={`rounded-2xl ${sharing ? 'ring-2 ring-indigo-400/60' : ''}`}
+      // Dropped anywhere on the section that isn't a folder or a row, it lands unfiled.
+      onDragOver={(e) => {
+        if (!drag.canDropInto(isPrivate)) return
+        e.preventDefault()
+      }}
+      onDrop={(e) => {
+        if (!drag.canDropInto(isPrivate)) return
+        e.preventDefault()
+        drag.onDropInto(null)
+      }}
+    >
+      <Card>
+        <SectionHeader
+          icon={icon}
+          title={`${title} (${rows.length})`}
+          description={description}
+          // Omitted in the Inbox, where a new folder would appear to do nothing: the
+          // Inbox shows only what is unfiled, so the folder lands out of sight.
+          action={
+            onAddFolder ? (
+              <Button variant="ghost" onClick={onAddFolder} loading={addingFolder}>
+                <PlusIcon className="h-4 w-4" />
+                {t('todo.newFolder')}
+              </Button>
+            ) : null
+          }
+        />
+        {sharing && (
+          <p className="mb-3 rounded-lg border border-dashed border-indigo-300 px-3 py-2 text-xs text-indigo-700 dark:border-indigo-400/40 dark:text-indigo-300">
+            {t('todo.dropToShare')}
+          </p>
+        )}
+        {rows.length === 0 && folders.length === 0 ? (
+          <EmptyState title={emptyTitle} description={emptyHint} />
+        ) : (
+          <div className={`flex flex-col ${dense ? 'gap-3' : 'gap-5'}`}>
+            {folders.map((folder) => (
+              <FolderGroup
+                key={folder.id}
+                folder={folder}
+                isPrivateSection={isPrivate}
+                rows={rows.filter((item) => item.folder?.id === folder.id)}
+                collapsed={collapsedIds.has(folder.id)}
+                onToggleCollapse={() => onToggleCollapse(folder.id)}
+                onRename={onRename}
+                onDeleteFolder={onDeleteFolder}
+                t={t}
+                rowProps={rowProps}
+              />
+            ))}
+            {showLoose && (
+              <FolderGroup
+                folder={null}
+                isPrivateSection={isPrivate}
+                rows={loose}
+                collapsed={collapsedIds.has(`loose-${title}`)}
+                onToggleCollapse={() => onToggleCollapse(`loose-${title}`)}
+                t={t}
+                rowProps={rowProps}
+              />
+            )}
+          </div>
+        )}
+      </Card>
+    </div>
   )
 }
 
@@ -656,6 +744,8 @@ export default function TodoPage() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [filter, setFilter] = useState('open')
+  // 'manual' is the drag order; 'priority' sorts urgent work to the top of every folder.
+  const [sortBy, setSortBy] = useState('manual')
   // The section comes from the URL, so each one is its own address: the sidebar can
   // mark the active one, and a link to "Today" survives being shared or bookmarked.
   const { view: rawView } = useParams()
@@ -666,9 +756,13 @@ export default function TodoPage() {
   const isAgenda = view === 'upcoming'
   // The two Shared/Private sections, and everything that only makes sense alongside them.
   const isSections = !isReport && !isAgenda
-  // 'open' and 'done' are server-side filters; 'all' sends nothing. The report needs
-  // the whole picture, so it ignores the status filter rather than reporting on a slice.
-  const filters = isReport || filter === 'all' ? {} : { done: filter === 'done' }
+  // 'open' and 'done' are server-side filters; 'all' sends nothing, and so does 'overdue',
+  // which spans both (still open past due, or finished late) and is narrowed below. The
+  // report needs the whole picture, so it ignores the status filter rather than reporting
+  // on a slice.
+  const filters =
+    isReport || filter === 'all' || filter === 'overdue' ? {} : { done: filter === 'done' }
+  const matchesFilter = (item) => filter !== 'overdue' || isOverdueItem(item)
   const { data: todos, isLoading } = useTodos(filters)
   const updateTodo = useUpdateTodo()
   const deleteTodo = useDeleteTodo()
@@ -687,8 +781,9 @@ export default function TodoPage() {
   const [exporting, setExporting] = useState(false)
   const [draggingId, setDraggingId] = useState(null)
   const [dragOverId, setDragOverId] = useState(null)
-  // Which section the dragged row came from, so a drop can be refused across the divide.
-  const [draggingPrivate, setDraggingPrivate] = useState(null)
+  // The row being dragged: which side it came from decides where it may land, and whose it
+  // is decides whether it may cross into the shared list.
+  const [draggingItem, setDraggingItem] = useState(null)
 
   // Today reaches back over anything already late — a missed deadline is today's
   // problem, not yesterday's. Undated work belongs to no particular day, so it appears
@@ -705,7 +800,9 @@ export default function TodoPage() {
   }
 
   const allRows = todos || []
-  const rows = allRows.filter(inView)
+  const filteredRows = allRows.filter((item) => inView(item) && matchesFilter(item))
+  // Sorted once here; folders and sections split this list without reordering it.
+  const rows = sortBy === 'priority' ? [...filteredRows].sort(byPriority) : filteredRows
   // The server only ever sends private items belonging to the current user, so splitting
   // on the flag alone is enough — there is no "someone else's private" case to exclude.
   const publicRows = rows.filter((item) => !item.is_private)
@@ -718,7 +815,7 @@ export default function TodoPage() {
   const openCount = rows.filter((item) => !item.done).length
   const doneCount = rows.filter((item) => item.done).length
   const now = Date.now()
-  const isOverdue = (item) => !item.done && item.due_at && new Date(item.due_at).getTime() < now
+  const isOverdue = (item) => isOverdueItem(item, now)
   const overdueCount = rows.filter(isOverdue).length
 
   // Adding and editing both happen on a page of their own. Each carries where it was
@@ -806,6 +903,36 @@ export default function TodoPage() {
     })
   }
 
+  // A private to-do can be dragged into the shared list — only that way round, since pulling
+  // shared work into a private list would hide it from the team — and only by its author,
+  // the one person allowed to change its privacy (the server holds the same rule). Sharing
+  // changes who can see it, so it is confirmed rather than done on release.
+  const canShare = (item) => Boolean(item?.is_private) && item.created_by?.id === user?.id
+
+  function moveToShared(item, folderId) {
+    if (
+      !window.confirm(
+        `${t('todo.moveToSharedConfirm')} "${item.title}"?\n\n${t('todo.moveToSharedHint')}`
+      )
+    )
+      return
+    updateTodo.mutate(
+      { id: item.id, is_private: false, folder_id: folderId ?? null },
+      {
+        onError: (err) => {
+          const data = err?.response?.data
+          window.alert(data ? Object.values(data).flat().join(' ') : t('todo.moveToSharedFailed'))
+        },
+      }
+    )
+  }
+
+  function endDrag() {
+    setDraggingId(null)
+    setDragOverId(null)
+    setDraggingItem(null)
+  }
+
   // Reordering happens inside one section, over that section's rows only. Positions may
   // collide across the two lists, which is harmless: each is sorted independently.
   const drag = {
@@ -813,24 +940,36 @@ export default function TodoPage() {
     dragOverId,
     onStart: (item) => {
       setDraggingId(item.id)
-      setDraggingPrivate(item.is_private)
+      setDraggingItem(item)
     },
-    onEnd: () => {
-      setDraggingId(null)
-      setDragOverId(null)
-      setDraggingPrivate(null)
-    },
+    onEnd: endDrag,
     onOver: setDragOverId,
     onLeave: (id) => setDragOverId((current) => (current === id ? null : current)),
-    // Refuse a drop from the other section — moving a row across would read as
-    // "reorder" while actually changing who can see it.
-    canDrop: (item) => draggingPrivate === null || item.is_private === draggingPrivate,
+    // Within a section any row takes a drop. Across, only a private to-do being shared, onto
+    // the shared side; any other crossing would change who can see it without being asked.
+    // Reordering only makes sense in manual order: under a priority sort the rows would
+    // snap straight back to where the sort puts them.
+    canDrop: (item) =>
+      !draggingItem ||
+      (sortBy === 'manual' && item.is_private === draggingItem.is_private) ||
+      (!item.is_private && canShare(draggingItem)),
+    // Folders and the shared section itself take a to-do being shared.
+    canDropInto: (isPrivateSection) => !isPrivateSection && canShare(draggingItem),
+    onDropInto: (folderId) => {
+      const item = draggingItem
+      endDrag()
+      if (item) moveToShared(item, folderId)
+    },
     onDrop: (target, sectionRows) => {
+      const item = draggingItem
       const from = sectionRows.findIndex((r) => r.id === draggingId)
       const to = sectionRows.findIndex((r) => r.id === target.id)
-      setDraggingId(null)
-      setDragOverId(null)
-      setDraggingPrivate(null)
+      endDrag()
+      // Dropped on a shared row: it moves across and joins that row's folder.
+      if (item && item.is_private !== target.is_private) {
+        moveToShared(item, target.folder?.id)
+        return
+      }
       if (from === -1 || to === -1 || from === to) return
       const ids = sectionRows.map((r) => r.id)
       const [moved] = ids.splice(from, 1)
@@ -890,6 +1029,17 @@ export default function TodoPage() {
               }))}
             />
           )}
+          {isSections && (
+            <Select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="w-40"
+              aria-label={t('todo.sortLabel')}
+            >
+              <option value="manual">{t('todo.sortManual')}</option>
+              <option value="priority">{t('todo.sortPriority')}</option>
+            </Select>
+          )}
           {!isReport && (
             <Select
               value={filter}
@@ -899,6 +1049,7 @@ export default function TodoPage() {
             >
               <option value="open">{t('todo.filterOpen')}</option>
               <option value="done">{t('todo.filterDone')}</option>
+              <option value="overdue">{t('todo.filterOverdue')}</option>
               <option value="all">{t('common.all')}</option>
             </Select>
           )}
@@ -935,7 +1086,7 @@ export default function TodoPage() {
       ) : isAgenda ? (
         // The agenda groups the same rows the sections would have shown, so it needs no
         // query of its own — and no second answer to what is on the list.
-        <TodoAgenda rows={allRows} />
+        <TodoAgenda rows={allRows.filter(matchesFilter)} />
       ) : isReport ? (
         <TodoReport rows={allRows} t={t} onExport={handleExport} exporting={exporting} />
       ) : (
@@ -945,6 +1096,7 @@ export default function TodoPage() {
         <div className={activeLayout.wrapper}>
           <TodoSection
             icon={UsersIcon}
+            isPrivate={false}
             title={t('todo.sectionPublic')}
             description={t(
               user?.role === 'admin'
@@ -967,6 +1119,7 @@ export default function TodoPage() {
           />
           <TodoSection
             icon={LockIcon}
+            isPrivate
             title={t('todo.sectionPrivate')}
             description={t('todo.sectionPrivateHint')}
             rows={privateRows}

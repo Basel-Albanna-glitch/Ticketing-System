@@ -15,6 +15,8 @@ class Notification(models.Model):
         ASSIGNED = 'assigned', 'Ticket assigned'
         # Its recipient was added to a ticket as a collaborator; raised the same way.
         COLLABORATOR_ADDED = 'collaborator_added', 'Added as collaborator'
+        # A to-do handed to its recipient by someone else; raised the same way.
+        TODO_ASSIGNED = 'todo_assigned', 'To-do assigned'
 
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL, related_name='notifications', on_delete=models.CASCADE
@@ -31,6 +33,11 @@ class Notification(models.Model):
     customer = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE,
         related_name='+',
+    )
+    # The to-do it is about, when a to-do is assigned to its recipient. Like `ticket` and
+    # `customer`, it is what the client opens when the notification is followed.
+    todo = models.ForeignKey(
+        'projects.TodoItem', null=True, blank=True, on_delete=models.CASCADE, related_name='+'
     )
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -50,11 +57,14 @@ PUSH_TITLES = {
     Notification.Kind.LICENSE_EXPIRY: 'Licence expiry',
     Notification.Kind.ASSIGNED: 'Ticket assigned to you',
     Notification.Kind.COLLABORATOR_ADDED: 'Added as a collaborator',
+    Notification.Kind.TODO_ASSIGNED: 'To-do assigned to you',
     Notification.Kind.GENERAL: 'Ticket update',
 }
 
 
-def notify(recipients, message, ticket=None, kind=Notification.Kind.GENERAL, customer=None):
+def notify(
+    recipients, message, ticket=None, kind=Notification.Kind.GENERAL, customer=None, todo=None
+):
     """Create a notification for each recipient (a queryset or iterable of users).
 
     Also pushes to those recipients' registered devices, so the alert arrives even
@@ -67,7 +77,8 @@ def notify(recipients, message, ticket=None, kind=Notification.Kind.GENERAL, cus
     created = Notification.objects.bulk_create(
         [
             Notification(
-                recipient=r, message=message, ticket=ticket, kind=kind, customer=customer
+                recipient=r, message=message, ticket=ticket, kind=kind, customer=customer,
+                todo=todo,
             )
             for r in people
         ]
@@ -88,6 +99,7 @@ def notify(recipients, message, ticket=None, kind=Notification.Kind.GENERAL, cus
                 'kind': kind,
                 'ticket_id': ticket.pk if ticket is not None else None,
                 'customer_id': customer.pk if customer is not None else None,
+                'todo_id': todo.pk if todo is not None else None,
             },
         )
 

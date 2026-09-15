@@ -89,7 +89,7 @@ class NotificationWatcher {
   /// A short heading above the server's message.
   ///
   /// Notification.Kind defines general / new_ticket / license_expiry / assigned /
-  /// collaborator_added.
+  /// collaborator_added / todo_assigned.
   /// A status change has no kind of its own — it arrives as `general` and its
   /// message already says what happened — so anything unrecognised keeps a
   /// generic heading rather than claiming something it cannot know.
@@ -98,6 +98,7 @@ class NotificationWatcher {
         'license_expiry' => 'License expiring',
         'assigned' => 'Ticket assigned to you',
         'collaborator_added' => 'Added as a collaborator',
+        'todo_assigned' => 'To-do assigned to you',
         _ => 'Ticket update',
       };
 }

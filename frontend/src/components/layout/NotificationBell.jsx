@@ -66,6 +66,7 @@ export default function NotificationBell() {
     if (!n.is_read) markRead.mutate(n.id)
     setOpen(false)
     if (n.ticket) navigate(`/tickets/${n.ticket}`)
+    else if (n.todo) navigate(`/todo/${n.todo}/edit`)
     // A customer-scoped notification (license expiry) goes to that customer's profile,
     // but that page is staff-only — a customer reading their own alert gets their account.
     else if (n.customer) {

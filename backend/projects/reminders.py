@@ -3,10 +3,11 @@
 There is no task queue in this project, so this follows the same shape as the licence
 expiry sweep: a function that finds what is due, a management command for cron, and an
 opportunistic trigger hung off the notification poll so an install with no cron still
-gets its reminders. Correctness never depends on the schedule — ``reminder_sent_at`` is
-what prevents a second send, so an extra sweep is wasted work rather than a duplicate.
+gets its reminders. Correctness never depends on the schedule — ``TodoReminder.sent_at``
+is what prevents a second send, so an extra sweep is wasted work rather than a duplicate.
 """
 import logging
+from collections import defaultdict
 from datetime import timedelta
 
 from django.conf import settings
@@ -15,7 +16,7 @@ from django.utils import timezone
 from notifications.emails import email_users
 from notifications.models import Notification, notify
 
-from .models import TodoItem
+from .models import TodoReminder
 
 logger = logging.getLogger(__name__)
 
@@ -37,30 +38,42 @@ def reminder_recipients(todo):
 
 
 def sweep_todo_reminders():
-    """Send every reminder that has come due. Returns how many to-dos were alerted on."""
+    """Send every reminder that has come due. Returns how many to-dos were alerted on.
+
+    A to-do can carry several reminders. Those of its reminders that are due together —
+    two that fell inside the same gap between sweeps, say — go out as one alert rather
+    than a burst of identical ones.
+    """
     now = timezone.now()
     due = (
-        TodoItem.objects.filter(
-            done=False,
-            remind_at__isnull=False,
+        TodoReminder.objects.filter(
+            todo__done=False,
+            sent_at__isnull=True,
             remind_at__lte=now,
-            reminder_sent_at__isnull=True,
         )
-        .select_related('created_by')
-        .prefetch_related('assignees')
+        .select_related('todo__created_by')
+        .prefetch_related('todo__assignees')
+        .order_by('todo_id', 'remind_at')
     )
 
+    reminder_ids = defaultdict(list)
+    todos = {}
+    for reminder in due:
+        reminder_ids[reminder.todo_id].append(reminder.pk)
+        todos[reminder.todo_id] = reminder.todo
+
     sent = 0
-    for todo in due:
-        # Claim it before sending. Gunicorn runs several workers, each with its own
-        # idea of when it last swept, so two can reach the same row at once; the
-        # conditional update means exactly one of them wins and sends.
-        claimed = TodoItem.objects.filter(
-            pk=todo.pk, reminder_sent_at__isnull=True
-        ).update(reminder_sent_at=now)
+    for todo_id, ids in reminder_ids.items():
+        # Claim them before sending. Gunicorn runs several workers, each with its own
+        # idea of when it last swept, so two can reach the same rows at once; the
+        # conditional update means only the one that stamps them sends.
+        claimed = TodoReminder.objects.filter(pk__in=ids, sent_at__isnull=True).update(
+            sent_at=now
+        )
         if not claimed:
             continue
 
+        todo = todos[todo_id]
         recipients = reminder_recipients(todo)
         if not recipients:
             continue
