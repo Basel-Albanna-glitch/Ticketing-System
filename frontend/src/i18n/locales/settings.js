@@ -88,9 +88,9 @@ export default {
     // Ticket table columns (roles and the site-wide defaults)
     'settings.ticketColumns.title': 'Ticket table columns',
     'settings.ticketColumns.roleHint':
-      'Ticked columns are the ones people with this role can see. They can hide more for themselves, but never show an unticked one.',
+      'Ticked columns are the ones people with this role can see. If the role also lets them hide and show columns, they can hide more for themselves, but never show an unticked one.',
     'settings.ticketColumns.defaultsHint':
-      'Columns agents without a role can see. They can hide more for themselves, but never show an unticked one. Admins without a role always see every column.',
+      'Columns agents without a role can see. If they may hide and show columns, they can hide more for themselves, but never show an unticked one. Admins without a role always see every column.',
 
     // Permissions section
     'settings.permissions.title': 'Permissions',
@@ -105,6 +105,10 @@ export default {
     'settings.permissions.viewTickets.label': 'Allow agents to open the Tickets section',
     'settings.permissions.viewTickets.hint':
       'Turning this off hides Tickets entirely for them. Customers always keep access to their own tickets.',
+    'settings.permissions.customizeColumns.label':
+      'Allow agents to hide and show ticket table columns',
+    'settings.permissions.customizeColumns.hint':
+      'Adds a Columns menu to the ticket list for choosing which columns they see, among those they are allowed. When off, they see every column they are allowed.',
     'settings.permissions.viewCustomers.label': 'Allow agents to open the Customers section',
     'settings.permissions.viewCustomers.hint':
       'Turning this off hides Customers. Note the new-ticket form picks a customer, so an agent raising tickets will usually need this.',
@@ -275,9 +279,9 @@ export default {
     // Ticket table columns (roles and the site-wide defaults)
     'settings.ticketColumns.title': 'أعمدة جدول التذاكر',
     'settings.ticketColumns.roleHint':
-      'الأعمدة المحددة هي التي يستطيع أصحاب هذا الدور رؤيتها. يمكنهم إخفاء المزيد لأنفسهم، لكن لا يمكنهم إظهار عمود غير محدد.',
+      'الأعمدة المحددة هي التي يستطيع أصحاب هذا الدور رؤيتها. إذا سمح لهم الدور أيضاً بإخفاء الأعمدة وإظهارها، يمكنهم إخفاء المزيد لأنفسهم، لكن لا يمكنهم إظهار عمود غير محدد.',
     'settings.ticketColumns.defaultsHint':
-      'الأعمدة التي يستطيع الوكلاء بلا دور رؤيتها. يمكنهم إخفاء المزيد لأنفسهم، لكن لا يمكنهم إظهار عمود غير محدد. المشرفون بلا دور يرون كل الأعمدة دائماً.',
+      'الأعمدة التي يستطيع الوكلاء بلا دور رؤيتها. إذا سُمح لهم بإخفاء الأعمدة وإظهارها، يمكنهم إخفاء المزيد لأنفسهم، لكن لا يمكنهم إظهار عمود غير محدد. المشرفون بلا دور يرون كل الأعمدة دائماً.',
 
     // Permissions section
     'settings.permissions.title': 'الصلاحيات',
@@ -291,6 +295,10 @@ export default {
     'settings.permissions.viewTickets.label': 'السماح للوكلاء بفتح قسم التذاكر',
     'settings.permissions.viewTickets.hint':
       'إيقاف هذا يخفي التذاكر عنهم تماماً. يحتفظ العملاء دائماً بالوصول إلى تذاكرهم.',
+    'settings.permissions.customizeColumns.label':
+      'السماح للوكلاء بإخفاء أعمدة جدول التذاكر وإظهارها',
+    'settings.permissions.customizeColumns.hint':
+      'يضيف قائمة "الأعمدة" إلى قائمة التذاكر لاختيار الأعمدة التي يرونها من بين المسموح لهم بها. عند الإيقاف، يرون كل الأعمدة المسموح لهم بها.',
     'settings.permissions.viewCustomers.label': 'السماح للوكلاء بفتح قسم العملاء',
     'settings.permissions.viewCustomers.hint':
       'إيقاف هذا يخفي العملاء. لاحظ أن نموذج التذكرة الجديدة يتطلب اختيار عميل، لذا يحتاجه الوكيل الذي ينشئ التذاكر عادةً.',

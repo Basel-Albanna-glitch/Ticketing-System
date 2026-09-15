@@ -154,6 +154,7 @@ class TicketListSerializer(serializers.ModelSerializer):
         ]
 
 
+
 class TicketCalendarSerializer(serializers.ModelSerializer):
     """Minimal ticket row for the calendar grid — just enough to draw a chip and link it."""
 
@@ -346,7 +347,7 @@ class TicketSettingsSerializer(serializers.ModelSerializer):
             'allow_agent_manage_kb', 'allow_agent_assign_projects',
             'allow_agent_unassign_projects', 'allow_agent_assign_tasks',
             'allow_agent_create_customers', 'allow_agent_view_reports',
-            'withheld_ticket_columns',
+            'allow_agent_customize_columns', 'withheld_ticket_columns',
         ]
 
 

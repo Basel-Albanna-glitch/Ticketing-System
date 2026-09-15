@@ -21,6 +21,12 @@ export const TICKET_COLUMNS = [
 // (a session loaded before this shipped): customers don't see who a ticket is assigned to.
 const CUSTOMER_WITHHELD = new Set(['assigned_at', 'assigned_agent'])
 
+// Whether this person may hide and show columns for themselves — a staff permission, already
+// resolved by the server from their role or the site-wide defaults. Customers never hold it.
+export function canCustomizeTicketColumns(user) {
+  return Boolean(user?.permissions?.allow_agent_customize_columns)
+}
+
 // Columns this person may see at all, as resolved by the server.
 export function allowedTicketColumns(user) {
   if (Array.isArray(user?.allowed_ticket_columns)) return user.allowed_ticket_columns
@@ -34,6 +40,9 @@ export function allowedTicketColumns(user) {
 // allowed rather than an empty table.
 export function visibleTicketColumns(user) {
   const allowed = allowedTicketColumns(user)
+  // Hiding columns is a permission. Without it — never granted, or since taken away — columns
+  // hidden earlier stop applying, rather than staying hidden with no way to bring them back.
+  if (!canCustomizeTicketColumns(user)) return allowed
   const hidden = new Set(user?.hidden_ticket_columns || [])
   const visible = allowed.filter((key) => !hidden.has(key))
   return visible.length ? visible : allowed

@@ -6,12 +6,14 @@ import { useI18n } from '../../i18n/useI18n'
 import {
   TICKET_COLUMNS,
   allowedTicketColumns,
+  canCustomizeTicketColumns,
   visibleTicketColumns,
 } from '../../constants/ticketColumns'
 
-// Lets someone hide ticket-table columns for themselves. Only the columns their role allows
-// are listed, so it can never reveal one they were denied. The choice is saved to their
-// account, so it follows them between browsers and applies to every ticket table they see.
+// Lets someone hide ticket-table columns for themselves, if their role grants that. Only the
+// columns their role allows are listed, so it can never reveal one they were denied. The
+// choice is saved to their account, so it follows them between browsers and applies to every
+// ticket table they see.
 export default function TicketColumnPicker() {
   const { t } = useI18n()
   const { user, updateMe } = useAuth()
@@ -20,6 +22,8 @@ export default function TicketColumnPicker() {
   const ref = useRef(null)
 
   useDismissOnOutsideClick(ref, useCallback(() => setOpen(false), []), open)
+
+  if (!canCustomizeTicketColumns(user)) return null
 
   const allowed = new Set(allowedTicketColumns(user))
   const options = TICKET_COLUMNS.filter((c) => allowed.has(c.key))

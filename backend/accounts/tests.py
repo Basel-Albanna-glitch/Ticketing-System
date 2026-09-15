@@ -263,8 +263,19 @@ class TicketColumnVisibilityTests(TestCase):
         self.assertNotIn('assigned_at', allowed)
         self.assertIn('subject', allowed)
 
+    def test_hiding_columns_needs_the_customize_permission(self):
+        agent = self.make(User.Role.AGENT)
+        self.client.force_authenticate(user=agent)
+        response = self.client.patch(
+            '/api/auth/me/', {'hidden_ticket_columns': ['status']}, format='json'
+        )
+        self.assertEqual(response.status_code, 400)
+        agent.refresh_from_db()
+        self.assertEqual(agent.hidden_ticket_columns, [])
+
     def test_me_saves_hidden_columns_and_refuses_unknown_ones(self):
-        self.client.force_authenticate(user=self.make(User.Role.AGENT))
+        role = StaffRole.objects.create(name='Tidy', allow_agent_customize_columns=True)
+        self.client.force_authenticate(user=self.make(User.Role.AGENT, staff_role=role))
         response = self.client.patch(
             '/api/auth/me/', {'hidden_ticket_columns': ['status', 'status']}, format='json'
         )

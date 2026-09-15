@@ -114,6 +114,12 @@ class MeSerializer(serializers.ModelSerializer):
         return obj.allowed_ticket_columns()
 
     def validate_hidden_ticket_columns(self, value):
+        # Choosing columns is itself a permission. Without it everyone sees every column
+        # their role allows, so there is no choice of theirs to save.
+        if self.instance and not self.instance.has_staff_permission('allow_agent_customize_columns'):
+            raise serializers.ValidationError(
+                'You do not have permission to customize table columns.'
+            )
         allowed = set(self.instance.allowed_ticket_columns()) if self.instance else set()
         if allowed and allowed <= set(value):
             raise serializers.ValidationError('Leave at least one column visible.')

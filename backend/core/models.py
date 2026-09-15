@@ -22,6 +22,7 @@ PERMISSION_FLAGS = (
     'allow_agent_view_tickets',
     'allow_agent_view_customers',
     'allow_agent_view_projects',
+    'allow_agent_customize_columns',
 )
 
 # Section-visibility flags. These differ from the rest in defaulting to True:
@@ -109,6 +110,10 @@ class AgentPermissionFlags(models.Model):
     allow_agent_view_tickets = models.BooleanField(default=True)
     allow_agent_view_customers = models.BooleanField(default=True)
     allow_agent_view_projects = models.BooleanField(default=True)
+    # When on, agents may hide and show ticket-table columns for themselves, among the
+    # columns withheld_ticket_columns leaves them. When off they see every column they
+    # are allowed. It grants a choice rather than withholding access, so it starts off.
+    allow_agent_customize_columns = models.BooleanField(default=False)
     # Ticket-table columns withheld from whoever this applies to (keys from
     # TICKET_COLUMNS). A deny-list rather than an allow-list for the same reason the
     # section flags default on: an empty list keeps every column, so upgrading hides

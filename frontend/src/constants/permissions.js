@@ -23,6 +23,7 @@ export const PERMISSION_GROUPS = [
       { key: 'allow_agent_reassign', i18n: 'reassign' },
       { key: 'allow_agent_edit_after_close', i18n: 'editAfterClose' },
       { key: 'allow_agent_delete', i18n: 'deleteTicket' },
+      { key: 'allow_agent_customize_columns', i18n: 'customizeColumns' },
     ],
   },
   {
