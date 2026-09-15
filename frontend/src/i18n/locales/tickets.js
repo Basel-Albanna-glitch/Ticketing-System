@@ -13,8 +13,8 @@ export default {
     // Table columns
     'tickets.parentCategory': 'Parent category',
     'tickets.subCategory': 'Sub-category',
-    'tickets.customerPriority': 'Customer priority',
-    'tickets.categoryPriority': 'Category priority',
+    'tickets.customerPriority': 'Requested priority',
+    'tickets.categoryPriority': 'Pre-defined priority',
 
     // Filters
     'tickets.allStatuses': 'All statuses',
@@ -55,9 +55,9 @@ export default {
     'tickets.resolvedIn': 'Resolved in',
     'tickets.noticeStatusUpdated': 'Status updated',
     'tickets.updatePriority': 'Update priority',
-    'tickets.useCategoryPriority': 'Use category priority',
+    'tickets.useCategoryPriority': 'Use pre-defined priority',
     'tickets.categoryPriorityHint':
-      "Applies to this ticket only — the category's own priority is unchanged.",
+      "Applies to this ticket only — the category's own pre-defined priority is unchanged.",
     'tickets.noticePriorityUpdated': 'Priority updated',
     'tickets.noticeDueDateSet': 'Due date updated',
     'tickets.noticeDueDateCleared': 'Due date cleared',
@@ -113,7 +113,7 @@ export default {
     'tickets.selectCustomer': 'Select a customer',
     'tickets.branch': 'Branch',
     'tickets.selectBranch': 'Select a branch',
-    'tickets.categoryPriorityByAdmin': 'Category priority (set by admin):',
+    'tickets.categoryPriorityByAdmin': 'Pre-defined priority (set by admin):',
     'tickets.attachment': 'Attachment',
     'tickets.assignToAgents': 'Assign to agents',
     'tickets.selectAgent': 'Select an agent…',
@@ -152,7 +152,7 @@ export default {
     'tickets.parentCategory': 'الفئة الرئيسية',
     'tickets.subCategory': 'الفئة الفرعية',
     'tickets.customerPriority': 'الأولوية المطلوبة',
-    'tickets.categoryPriority': 'أولوية الفئة',
+    'tickets.categoryPriority': 'الأولوية المحددة مسبقًا',
 
     // Filters
     'tickets.allStatuses': 'كل الحالات',
@@ -193,8 +193,9 @@ export default {
     'tickets.resolvedIn': 'تم الحل خلال',
     'tickets.noticeStatusUpdated': 'تم تحديث الحالة',
     'tickets.updatePriority': 'تحديث الأولوية',
-    'tickets.useCategoryPriority': 'استخدام أولوية الفئة',
-    'tickets.categoryPriorityHint': 'تنطبق على هذه التذكرة فقط — أولوية الفئة نفسها لا تتغير.',
+    'tickets.useCategoryPriority': 'استخدام الأولوية المحددة مسبقًا',
+    'tickets.categoryPriorityHint':
+      'تنطبق على هذه التذكرة فقط — الأولوية المحددة مسبقًا للفئة نفسها لا تتغير.',
     'tickets.noticePriorityUpdated': 'تم تحديث الأولوية',
     'tickets.noticeDueDateSet': 'تم تحديث تاريخ الاستحقاق',
     'tickets.noticeDueDateCleared': 'تم مسح تاريخ الاستحقاق',
@@ -249,7 +250,7 @@ export default {
     'tickets.selectCustomer': 'اختر عميلًا',
     'tickets.branch': 'الفرع',
     'tickets.selectBranch': 'اختر فرعًا',
-    'tickets.categoryPriorityByAdmin': 'أولوية الفئة (يحددها المدير):',
+    'tickets.categoryPriorityByAdmin': 'الأولوية المحددة مسبقًا (يحددها المدير):',
     'tickets.attachment': 'مرفق',
     'tickets.assignToAgents': 'تعيين إلى وكلاء',
     'tickets.selectAgent': 'اختر وكيلًا…',

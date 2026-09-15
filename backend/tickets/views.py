@@ -303,14 +303,14 @@ class TicketViewSet(viewsets.ModelViewSet):
         if new_priority and new_priority != old_priority:
             log_activity(
                 ticket, request.user, TicketActivity.ActivityType.PRIORITY_CHANGED,
-                f'Priority changed from {old_priority} to {new_priority}',
+                f'Requested priority changed from {old_priority} to {new_priority}',
                 metadata={'old': old_priority, 'new': new_priority},
             )
         new_category_priority = response.data.get('category_priority')
         if new_category_priority != old_category_priority:
             log_activity(
                 ticket, request.user, TicketActivity.ActivityType.PRIORITY_CHANGED,
-                f'Category priority for this ticket changed from '
+                f'Pre-defined priority for this ticket changed from '
                 f'{old_category_priority or "—"} to {new_category_priority or "—"}',
                 metadata={
                     'field': 'category_priority',
