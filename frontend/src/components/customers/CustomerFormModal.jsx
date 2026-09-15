@@ -9,6 +9,7 @@ import MultiSelect from '../ui/MultiSelect'
 import Select from '../ui/Select'
 import Table from '../ui/Table'
 import Textarea from '../ui/Textarea'
+import Toggle from '../ui/Toggle'
 import { PlusIcon } from '../ui/icons'
 import { useI18n } from '../../i18n/useI18n'
 import { useAuth } from '../../auth/useAuth'
@@ -26,6 +27,7 @@ const EMPTY_FORM = {
   tax_number: '',
   software_types: [],
   customer_priority: '',
+  can_set_ticket_priority: true,
 }
 
 const EMPTY_LICENSE = { name: '', start_date: '', end_date: '' }
@@ -48,6 +50,7 @@ function formToState(customer) {
       tax_number: customer.tax_number || '',
       software_types: customer.software_types || [],
       customer_priority: customer.customer_priority || '',
+      can_set_ticket_priority: customer.can_set_ticket_priority ?? true,
     },
     licenses: (customer.licenses || []).map((l) => ({
       name: l.name || '',
@@ -137,6 +140,7 @@ export default function CustomerFormModal({ open, onClose, onCreated, customer =
       tax_number: form.tax_number,
       software_types: form.software_types,
       customer_priority: form.customer_priority,
+      can_set_ticket_priority: form.can_set_ticket_priority,
       password: form.password,
       licenses: cleanedLicenses,
       branches: cleanedBranches,
@@ -281,6 +285,21 @@ export default function CustomerFormModal({ open, onClose, onCreated, customer =
             <option value="high">{t('priority.high')}</option>
             <option value="urgent">{t('priority.urgent')}</option>
           </Select>
+          <label className="flex items-center justify-between gap-4 rounded-xl border border-gray-200/70 px-3 py-2 sm:col-span-2 dark:border-white/10">
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {t('customers.canSetPriority')}
+              </span>
+              <span className="block text-xs text-gray-400 dark:text-gray-400">
+                {t('customers.canSetPriorityHint')}
+              </span>
+            </span>
+            <Toggle
+              checked={form.can_set_ticket_priority}
+              onChange={(next) => setForm({ ...form, can_set_ticket_priority: next })}
+              aria-label={t('customers.canSetPriority')}
+            />
+          </label>
         </div>
 
         <Textarea

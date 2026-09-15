@@ -444,3 +444,36 @@ class CustomerPriorityTests(TestCase):
         self.client.force_authenticate(user=User.objects.get(pk=customer_id))
         data = self.client.get('/api/auth/me/profile/').json()
         self.assertNotIn('customer_priority', data)
+
+
+class CustomerPrioritySwitchTests(TestCase):
+    """Staff decide, per customer, whether that customer may choose a ticket's priority."""
+
+    def setUp(self):
+        self.client = APIClient()
+        admin = User.objects.create_user(
+            username='swadmin', full_name='Admin', password='testpass123', role=User.Role.ADMIN
+        )
+        self.client.force_authenticate(user=admin)
+
+    def create(self, username, **extra):
+        payload = {
+            'username': username, 'full_name': 'Switch', 'password': 'abcd12345',
+            'licenses': '[]', 'branches': '[]', **extra,
+        }
+        return self.client.post('/api/users/customers/', payload, format='multipart')
+
+    def test_it_is_on_unless_turned_off(self):
+        self.assertTrue(self.create('allowed').json()['can_set_ticket_priority'])
+        response = self.create('restricted', can_set_ticket_priority='false')
+        self.assertEqual(response.status_code, 201)
+        self.assertFalse(response.json()['can_set_ticket_priority'])
+
+    def test_a_customer_reads_it_but_cannot_switch_it_on_themselves(self):
+        customer_id = self.create('restricted', can_set_ticket_priority='false').json()['id']
+        customer = User.objects.get(pk=customer_id)
+        self.client.force_authenticate(user=customer)
+        self.assertFalse(self.client.get('/api/auth/me/').json()['can_set_ticket_priority'])
+        self.client.patch('/api/auth/me/', {'can_set_ticket_priority': True}, format='json')
+        customer.refresh_from_db()
+        self.assertFalse(customer.can_set_ticket_priority)

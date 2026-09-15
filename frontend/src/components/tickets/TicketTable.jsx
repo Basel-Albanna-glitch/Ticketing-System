@@ -81,6 +81,7 @@ export default function TicketTable({ tickets, sortBy, sortDir, onSort }) {
       ),
     },
     customer: {
+      sortKey: 'customer_name',
       render: (ticket) => (
         <td className="px-4 py-2 text-gray-600 dark:text-gray-300">
           {ticket.customer ? (
@@ -97,6 +98,7 @@ export default function TicketTable({ tickets, sortBy, sortDir, onSort }) {
       ),
     },
     parent_category: {
+      sortKey: 'parent_category_name',
       render: (ticket) => (
         <td className="px-4 py-2 text-gray-600 dark:text-gray-300">
           {parentChild(ticket.category).parent}
@@ -104,14 +106,16 @@ export default function TicketTable({ tickets, sortBy, sortDir, onSort }) {
       ),
     },
     sub_category: {
+      sortKey: 'sub_category_name',
       render: (ticket) => (
         <td className="px-4 py-2 text-gray-600 dark:text-gray-300">
           {parentChild(ticket.category).child}
         </td>
       ),
     },
+    // The three priority columns sort by importance (low → urgent), not alphabetically.
     requested_priority: {
-      sortKey: 'priority',
+      sortKey: 'priority_rank',
       render: (ticket) => (
         <td className="px-4 py-2">
           <PriorityBadge priority={ticket.priority} />
@@ -119,7 +123,7 @@ export default function TicketTable({ tickets, sortBy, sortDir, onSort }) {
       ),
     },
     customer_priority: {
-      sortKey: 'customer__customer_priority',
+      sortKey: 'customer_priority_rank',
       render: (ticket) => (
         <td className="px-4 py-2">
           {/* The customer's own ranking, set on their profile — blank for guests and for
@@ -129,6 +133,7 @@ export default function TicketTable({ tickets, sortBy, sortDir, onSort }) {
       ),
     },
     predefined_priority: {
+      sortKey: 'predefined_priority_rank',
       render: (ticket) => (
         <td className="px-4 py-2">
           {/* The resolved value: this ticket's override when it has one, else the
@@ -160,6 +165,7 @@ export default function TicketTable({ tickets, sortBy, sortDir, onSort }) {
       ),
     },
     assigned_agent: {
+      sortKey: 'assigned_agent_name',
       render: (ticket) => (
         <td className="px-4 py-2 text-gray-600 dark:text-gray-300">
           {ticket.assigned_agent?.full_name || '—'}

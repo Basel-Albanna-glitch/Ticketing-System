@@ -97,6 +97,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     customer_priority = models.CharField(
         max_length=10, choices=CustomerPriority.choices, null=True, blank=True
     )
+    # Whether this customer may choose a priority when raising a ticket. When off, the field
+    # isn't offered and their tickets take the default. On by default: that is how every
+    # customer worked before the switch existed.
+    can_set_ticket_priority = models.BooleanField(default=True)
 
     # Ticket-table columns this person chose to hide for themselves. It only narrows
     # what allowed_ticket_columns() permits; it can never bring a withheld one back.

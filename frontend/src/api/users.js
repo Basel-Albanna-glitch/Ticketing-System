@@ -65,6 +65,7 @@ function buildCustomerForm({
   tax_number = '',
   software_types = [],
   customer_priority = '',
+  can_set_ticket_priority = true,
   licenses = [],
   branches = [],
   attachments = [],
@@ -77,6 +78,7 @@ function buildCustomerForm({
   form.append('tax_number', tax_number)
   form.append('software_types', JSON.stringify(software_types))
   form.append('customer_priority', customer_priority)
+  form.append('can_set_ticket_priority', String(can_set_ticket_priority))
   if (password) form.append('password', password)
   form.append('licenses', JSON.stringify(licenses))
   form.append('branches', JSON.stringify(branches))

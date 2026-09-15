@@ -119,6 +119,12 @@ export default function CustomerProfileDetails({ customer, customerId }) {
               }
             />
           )}
+          {user?.role !== 'customer' && (
+            <Detail
+              label={t('customers.canSetPriority')}
+              value={customer?.can_set_ticket_priority === false ? t('common.no') : t('common.yes')}
+            />
+          )}
           <Detail label={t('field.email')} value={customer?.email} />
           <Detail label={t('field.address')} value={customer?.address} full />
         </dl>

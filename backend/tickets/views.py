@@ -12,7 +12,8 @@ from django.http import HttpResponse
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Case, CharField, Count, F, IntegerField, Q, Value, When
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django_filters.rest_framework import DjangoFilterBackend
@@ -70,6 +71,11 @@ from notifications.whatsapp import notify_staff_new_ticket, send_whatsapp_templa
 # Upper bound on rows returned by the calendar endpoint — a month of tickets is far below
 # this; the cap only guards against a caller asking for a multi-year window.
 CALENDAR_MAX_TICKETS = 1000
+
+# Opens the activity entry written when a work phase is logged. Phases are staff-only, and
+# older entries carry nothing else to recognise them by, so the activity feed filters a
+# customer's view on this.
+PHASE_ACTIVITY_PREFIX = 'Phase logged: '
 
 
 def get_scoped_tickets(user):
@@ -206,13 +212,45 @@ class ArticleViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class StableOrderingFilter(filters.OrderingFilter):
+    """OrderingFilter with ties broken by id.
+
+    Sorting by a column many tickets share — a priority, a status, an agent — leaves their
+    order to the database, which may shuffle them between one page's query and the next;
+    paging through the sort would then repeat some tickets and skip others.
+    """
+
+    def get_ordering(self, request, queryset, view):
+        ordering = super().get_ordering(request, queryset, view)
+        if ordering and not any(field.lstrip('-') == 'id' for field in ordering):
+            ordering = [*ordering, '-id']
+        return ordering
+
+
+def _priority_rank(field):
+    """A priority as a number, low to urgent, so sorting follows importance rather than
+    the alphabet (which would put High before Low and Urgent last). Unset ranks lowest."""
+    return Case(
+        When(**{field: Ticket.Priority.LOW}, then=Value(1)),
+        When(**{field: Ticket.Priority.MEDIUM}, then=Value(2)),
+        When(**{field: Ticket.Priority.HIGH}, then=Value(3)),
+        When(**{field: Ticket.Priority.URGENT}, then=Value(4)),
+        default=Value(0),
+        output_field=IntegerField(),
+    )
+
+
 class TicketViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, StableOrderingFilter]
     filterset_class = TicketFilterSet
+    # Every ticket-table column can be sorted. The *_rank and *_name fields are annotated in
+    # get_queryset; `priority` and `customer__customer_priority` stay for older clients.
     ordering_fields = [
         'id', 'subject', 'priority', 'status', 'created_at', 'start_date', 'due_at',
         'assigned_at', 'closed_at', 'customer__customer_priority',
+        'priority_rank', 'customer_priority_rank', 'predefined_priority_rank',
+        'customer_name', 'parent_category_name', 'sub_category_name', 'assigned_agent_name',
     ]
     ordering = ['-created_at']
 
@@ -225,7 +263,27 @@ class TicketViewSet(viewsets.ModelViewSet):
         return ['subject', 'customer__full_name', 'customer__email']
 
     def get_queryset(self):
-        return get_scoped_tickets(self.request.user)
+        # The sortable values the table shows but the ticket doesn't store as such. The
+        # pre-defined priority in force — this ticket's override, else its category's — is
+        # worked out first, in its own step, so it can then be ranked like the others.
+        return get_scoped_tickets(self.request.user).annotate(
+            predefined_priority=Coalesce('category_priority_override', 'category__priority'),
+        ).annotate(
+            priority_rank=_priority_rank('priority'),
+            customer_priority_rank=_priority_rank('customer__customer_priority'),
+            predefined_priority_rank=_priority_rank('predefined_priority'),
+            # A guest ticket has no customer, so it sorts by the name the guest gave.
+            customer_name=Coalesce('customer__full_name', 'guest_name'),
+            # The table splits a category into parent and child: a top-level category is
+            # its own parent and has no child.
+            parent_category_name=Coalesce('category__parent__name', 'category__name'),
+            sub_category_name=Case(
+                When(category__parent__isnull=False, then=F('category__name')),
+                default=Value(''),
+                output_field=CharField(),
+            ),
+            assigned_agent_name=F('assigned_agent__full_name'),
+        )
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -336,6 +394,17 @@ class TicketViewSet(viewsets.ModelViewSet):
             customer = request.user
             # A customer's ticket always starts on its creation date — they don't pick it.
             serializer.validated_data['start_date'] = timezone.now().date()
+            # Nor its priority, unless staff allowed that on their record: it takes the default.
+            if not customer.can_set_ticket_priority:
+                serializer.validated_data.pop('priority', None)
+            # The serializer can only match a branch to a customer sent in the request, and a
+            # customer never sends one, so check here that the branch is their own.
+            branch = serializer.validated_data.get('branch')
+            if branch is not None and branch.customer_id != customer.id:
+                return Response(
+                    {'branch_id': 'Branch does not belong to this customer.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         else:
             customer = serializer.validated_data.get('customer')
             if customer is None:
@@ -398,6 +467,16 @@ class TicketViewSet(viewsets.ModelViewSet):
                         f'Ticket {ticket.reference} was assigned to you by {request.user.full_name}',
                         ticket=ticket,
                         kind=Notification.Kind.ASSIGNED,
+                    )
+                # Everyone picked after the first joins as a collaborator, and is told so.
+                added_collaborators = [a for a in extra_collaborators if a != request.user]
+                if added_collaborators:
+                    notify(
+                        added_collaborators,
+                        f'You were added as a collaborator on ticket {ticket.reference} '
+                        f'by {request.user.full_name}',
+                        ticket=ticket,
+                        kind=Notification.Kind.COLLABORATOR_ADDED,
                     )
             # Notify all staff (admins + agents) about the new ticket, except its creator.
             staff = User.objects.filter(
@@ -731,6 +810,7 @@ class TicketViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['patch'], url_path='collaborators')
     def set_collaborators(self, request, pk=None):
         ticket = self.get_object()
+        previous = set(ticket.collaborators.values_list('pk', flat=True))
         serializer = TicketCollaboratorsSerializer(ticket, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         ticket = serializer.save()
@@ -739,6 +819,17 @@ class TicketViewSet(viewsets.ModelViewSet):
             ticket, request.user, TicketActivity.ActivityType.ASSIGNED,
             f'Collaborating agents set to: {names}',
         )
+        # Only people newly added hear about it — saving the same list again alerts nobody —
+        # and never whoever made the change.
+        added = ticket.collaborators.exclude(pk__in=previous).exclude(pk=request.user.pk)
+        if added.exists():
+            notify(
+                added,
+                f'You were added as a collaborator on ticket {ticket.reference} '
+                f'by {request.user.full_name}',
+                ticket=ticket,
+                kind=Notification.Kind.COLLABORATOR_ADDED,
+            )
         return Response(TicketDetailSerializer(ticket, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=['patch'], url_path='articles')
@@ -814,9 +905,14 @@ class TicketViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get', 'post'], url_path='phases')
     def phases(self, request, pk=None):
-        """Work phases logged against the ticket. Staff-only to write — a customer sees them
-        on the ticket but doesn't log them."""
+        """Work phases logged against the ticket: the staff side of the work, so staff-only to
+        read as well as to write — a customer never sees them."""
         ticket = self.get_object()
+        if request.user.role == User.Role.CUSTOMER:
+            return Response(
+                {'detail': 'Work phases are only visible to staff.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if request.method == 'GET':
             phases = ticket.phases.select_related('author')
             return Response(
@@ -846,7 +942,7 @@ class TicketViewSet(viewsets.ModelViewSet):
             phase = TicketPhase.objects.create(ticket=ticket, author=request.user, body=body)
             log_activity(
                 ticket, request.user, TicketActivity.ActivityType.STATUS_CHANGED,
-                f'Phase logged: {body}',
+                f'{PHASE_ACTIVITY_PREFIX}{body}',
             )
         return Response(
             TicketPhaseSerializer(phase, context=self.get_serializer_context()).data,
@@ -875,6 +971,10 @@ class TicketViewSet(viewsets.ModelViewSet):
     def activity(self, request, pk=None):
         ticket = self.get_object()
         activities = ticket.activities.select_related('actor')
+        # A logged phase repeats the phase's text, so it goes wherever the phases themselves
+        # don't: out of a customer's view.
+        if request.user.role == User.Role.CUSTOMER:
+            activities = activities.exclude(description__startswith=PHASE_ACTIVITY_PREFIX)
         return Response(TicketActivitySerializer(activities, many=True).data)
 
     @action(detail=False, methods=['get'], url_path='calendar', pagination_class=None)

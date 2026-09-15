@@ -183,8 +183,8 @@ export default function TicketDetailPage() {
   const [articleToAdd, setArticleToAdd] = useState('')
   const [deadline, setDeadlineInput] = useState('')
   const [editOpen, setEditOpen] = useState(false)
-  // The activity log is reference material, not something you read on arrival.
-  const [showActivity, setShowActivity] = useState(false)
+  // The activity log starts open; the Hide link folds it away for anyone who doesn't need it.
+  const [showActivity, setShowActivity] = useState(true)
   const [now, setNow] = useState(() => Date.now())
 
   // How long this ticket has been running — the same counter the guest tracker shows, so
@@ -285,7 +285,7 @@ export default function TicketDetailPage() {
   // Customers reply on their own tickets; admins, the assigned agent, and collaborators too.
   const canReply =
     (isAdmin || user?.role === 'customer' || isAssignedToMe || isCollaborator) && !closedLocked
-  // Phases record the staff-side work, so customers read them but never log them.
+  // Phases record the staff-side work, so customers neither see nor log them.
   const canLogPhases = (isAdmin || isAssignedToMe || isCollaborator) && !closedLocked
   // Agents can claim an unassigned ticket, but can't unassign themselves once they take it.
   // A closed & locked ticket blocks these too — only an admin can change a closed ticket.
@@ -657,18 +657,21 @@ export default function TicketDetailPage() {
             <CommentThread ticketId={ticket.id} comments={ticket.comments} canReply={canReply} />
           </Card>
 
-          <Card>
-            <SectionHeader
-              icon={BoardIcon}
-              title={
-                ticket.phases?.length
-                  ? `${t('tickets.phases')} (${ticket.phases.length})`
-                  : t('tickets.phases')
-              }
-              description={t('tickets.phasesDescription')}
-            />
-            <PhaseList ticketId={ticket.id} phases={ticket.phases} canAdd={canLogPhases} />
-          </Card>
+          {/* Work phases are the staff side of the work: agents and admins only. */}
+          {!isCustomer && (
+            <Card>
+              <SectionHeader
+                icon={BoardIcon}
+                title={
+                  ticket.phases?.length
+                    ? `${t('tickets.phases')} (${ticket.phases.length})`
+                    : t('tickets.phases')
+                }
+                description={t('tickets.phasesDescription')}
+              />
+              <PhaseList ticketId={ticket.id} phases={ticket.phases} canAdd={canLogPhases} />
+            </Card>
+          )}
 
           <Card>
             <SectionHeader

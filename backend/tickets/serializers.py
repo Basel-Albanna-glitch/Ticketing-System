@@ -161,10 +161,12 @@ class TicketListSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        # Staff's ranking of a customer stays with staff, on their tickets as on their account.
+        # Staff's ranking of a customer stays with staff, on their tickets as on their account,
+        # and so do work phases (carried by TicketDetailSerializer, which shares this).
         request = self.context.get('request')
         if request and getattr(request.user, 'role', None) == User.Role.CUSTOMER:
             data.pop('customer_priority', None)
+            data.pop('phases', None)
         return data
 
 

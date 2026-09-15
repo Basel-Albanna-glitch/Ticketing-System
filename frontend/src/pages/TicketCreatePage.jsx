@@ -17,7 +17,7 @@ import { useAuth } from '../auth/useAuth'
 import { usePermissions } from '../auth/usePermissions'
 import { useAgents } from '../hooks/useAgents'
 import { useCategories } from '../hooks/useCategories'
-import { useCustomers } from '../hooks/useCustomers'
+import { useCustomers, useMyProfile } from '../hooks/useCustomers'
 import { createTicket } from '../api/tickets'
 import { useI18n } from '../i18n/useI18n'
 
@@ -35,8 +35,14 @@ export default function TicketCreatePage() {
   const { user } = useAuth()
   const isStaff = user?.role === 'admin' || user?.role === 'agent'
   const isAdmin = user?.role === 'admin'
+  // Staff always choose the priority. A customer does only if their record allows it, and the
+  // server drops it otherwise; `!== false` keeps the field for a session loaded before the
+  // switch existed.
+  const canChoosePriority = isStaff || user?.can_set_ticket_priority !== false
   const { data: categories } = useCategories()
   const { data: customers } = useCustomers({ enabled: isStaff })
+  // A customer picks from their own branches, which come with their profile.
+  const { data: myProfile } = useMyProfile({ enabled: !isStaff })
   const { data: agents } = useAgents({ enabled: isAdmin, includeAdmins: true })
   const permissions = usePermissions()
   // Mirrors the backend rule in accounts/views.py: creating a customer is
@@ -58,7 +64,8 @@ export default function TicketCreatePage() {
 
   const selectedCategory = (categories || []).find((c) => String(c.id) === String(category))
   const selectedCustomer = (customers || []).find((c) => String(c.id) === String(customerId))
-  const branchOptions = (selectedCustomer?.branches || []).map((b) => ({
+  // Staff see the chosen customer's branches; a customer sees their own.
+  const branchOptions = ((isStaff ? selectedCustomer : myProfile)?.branches || []).map((b) => ({
     value: b.id,
     label: b.address ? `${b.name} — ${b.address}` : b.name,
   }))
@@ -87,6 +94,13 @@ export default function TicketCreatePage() {
     setError('')
     if (isStaff && !customerId) {
       setError(t('tickets.selectCustomer'))
+      return
+    }
+    // A customer with branches says which one the ticket is for. Required here rather than on
+    // the server, which still accepts no branch so the mobile app (whose customer form has no
+    // branch picker) keeps working; the server does refuse a branch that isn't theirs.
+    if (!isStaff && branchOptions.length > 0 && !branchId) {
+      setError(t('tickets.branchRequired'))
       return
     }
     // The subject must contain actual text (any language), not just numbers or symbols.
@@ -200,9 +214,10 @@ export default function TicketCreatePage() {
               )}
             </div>
           )}
-          {isStaff && branchOptions.length > 0 && (
+          {branchOptions.length > 0 && (
             <SearchableSelect
-              label={t('tickets.branch')}
+              // Optional for staff; a customer with branches must choose one.
+              label={isStaff ? t('tickets.branch') : `${t('tickets.branch')} *`}
               value={branchId}
               onChange={setBranchId}
               placeholder={t('tickets.selectBranch')}
@@ -215,7 +230,8 @@ export default function TicketCreatePage() {
             onChange={setCategory}
             required
           />
-          {selectedCategory && (
+          {/* The admin-set priority is for staff; a customer only states their own below. */}
+          {isStaff && selectedCategory && (
             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
               <span>{t('tickets.categoryPriorityByAdmin')}</span>
               <PriorityBadge priority={selectedCategory.priority} variant="outline" />
@@ -240,12 +256,14 @@ export default function TicketCreatePage() {
                 onChange={(e) => setStartDate(e.target.value)}
               />
             )}
-            <Select label={t('field.priority')} value={priority} onChange={(e) => setPriority(e.target.value)}>
-              <option value="low">{t('priority.low')}</option>
-              <option value="medium">{t('priority.medium')}</option>
-              <option value="high">{t('priority.high')}</option>
-              <option value="urgent">{t('priority.urgent')}</option>
-            </Select>
+            {canChoosePriority && (
+              <Select label={t('field.priority')} value={priority} onChange={(e) => setPriority(e.target.value)}>
+                <option value="low">{t('priority.low')}</option>
+                <option value="medium">{t('priority.medium')}</option>
+                <option value="high">{t('priority.high')}</option>
+                <option value="urgent">{t('priority.urgent')}</option>
+              </Select>
+            )}
           </div>
           <FileInput label={t('tickets.attachment')} files={attachments} onChange={setAttachments} />
           {isAdmin && (

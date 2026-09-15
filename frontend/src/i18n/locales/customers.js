@@ -30,6 +30,9 @@ export default {
     'customers.softwareType': 'Software types',
     'customers.taxNumber': 'Tax number',
     'customers.priority': 'Customer priority',
+    'customers.canSetPriority': 'Can choose ticket priority',
+    'customers.canSetPriorityHint':
+      "When off, this customer isn't asked for a priority when creating a ticket; it gets the default (Medium).",
     'customers.licenses': 'Licenses',
     'customers.licenseName': 'License name',
     'customers.projects': 'Projects',
@@ -102,6 +105,9 @@ export default {
     'customers.softwareType': 'أنواع البرامج',
     'customers.taxNumber': 'الرقم الضريبي',
     'customers.priority': 'أولوية العميل',
+    'customers.canSetPriority': 'يمكنه اختيار أولوية التذكرة',
+    'customers.canSetPriorityHint':
+      'عند الإيقاف، لا يُطلب من هذا العميل تحديد أولوية عند إنشاء تذكرة، وتأخذ القيمة الافتراضية (متوسطة).',
     'customers.licenses': 'التراخيص',
     'customers.licenseName': 'اسم الترخيص',
     'customers.projects': 'المشاريع',

@@ -7,10 +7,14 @@ import { useAuth } from '../../auth/useAuth'
 import { useMarkNotificationRead, useNotifications } from '../../hooks/useNotifications'
 import { useI18n } from '../../i18n/useI18n'
 
-// Interrupts an agent or admin when a ticket has been handed to them, instead of leaving it as
-// one more line in the bell. It reads the same polled notifications the bell does, so it needs
-// no channel of its own: each unread "assigned" notification is shown in turn until it is
-// confirmed or opened, and both mark it read, so it never comes back.
+// The notifications that interrupt instead of waiting in the bell: a ticket handed to someone,
+// and someone added to a ticket as a collaborator.
+const ALERT_KINDS = new Set(['assigned', 'collaborator_added'])
+
+// Interrupts an agent or admin when a ticket has been handed to them, or they've been added to
+// one as a collaborator, instead of leaving it as one more line in the bell. It reads the same
+// polled notifications the bell does, so it needs no channel of its own: each unread one is
+// shown in turn until it is confirmed or opened, and both mark it read, so it never comes back.
 export default function AssignmentAlert() {
   const { t } = useI18n()
   const { user } = useAuth()
@@ -23,7 +27,7 @@ export default function AssignmentAlert() {
 
   const isStaff = user?.role === 'agent' || user?.role === 'admin'
   const pending = isStaff
-    ? (data?.results || []).filter((n) => n.kind === 'assigned' && !n.is_read && !handled.has(n.id))
+    ? (data?.results || []).filter((n) => ALERT_KINDS.has(n.kind) && !n.is_read && !handled.has(n.id))
     : []
   // The list arrives newest first; take the oldest so a backlog reads in the order it happened.
   const current = pending[pending.length - 1]
@@ -42,7 +46,11 @@ export default function AssignmentAlert() {
       // The ✕ counts as confirming: an alert that could be closed without being answered
       // would simply pop up again on the next poll.
       onClose={() => answer(false)}
-      title={t('notifications.assignedTitle')}
+      title={t(
+        current.kind === 'collaborator_added'
+          ? 'notifications.collaboratorTitle'
+          : 'notifications.assignedTitle'
+      )}
       dismissOnBackdrop={false}
     >
       <div className="flex flex-col gap-5">

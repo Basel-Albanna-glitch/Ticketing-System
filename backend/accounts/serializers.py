@@ -100,11 +100,14 @@ class MeSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'full_name', 'email', 'role', 'is_available', 'avatar',
             'date_joined', 'staff_role', 'staff_role_name', 'is_full_admin', 'permissions',
-            'allowed_ticket_columns', 'hidden_ticket_columns',
+            'allowed_ticket_columns', 'hidden_ticket_columns', 'can_set_ticket_priority',
         ]
+        # can_set_ticket_priority is read here so the new-ticket form knows whether to ask,
+        # and read-only so a customer can't switch it on for themselves.
         read_only_fields = [
             'id', 'username', 'role', 'avatar', 'date_joined', 'staff_role',
             'staff_role_name', 'is_full_admin', 'permissions', 'allowed_ticket_columns',
+            'can_set_ticket_priority',
         ]
 
     def get_permissions(self, obj):
@@ -314,9 +317,9 @@ class CustomerSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'full_name', 'email', 'address', 'phone',
-            'tax_number', 'software_types', 'software_type', 'customer_priority', 'is_active',
-            'ticket_count', 'open_count', 'licenses', 'branches', 'attachments', 'avatar',
-            'date_joined',
+            'tax_number', 'software_types', 'software_type', 'customer_priority',
+            'can_set_ticket_priority', 'is_active', 'ticket_count', 'open_count', 'licenses',
+            'branches', 'attachments', 'avatar', 'date_joined',
         ]
 
     def get_software_type(self, obj):
@@ -347,13 +350,15 @@ class CustomerCreateUpdateSerializer(serializers.ModelSerializer):
     customer_priority = serializers.ChoiceField(
         choices=User.CustomerPriority.choices, required=False, allow_null=True, allow_blank=True
     )
+    # Posted multipart like is_active, so a missing value must not read as "off".
+    can_set_ticket_priority = OptionalBooleanField(required=False)
 
     class Meta:
         model = User
         fields = [
             'id', 'username', 'full_name', 'email', 'address', 'phone',
             'tax_number', 'software_types', 'software_type', 'customer_priority',
-            'is_active', 'password',
+            'can_set_ticket_priority', 'is_active', 'password',
         ]
 
     def validate_customer_priority(self, value):
