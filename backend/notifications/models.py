@@ -10,6 +10,9 @@ class Notification(models.Model):
         GENERAL = 'general', 'General'
         NEW_TICKET = 'new_ticket', 'New ticket'
         LICENSE_EXPIRY = 'license_expiry', 'License expiry'
+        # A ticket handed to its recipient by someone else. The web app interrupts them
+        # with it (confirm / view ticket) rather than leaving it as a line in the bell.
+        ASSIGNED = 'assigned', 'Ticket assigned'
 
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL, related_name='notifications', on_delete=models.CASCADE
@@ -43,6 +46,7 @@ class Notification(models.Model):
 PUSH_TITLES = {
     Notification.Kind.NEW_TICKET: 'New ticket',
     Notification.Kind.LICENSE_EXPIRY: 'Licence expiry',
+    Notification.Kind.ASSIGNED: 'Ticket assigned to you',
     Notification.Kind.GENERAL: 'Ticket update',
 }
 

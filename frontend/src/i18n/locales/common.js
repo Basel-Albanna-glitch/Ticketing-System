@@ -133,6 +133,10 @@ export default {
     'notifications.title': 'Notifications',
     'notifications.markAllRead': 'Mark all read',
     'notifications.empty': 'No notifications',
+    'notifications.assignedTitle': 'Ticket assigned to you',
+    'notifications.assignedMore': '{n} more assigned ticket(s) waiting',
+    'notifications.confirm': 'Confirm',
+    'notifications.viewTicket': 'View ticket',
   },
   ar: {
     // Language switcher
@@ -266,5 +270,9 @@ export default {
     'notifications.title': 'الإشعارات',
     'notifications.markAllRead': 'تعليم الكل كمقروء',
     'notifications.empty': 'لا توجد إشعارات',
+    'notifications.assignedTitle': 'تم إسناد تذكرة إليك',
+    'notifications.assignedMore': 'تذاكر أخرى مُسندة بانتظارك: {n}',
+    'notifications.confirm': 'تأكيد',
+    'notifications.viewTicket': 'عرض التذكرة',
   },
 }

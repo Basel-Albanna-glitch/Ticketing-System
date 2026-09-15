@@ -389,6 +389,16 @@ class TicketViewSet(viewsets.ModelViewSet):
                     ticket, request.user, TicketActivity.ActivityType.ASSIGNED,
                     f'Ticket assigned to {names}',
                 )
+                # The new-ticket alert below goes to all staff and says nothing about whose
+                # ticket it is, so the assignee is told directly — the same notification the
+                # assign action sends — unless they picked themselves.
+                if assigned_agent != request.user:
+                    notify(
+                        [assigned_agent],
+                        f'Ticket {ticket.reference} was assigned to you by {request.user.full_name}',
+                        ticket=ticket,
+                        kind=Notification.Kind.ASSIGNED,
+                    )
             # Notify all staff (admins + agents) about the new ticket, except its creator.
             staff = User.objects.filter(
                 role__in=[User.Role.ADMIN, User.Role.AGENT]
@@ -706,6 +716,7 @@ class TicketViewSet(viewsets.ModelViewSet):
                 [ticket.assigned_agent],
                 f'Ticket {ticket.reference} was assigned to you by {request.user.full_name}',
                 ticket=ticket,
+                kind=Notification.Kind.ASSIGNED,
             )
             email_users(
                 [ticket.assigned_agent],

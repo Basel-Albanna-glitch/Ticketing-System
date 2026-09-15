@@ -88,13 +88,14 @@ class NotificationWatcher {
 
   /// A short heading above the server's message.
   ///
-  /// Notification.Kind only defines general / new_ticket / license_expiry, so
-  /// there is no distinct kind for a status change or an assignment — those all
-  /// arrive as `general` and their message already says which. The heading
-  /// therefore stays generic rather than claiming something it cannot know.
+  /// Notification.Kind defines general / new_ticket / license_expiry / assigned.
+  /// A status change has no kind of its own — it arrives as `general` and its
+  /// message already says what happened — so anything unrecognised keeps a
+  /// generic heading rather than claiming something it cannot know.
   static String _titleFor(AppNotification n) => switch (n.kind) {
         'new_ticket' => 'New ticket',
         'license_expiry' => 'License expiring',
+        'assigned' => 'Ticket assigned to you',
         _ => 'Ticket update',
       };
 }

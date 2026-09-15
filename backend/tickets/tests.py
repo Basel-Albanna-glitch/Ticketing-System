@@ -1,9 +1,13 @@
 import shutil
 import tempfile
+from unittest import mock
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
+
+from accounts.models import User
+from notifications.models import Notification
 
 from .models import Attachment, Category, Comment, Ticket, TicketActivity
 
@@ -88,3 +92,77 @@ class GuestReplyAttachmentTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertFalse(Comment.objects.exists())
         self.assertFalse(Attachment.objects.exists())
+
+
+class AssignmentNotificationTests(TestCase):
+    """Whoever a ticket is handed to, agent or admin, gets an "assigned" notification,
+    which the web app raises as a confirm / view-ticket alert. Taking a ticket
+    yourself raises none."""
+
+    def setUp(self):
+        self.client = APIClient()
+        # WhatsApp and email go out off-thread or to real services; neither is under test.
+        for target in ('tickets.views.run_in_background', 'tickets.views.email_users'):
+            patcher = mock.patch(target)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.admin = self.make('boss', User.Role.ADMIN)
+        self.agent = self.make('agent', User.Role.AGENT)
+        self.customer = self.make('client', User.Role.CUSTOMER)
+        self.category = Category.objects.create(name='Hardware')
+
+    def make(self, username, role):
+        return User.objects.create_user(
+            username=username, full_name=username.title(), password='testpass123', role=role
+        )
+
+    def ticket(self):
+        return Ticket.objects.create(
+            category=self.category, customer=self.customer,
+            subject='Till frozen', description='The till froze mid-sale.',
+        )
+
+    def create_assigned_to(self, user):
+        return self.client.post(
+            '/api/tickets/',
+            {
+                'subject': 'Card reader offline',
+                'description': 'No card payments since this morning.',
+                'category': self.category.pk,
+                'priority': 'high',
+                'customer_id': self.customer.pk,
+                'assigned_agent_ids': [user.pk],
+            },
+            format='json',
+        )
+
+    def alerts_for(self, user):
+        return Notification.objects.filter(recipient=user, kind=Notification.Kind.ASSIGNED)
+
+    def test_assigning_a_ticket_alerts_the_assignee(self):
+        ticket = self.ticket()
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(
+            f'/api/tickets/{ticket.pk}/assign/', {'assigned_agent': self.agent.pk}, format='json'
+        )
+        self.assertEqual(response.status_code, 200)
+        alert = self.alerts_for(self.agent).get()
+        self.assertEqual(alert.ticket_id, ticket.pk)
+        self.assertFalse(alert.is_read)
+
+    def test_an_admin_assigned_when_the_ticket_is_created_is_alerted(self):
+        colleague = self.make('colleague', User.Role.ADMIN)
+        self.client.force_authenticate(user=self.admin)
+        self.assertEqual(self.create_assigned_to(colleague).status_code, 201)
+        self.assertEqual(self.alerts_for(colleague).count(), 1)
+
+    def test_taking_a_ticket_yourself_raises_no_alert(self):
+        self.client.force_authenticate(user=self.admin)
+        self.assertEqual(self.create_assigned_to(self.admin).status_code, 201)
+        response = self.client.patch(
+            f'/api/tickets/{self.ticket().pk}/assign/', {'assigned_agent': self.admin.pk},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(self.alerts_for(self.admin).exists())
+
