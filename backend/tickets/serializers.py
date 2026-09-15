@@ -141,18 +141,31 @@ class TicketListSerializer(serializers.ModelSerializer):
     category_priority = serializers.CharField(
         source='effective_category_priority', read_only=True, allow_null=True
     )
+    # The priority staff give the ticket's customer (User.customer_priority), not the
+    # ticket's own. Null for guest tickets and for customers nobody has ranked.
+    customer_priority = serializers.SerializerMethodField()
 
     class Meta:
         model = Ticket
         fields = [
             'id', 'reference', 'subject', 'customer', 'branch',
             'guest_name', 'guest_company', 'guest_branch', 'guest_phone', 'guest_email',
-            'category', 'priority', 'category_priority', 'category_priority_override',
-            'status',
+            'category', 'priority', 'customer_priority', 'category_priority',
+            'category_priority_override', 'status',
             'assigned_agent', 'assigned_at', 'start_date', 'due_at', 'created_at',
             'closed_at',
         ]
 
+    def get_customer_priority(self, obj):
+        return obj.customer.customer_priority if obj.customer_id else None
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Staff's ranking of a customer stays with staff, on their tickets as on their account.
+        request = self.context.get('request')
+        if request and getattr(request.user, 'role', None) == User.Role.CUSTOMER:
+            data.pop('customer_priority', None)
+        return data
 
 
 class TicketCalendarSerializer(serializers.ModelSerializer):

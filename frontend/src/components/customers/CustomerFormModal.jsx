@@ -6,6 +6,7 @@ import FileInput from '../ui/FileInput'
 import Input from '../ui/Input'
 import Modal from '../ui/Modal'
 import MultiSelect from '../ui/MultiSelect'
+import Select from '../ui/Select'
 import Table from '../ui/Table'
 import Textarea from '../ui/Textarea'
 import { PlusIcon } from '../ui/icons'
@@ -24,6 +25,7 @@ const EMPTY_FORM = {
   phone: '',
   tax_number: '',
   software_types: [],
+  customer_priority: '',
 }
 
 const EMPTY_LICENSE = { name: '', start_date: '', end_date: '' }
@@ -45,6 +47,7 @@ function formToState(customer) {
       phone: customer.phone || '',
       tax_number: customer.tax_number || '',
       software_types: customer.software_types || [],
+      customer_priority: customer.customer_priority || '',
     },
     licenses: (customer.licenses || []).map((l) => ({
       name: l.name || '',
@@ -133,6 +136,7 @@ export default function CustomerFormModal({ open, onClose, onCreated, customer =
       phone: form.phone,
       tax_number: form.tax_number,
       software_types: form.software_types,
+      customer_priority: form.customer_priority,
       password: form.password,
       licenses: cleanedLicenses,
       branches: cleanedBranches,
@@ -266,6 +270,17 @@ export default function CustomerFormModal({ open, onClose, onCreated, customer =
             onChange={(next) => setForm({ ...form, software_types: next })}
             options={softwareTypeOptions}
           />
+          <Select
+            label={`${t('customers.priority')} (${t('common.optional')})`}
+            value={form.customer_priority}
+            onChange={(e) => setForm({ ...form, customer_priority: e.target.value })}
+          >
+            <option value="">{t('tickets.none')}</option>
+            <option value="low">{t('priority.low')}</option>
+            <option value="medium">{t('priority.medium')}</option>
+            <option value="high">{t('priority.high')}</option>
+            <option value="urgent">{t('priority.urgent')}</option>
+          </Select>
         </div>
 
         <Textarea

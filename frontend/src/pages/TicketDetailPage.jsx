@@ -757,6 +757,12 @@ export default function TicketDetailPage() {
                 </DetailRow>
               )}
 
+              {!isCustomer && ticket.customer_priority && (
+                <DetailRow icon={StarIcon} label={t('customers.priority')}>
+                  <PriorityBadge priority={ticket.customer_priority} />
+                </DetailRow>
+              )}
+
               {ticket.branch && (
                 <DetailRow icon={BadgeIcon} label={t('tickets.branch')}>
                   {ticket.branch.name}

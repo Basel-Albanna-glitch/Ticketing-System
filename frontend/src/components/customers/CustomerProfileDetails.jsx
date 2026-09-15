@@ -7,7 +7,9 @@ import Spinner from '../ui/Spinner'
 import Table from '../ui/Table'
 import ImageLightbox from '../ui/ImageLightbox'
 import { BadgeIcon, BoardIcon, ChevronRightIcon, PaperClipIcon, TicketIcon, UserIcon } from '../ui/icons'
+import PriorityBadge from '../tickets/PriorityBadge'
 import TicketTable from '../tickets/TicketTable'
+import { useAuth } from '../../auth/useAuth'
 import { useTickets } from '../../hooks/useTickets'
 import { isImageAttachment } from '../../utils/attachments'
 import { usePagedRows } from '../../utils/tablePage'
@@ -86,6 +88,7 @@ function BranchTicketsPanel({ customerId, branchId }) {
 // customer profile page and a customer's own "My account" page.
 export default function CustomerProfileDetails({ customer, customerId }) {
   const { t } = useI18n()
+  const { user } = useAuth()
   const [expandedBranch, setExpandedBranch] = useState(null)
   const [page, setPage] = useState(1)
   const [previewIndex, setPreviewIndex] = useState(null)
@@ -104,6 +107,18 @@ export default function CustomerProfileDetails({ customer, customerId }) {
           <Detail label={t('customers.softwareType')} value={customer?.software_types?.join(', ')} />
           <Detail label={t('field.phone')} value={customer?.phone} />
           <Detail label={t('customers.taxNumber')} value={customer?.tax_number} />
+          {/* Shared with a customer's own account page, where this staff ranking doesn't
+              belong (the server leaves it out for them too). */}
+          {user?.role !== 'customer' && (
+            <Detail
+              label={t('customers.priority')}
+              value={
+                customer?.customer_priority && (
+                  <PriorityBadge priority={customer.customer_priority} />
+                )
+              }
+            />
+          )}
           <Detail label={t('field.email')} value={customer?.email} />
           <Detail label={t('field.address')} value={customer?.address} full />
         </dl>

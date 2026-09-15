@@ -12,14 +12,16 @@ export const TICKET_COLUMNS = [
   { key: 'parent_category', labelKey: 'tickets.parentCategory' },
   { key: 'sub_category', labelKey: 'tickets.subCategory' },
   { key: 'requested_priority', labelKey: 'tickets.customerPriority' },
+  { key: 'customer_priority', labelKey: 'customers.priority' },
   { key: 'predefined_priority', labelKey: 'tickets.categoryPriority' },
   { key: 'status', labelKey: 'field.status' },
   { key: 'assigned_agent', labelKey: 'field.assignedAgent' },
 ]
 
 // The rule the table always had, used only if the server hasn't sent the resolved list
-// (a session loaded before this shipped): customers don't see who a ticket is assigned to.
-const CUSTOMER_WITHHELD = new Set(['assigned_at', 'assigned_agent'])
+// (a session loaded before this shipped): customers don't see who a ticket is assigned to, or
+// the priority staff give the customer.
+const CUSTOMER_WITHHELD = new Set(['assigned_at', 'assigned_agent', 'customer_priority'])
 
 // Whether this person may hide and show columns for themselves — a staff permission, already
 // resolved by the server from their role or the site-wide defaults. Customers never hold it.

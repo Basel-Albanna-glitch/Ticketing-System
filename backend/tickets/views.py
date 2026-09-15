@@ -212,7 +212,7 @@ class TicketViewSet(viewsets.ModelViewSet):
     filterset_class = TicketFilterSet
     ordering_fields = [
         'id', 'subject', 'priority', 'status', 'created_at', 'start_date', 'due_at',
-        'assigned_at', 'closed_at',
+        'assigned_at', 'closed_at', 'customer__customer_priority',
     ]
     ordering = ['-created_at']
 
@@ -936,13 +936,21 @@ class TicketViewSet(viewsets.ModelViewSet):
         wb = Workbook()
         ws = wb.active
         ws.title = 'Tickets'
+        # Staff's ranking of each customer goes in beside the ticket's own priority; a
+        # customer exporting their own tickets doesn't get it.
+        with_customer_priority = request.user.role != User.Role.CUSTOMER
         headers = [
-            'Reference', 'ID', 'Subject', 'Customer', 'Category', 'Priority', 'Status',
-            'Assigned agent', 'Created', 'Start date', 'Due', 'Resolved', 'Closed', 'Rating',
+            'Reference', 'ID', 'Subject', 'Customer', 'Category', 'Requested priority',
+            *(['Customer priority'] if with_customer_priority else []),
+            'Status', 'Assigned agent', 'Created', 'Start date', 'Due', 'Resolved', 'Closed',
+            'Rating',
         ]
         ws.append(headers)
         for tk in queryset:
             customer = tk.customer.full_name if tk.customer_id else (tk.guest_name or 'Guest')
+            customer_priority = (
+                priority_labels.get(tk.customer.customer_priority, '') if tk.customer_id else ''
+            )
             ws.append([
                 tk.reference,
                 tk.id,
@@ -950,6 +958,7 @@ class TicketViewSet(viewsets.ModelViewSet):
                 customer,
                 tk.category.name if tk.category_id else '',
                 priority_labels.get(tk.priority, tk.priority),
+                *([customer_priority] if with_customer_priority else []),
                 status_labels.get(tk.status, tk.status),
                 tk.assigned_agent.full_name if tk.assigned_agent_id else '',
                 naive(tk.created_at),

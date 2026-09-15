@@ -52,8 +52,8 @@ export async function fetchMyProfile() {
 }
 
 // Builds the multipart body shared by create + full-profile update. `email`, `address`,
-// `phone`, `tax_number` are always sent (empty string clears them); `password` only when
-// provided. `software_types` and `licenses` go JSON-encoded, since a multipart list has no
+// `phone`, `tax_number`, `customer_priority` are always sent (empty string clears them);
+// `password` only when provided. `software_types` and `licenses` go JSON-encoded, since a multipart list has no
 // way to say "empty", and each fully replaces what was there; `attachments` are appended to
 // any existing files.
 function buildCustomerForm({
@@ -64,6 +64,7 @@ function buildCustomerForm({
   phone = '',
   tax_number = '',
   software_types = [],
+  customer_priority = '',
   licenses = [],
   branches = [],
   attachments = [],
@@ -75,6 +76,7 @@ function buildCustomerForm({
   form.append('phone', phone)
   form.append('tax_number', tax_number)
   form.append('software_types', JSON.stringify(software_types))
+  form.append('customer_priority', customer_priority)
   if (password) form.append('password', password)
   form.append('licenses', JSON.stringify(licenses))
   form.append('branches', JSON.stringify(branches))

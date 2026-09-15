@@ -402,3 +402,45 @@ class CustomerSoftwareTypesTests(TestCase):
         response = self.patch(customer_id, {'software_type': 'Symphony'})
         self.assertEqual(response.json()['software_types'], ['Symphony'])
 
+
+class CustomerPriorityTests(TestCase):
+    """Staff can rank a customer, optionally. The customer never sees the ranking."""
+
+    def setUp(self):
+        self.client = APIClient()
+        admin = User.objects.create_user(
+            username='cpadmin', full_name='Admin', password='testpass123', role=User.Role.ADMIN
+        )
+        self.client.force_authenticate(user=admin)
+
+    def create(self, username, **extra):
+        payload = {
+            'username': username, 'full_name': 'Ranked', 'password': 'abcd12345',
+            'licenses': '[]', 'branches': '[]', **extra,
+        }
+        return self.client.post('/api/users/customers/', payload, format='multipart')
+
+    def test_it_is_optional_and_saves_when_given(self):
+        self.assertIsNone(self.create('unranked').json()['customer_priority'])
+        response = self.create('ranked', customer_priority='high')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()['customer_priority'], 'high')
+
+    def test_choosing_none_clears_it(self):
+        customer_id = self.create('ranked', customer_priority='urgent').json()['id']
+        response = self.client.patch(
+            f'/api/users/customers/{customer_id}/',
+            {'customer_priority': '', 'licenses': '[]', 'branches': '[]'},
+            format='multipart',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(User.objects.get(pk=customer_id).customer_priority)
+
+    def test_an_unknown_value_is_refused(self):
+        self.assertEqual(self.create('odd', customer_priority='vip').status_code, 400)
+
+    def test_a_customer_does_not_see_their_own_ranking(self):
+        customer_id = self.create('ranked', customer_priority='high').json()['id']
+        self.client.force_authenticate(user=User.objects.get(pk=customer_id))
+        data = self.client.get('/api/auth/me/profile/').json()
+        self.assertNotIn('customer_priority', data)

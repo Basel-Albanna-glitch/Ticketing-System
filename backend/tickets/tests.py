@@ -166,3 +166,42 @@ class AssignmentNotificationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(self.alerts_for(self.admin).exists())
 
+
+class CustomerPriorityOnTicketsTests(TestCase):
+    """The ticket list carries the priority staff give each ticket's customer, for staff
+    only."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            username='boss', full_name='Boss', password='testpass123', role=User.Role.ADMIN
+        )
+        self.customer = User.objects.create_user(
+            username='client', full_name='Client', password='testpass123',
+            role=User.Role.CUSTOMER, customer_priority=User.CustomerPriority.URGENT,
+        )
+        category = Category.objects.create(name='Hardware')
+        self.ticket = Ticket.objects.create(
+            category=category, customer=self.customer, subject='Till frozen',
+            description='The till froze mid-sale.', priority=Ticket.Priority.LOW,
+        )
+        self.guest_ticket = Ticket.objects.create(
+            category=category, subject='Printer down', description='No receipts.',
+            guest_name='Sam', guest_phone='0790001111',
+        )
+
+    def rows(self, user):
+        self.client.force_authenticate(user=user)
+        response = self.client.get('/api/tickets/')
+        self.assertEqual(response.status_code, 200)
+        return {row['id']: row for row in response.json()['results']}
+
+    def test_staff_see_the_customers_priority_beside_the_tickets_own(self):
+        rows = self.rows(self.admin)
+        self.assertEqual(rows[self.ticket.pk]['customer_priority'], 'urgent')
+        self.assertEqual(rows[self.ticket.pk]['priority'], 'low')
+        self.assertIsNone(rows[self.guest_ticket.pk]['customer_priority'])
+
+    def test_a_customer_does_not_see_it_on_their_tickets(self):
+        row = self.rows(self.customer)[self.ticket.pk]
+        self.assertNotIn('customer_priority', row)

@@ -118,6 +118,16 @@ export default function TicketTable({ tickets, sortBy, sortDir, onSort }) {
         </td>
       ),
     },
+    customer_priority: {
+      sortKey: 'customer__customer_priority',
+      render: (ticket) => (
+        <td className="px-4 py-2">
+          {/* The customer's own ranking, set on their profile — blank for guests and for
+              customers nobody has ranked. */}
+          {ticket.customer_priority ? <PriorityBadge priority={ticket.customer_priority} /> : '—'}
+        </td>
+      ),
+    },
     predefined_priority: {
       render: (ticket) => (
         <td className="px-4 py-2">

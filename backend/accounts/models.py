@@ -52,6 +52,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         AGENT = 'agent', 'Agent'
         ADMIN = 'admin', 'Admin'
 
+    # The same scale tickets use, so the two read side by side in the ticket table.
+    class CustomerPriority(models.TextChoices):
+        LOW = 'low', 'Low'
+        MEDIUM = 'medium', 'Medium'
+        HIGH = 'high', 'High'
+        URGENT = 'urgent', 'Urgent'
+
     username = models.CharField(max_length=150, unique=True)
     email = models.EmailField(blank=True)
     full_name = models.CharField(max_length=150)
@@ -84,6 +91,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     # renaming or removing a type never rewrites a customer's record — as a list, since a
     # customer can run more than one.
     software_types = models.JSONField(default=list, blank=True)
+    # How much weight staff give this customer, whatever a given ticket asks for — not the
+    # ticket's own priority. Optional: null means nobody has ranked them. Staff-only; a
+    # customer never sees it.
+    customer_priority = models.CharField(
+        max_length=10, choices=CustomerPriority.choices, null=True, blank=True
+    )
 
     # Ticket-table columns this person chose to hide for themselves. It only narrows
     # what allowed_ticket_columns() permits; it can never bring a withheld one back.

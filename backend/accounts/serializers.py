@@ -314,12 +314,22 @@ class CustomerSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'full_name', 'email', 'address', 'phone',
-            'tax_number', 'software_types', 'software_type', 'is_active', 'ticket_count',
-            'open_count', 'licenses', 'branches', 'attachments', 'avatar', 'date_joined',
+            'tax_number', 'software_types', 'software_type', 'customer_priority', 'is_active',
+            'ticket_count', 'open_count', 'licenses', 'branches', 'attachments', 'avatar',
+            'date_joined',
         ]
 
     def get_software_type(self, obj):
         return ', '.join(obj.software_types or [])
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # How staff rank a customer is theirs to know: a customer reading their own
+        # account (MyProfileView serves them this serializer) doesn't see it.
+        request = self.context.get('request')
+        if request and getattr(request.user, 'role', None) == User.Role.CUSTOMER:
+            data.pop('customer_priority', None)
+        return data
 
 
 class CustomerCreateUpdateSerializer(serializers.ModelSerializer):
@@ -332,13 +342,22 @@ class CustomerCreateUpdateSerializer(serializers.ModelSerializer):
     software_type = serializers.CharField(
         required=False, allow_blank=True, write_only=True, max_length=255
     )
+    # Optional. The multipart form sends '' for "none", which is stored as null rather
+    # than as an empty choice.
+    customer_priority = serializers.ChoiceField(
+        choices=User.CustomerPriority.choices, required=False, allow_null=True, allow_blank=True
+    )
 
     class Meta:
         model = User
         fields = [
             'id', 'username', 'full_name', 'email', 'address', 'phone',
-            'tax_number', 'software_types', 'software_type', 'is_active', 'password',
+            'tax_number', 'software_types', 'software_type', 'customer_priority',
+            'is_active', 'password',
         ]
+
+    def validate_customer_priority(self, value):
+        return value or None
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

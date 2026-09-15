@@ -52,14 +52,18 @@ TICKET_COLUMNS = (
     'parent_category',
     'sub_category',
     'requested_priority',
+    'customer_priority',
     'predefined_priority',
     'status',
     'assigned_agent',
 )
 
-# Customers hold no role. The one thing always kept from them is who a ticket is
-# assigned to, which the table withheld from them before columns were configurable.
-CUSTOMER_WITHHELD_TICKET_COLUMNS = frozenset({'assigned_at', 'assigned_agent'})
+# Customers hold no role. Always kept from them: who a ticket is assigned to, which the
+# table withheld from them before columns were configurable, and the priority staff
+# give the customer themselves.
+CUSTOMER_WITHHELD_TICKET_COLUMNS = frozenset(
+    {'assigned_at', 'assigned_agent', 'customer_priority'}
+)
 
 
 class AgentPermissionFlags(models.Model):
