@@ -160,7 +160,6 @@ export default function GuestTrackPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const [checkedAt, setCheckedAt] = useState(null)
   const [reply, setReply] = useState('')
   const [replyError, setReplyError] = useState('')
   const [replying, setReplying] = useState(false)
@@ -194,7 +193,6 @@ export default function GuestTrackPage() {
       try {
         const data = await trackGuestTicket({ phone: tel, reference: ref })
         setTicket(data)
-        setCheckedAt(Date.now())
         sessionStorage.setItem(SESSION_KEY, JSON.stringify({ reference: ref, phone: tel }))
         setParams((prev) => {
           const next = new URLSearchParams(prev)
@@ -230,7 +228,6 @@ export default function GuestTrackPage() {
   function changeTicket() {
     setTicket(null)
     setError('')
-    setCheckedAt(null)
     // Files picked for this ticket's reply must not ride along onto the next one looked up.
     setReplyFiles([])
     setFileInputKey((k) => k + 1)
@@ -401,7 +398,7 @@ export default function GuestTrackPage() {
                     className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 font-medium text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-white/10"
                   >
                     <RefreshIcon className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-                    {checkedAt ? `${t('guest.track.checked')} ${timeAgo(checkedAt, lang)}` : t('guest.track.refresh')}
+                    {t('guest.track.refresh')}
                   </button>
                 </div>
               </div>
