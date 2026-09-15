@@ -5,10 +5,11 @@ import Card from '../ui/Card'
 import Input from '../ui/Input'
 import Modal from '../ui/Modal'
 import Toggle from '../ui/Toggle'
-import { PlusIcon, TrashIcon } from '../ui/icons'
+import { PlusIcon, TicketIcon, TrashIcon } from '../ui/icons'
 import { DEFAULT_ON_FLAGS, PERMISSION_FIELDS, PERMISSION_GROUPS } from '../../constants/permissions'
 import { useCreateRole, useDeleteRole, useRoles, useUpdateRole } from '../../hooks/useRoles'
 import { useI18n } from '../../i18n/useI18n'
+import TicketColumnAccess from './TicketColumnAccess'
 
 // A new role starts with the section-visibility flags on and everything else
 // off, matching the model defaults — otherwise creating a role to grant one
@@ -22,7 +23,12 @@ function RoleFormModal({ open, onClose, role }) {
   const createRole = useCreateRole()
   const updateRole = useUpdateRole()
   const isEdit = Boolean(role)
-  const [form, setForm] = useState({ name: '', description: '', ...EMPTY })
+  const [form, setForm] = useState({
+    name: '',
+    description: '',
+    withheld_ticket_columns: [],
+    ...EMPTY,
+  })
   const [error, setError] = useState('')
 
   // Re-seed whenever the modal opens or the target role changes, so a previous
@@ -33,6 +39,9 @@ function RoleFormModal({ open, onClose, role }) {
     setForm({
       name: role?.name || '',
       description: role?.description || '',
+      // Like the section flags, a new role withholds no columns — nothing goes missing
+      // from whoever it is given to until an admin decides it should.
+      withheld_ticket_columns: role?.withheld_ticket_columns || [],
       // Editing mirrors the stored role exactly; creating starts from EMPTY, so
       // the default-on section flags survive rather than being reset to false.
       ...(role
@@ -109,6 +118,18 @@ function RoleFormModal({ open, onClose, role }) {
               ))}
             </div>
           ))}
+
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-200">
+              <TicketIcon className="h-4 w-4 text-indigo-500" />
+              {t('settings.ticketColumns.title')}
+            </div>
+            <TicketColumnAccess
+              withheld={form.withheld_ticket_columns}
+              onChange={(next) => setForm((prev) => ({ ...prev, withheld_ticket_columns: next }))}
+              hint={t('settings.ticketColumns.roleHint')}
+            />
+          </div>
         </div>
 
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
@@ -190,6 +211,7 @@ export default function RolesSection() {
       <div className="flex flex-col gap-3">
         {(roles || []).map((role) => {
           const granted = PERMISSION_FIELDS.filter((f) => role[f.key])
+          const withheldColumns = role.withheld_ticket_columns?.length || 0
           return (
             <div
               key={role.id}
@@ -233,6 +255,13 @@ export default function RolesSection() {
                       {t(`settings.permissions.${f.i18n}.label`)}
                     </span>
                   ))
+                )}
+                {/* Withholding is a restriction, not a grant, so it reads in grey
+                    beside the indigo permissions rather than as one of them. */}
+                {withheldColumns > 0 && (
+                  <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 dark:bg-white/10 dark:text-gray-300">
+                    {t('settings.roles.hiddenColumnsCount').replace('{n}', withheldColumns)}
+                  </span>
                 )}
               </div>
             </div>

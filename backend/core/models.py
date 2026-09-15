@@ -36,6 +36,30 @@ DEFAULT_ON_FLAGS = frozenset({
     'allow_agent_view_projects',
 })
 
+# Columns of the ticket table, in display order. A role (or, for agents without
+# one, TicketSettings) can withhold any of them; each person may then hide more
+# for themselves but never show one they were denied — see
+# User.allowed_ticket_columns. Mirrored by frontend/src/constants/ticketColumns.js.
+TICKET_COLUMNS = (
+    'created_at',
+    'start_date',
+    'assigned_at',
+    'closed_at',
+    'id',
+    'subject',
+    'customer',
+    'parent_category',
+    'sub_category',
+    'requested_priority',
+    'predefined_priority',
+    'status',
+    'assigned_agent',
+)
+
+# Customers hold no role. The one thing always kept from them is who a ticket is
+# assigned to, which the table withheld from them before columns were configurable.
+CUSTOMER_WITHHELD_TICKET_COLUMNS = frozenset({'assigned_at', 'assigned_agent'})
+
 
 class AgentPermissionFlags(models.Model):
     """The grantable permissions, shared by TicketSettings and StaffRole.
@@ -85,6 +109,12 @@ class AgentPermissionFlags(models.Model):
     allow_agent_view_tickets = models.BooleanField(default=True)
     allow_agent_view_customers = models.BooleanField(default=True)
     allow_agent_view_projects = models.BooleanField(default=True)
+    # Ticket-table columns withheld from whoever this applies to (keys from
+    # TICKET_COLUMNS). A deny-list rather than an allow-list for the same reason the
+    # section flags default on: an empty list keeps every column, so upgrading hides
+    # nothing, and a column added later appears for existing roles instead of silently
+    # going missing from them.
+    withheld_ticket_columns = models.JSONField(default=list, blank=True)
 
     class Meta:
         abstract = True

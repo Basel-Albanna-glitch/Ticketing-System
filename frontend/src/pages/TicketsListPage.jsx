@@ -6,6 +6,7 @@ import EmptyState from '../components/ui/EmptyState'
 import Pagination from '../components/ui/Pagination'
 import Spinner from '../components/ui/Spinner'
 import { PlusIcon } from '../components/ui/icons'
+import TicketColumnPicker from '../components/tickets/TicketColumnPicker'
 import TicketFilters from '../components/tickets/TicketFilters'
 import TicketTable from '../components/tickets/TicketTable'
 import { useTickets } from '../hooks/useTickets'
@@ -54,6 +55,7 @@ export default function TicketsListPage() {
       <div className="mb-4 flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{t('nav.tickets')}</h1>
         <div className="flex shrink-0 items-center gap-2">
+          <TicketColumnPicker />
           <Button
             variant="secondary"
             onClick={handleExport}

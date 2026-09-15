@@ -71,7 +71,9 @@ import { sortRows, useTableSort } from '../utils/tableSort'
 import { usePagedRows } from '../utils/tablePage'
 import { useI18n } from '../i18n/useI18n'
 import { PERMISSION_FIELDS, PERMISSION_GROUPS } from '../constants/permissions'
+import { sameColumnSet } from '../constants/ticketColumns'
 import RolesSection from '../components/settings/RolesSection'
+import TicketColumnAccess from '../components/settings/TicketColumnAccess'
 
 function ProfileSection() {
   const { t } = useI18n()
@@ -616,13 +618,18 @@ function PermissionsSection() {
   // Seed (and re-sync) the draft whenever the saved settings load or change.
   useEffect(() => {
     if (data) {
-      setForm(Object.fromEntries(PERMISSION_FIELDS.map((f) => [f.key, data[f.key]])))
+      setForm({
+        ...Object.fromEntries(PERMISSION_FIELDS.map((f) => [f.key, data[f.key]])),
+        withheld_ticket_columns: data.withheld_ticket_columns || [],
+      })
     }
   }, [data])
 
   if (!data || !form) return null
 
-  const dirty = PERMISSION_FIELDS.some((f) => form[f.key] !== data[f.key])
+  const dirty =
+    PERMISSION_FIELDS.some((f) => form[f.key] !== data[f.key]) ||
+    !sameColumnSet(form.withheld_ticket_columns, data.withheld_ticket_columns || [])
 
   function toggle(key) {
     setMessage('')
@@ -673,6 +680,22 @@ function PermissionsSection() {
             </div>
           </div>
         ))}
+        <div>
+          <div className="mb-1 flex items-center gap-2">
+            <TicketIcon className="h-4 w-4 text-gray-400 dark:text-gray-400" />
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-400">
+              {t('settings.ticketColumns.title')}
+            </h3>
+          </div>
+          <TicketColumnAccess
+            withheld={form.withheld_ticket_columns}
+            onChange={(next) => {
+              setMessage('')
+              setForm((prev) => ({ ...prev, withheld_ticket_columns: next }))
+            }}
+            hint={t('settings.ticketColumns.defaultsHint')}
+          />
+        </div>
         {message && <p className="text-sm text-green-600 dark:text-green-400">{message}</p>}
         <Button
           type="submit"

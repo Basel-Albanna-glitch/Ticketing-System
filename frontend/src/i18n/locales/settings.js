@@ -83,6 +83,14 @@ export default {
     'settings.roles.confirmDelete': 'Delete the role "{name}"?',
     'settings.roles.confirmDeleteInUse':
       'Delete the role "{name}"? {n} user(s) hold it and will revert to the default permissions.',
+    'settings.roles.hiddenColumnsCount': '{n} ticket column(s) hidden',
+
+    // Ticket table columns (roles and the site-wide defaults)
+    'settings.ticketColumns.title': 'Ticket table columns',
+    'settings.ticketColumns.roleHint':
+      'Ticked columns are the ones people with this role can see. They can hide more for themselves, but never show an unticked one.',
+    'settings.ticketColumns.defaultsHint':
+      'Columns agents without a role can see. They can hide more for themselves, but never show an unticked one. Admins without a role always see every column.',
 
     // Permissions section
     'settings.permissions.title': 'Permissions',
@@ -262,6 +270,14 @@ export default {
     'settings.roles.confirmDelete': 'حذف الدور "{name}"؟',
     'settings.roles.confirmDeleteInUse':
       'حذف الدور "{name}"؟ يحمله {n} مستخدم/مستخدمين وسيعودون إلى الصلاحيات الافتراضية.',
+    'settings.roles.hiddenColumnsCount': 'أعمدة تذاكر مخفية: {n}',
+
+    // Ticket table columns (roles and the site-wide defaults)
+    'settings.ticketColumns.title': 'أعمدة جدول التذاكر',
+    'settings.ticketColumns.roleHint':
+      'الأعمدة المحددة هي التي يستطيع أصحاب هذا الدور رؤيتها. يمكنهم إخفاء المزيد لأنفسهم، لكن لا يمكنهم إظهار عمود غير محدد.',
+    'settings.ticketColumns.defaultsHint':
+      'الأعمدة التي يستطيع الوكلاء بلا دور رؤيتها. يمكنهم إخفاء المزيد لأنفسهم، لكن لا يمكنهم إظهار عمود غير محدد. المشرفون بلا دور يرون كل الأعمدة دائماً.',
 
     // Permissions section
     'settings.permissions.title': 'الصلاحيات',

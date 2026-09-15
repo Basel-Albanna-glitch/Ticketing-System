@@ -65,8 +65,23 @@ export function AuthProvider({ children }) {
     return me
   }, [])
 
+  // Saves part of the signed-in user's own record. Applied up front, so a quick run of
+  // changes (ticking several columns) each builds on the last rather than on whatever the
+  // server had echoed back so far; if the save fails, the real record is fetched again.
+  const updateMe = useCallback(async (payload) => {
+    setUser((prev) => (prev ? { ...prev, ...payload } : prev))
+    try {
+      return await authApi.updateMe(payload)
+    } catch (err) {
+      setUser(await authApi.fetchMe())
+      throw err
+    }
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{ user, isLoading, login, register, logout, refreshUser, updateMe }}
+    >
       {children}
     </AuthContext.Provider>
   )

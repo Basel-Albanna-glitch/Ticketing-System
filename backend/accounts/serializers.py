@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from core.models import PERMISSION_FLAGS
+from core.models import PERMISSION_FLAGS, TICKET_COLUMNS
 
 from .models import (
     CustomerAttachment,
@@ -56,6 +56,28 @@ class RegisterSerializer(serializers.ModelSerializer):
         return User.objects.create_user(role=User.Role.CUSTOMER, **validated_data)
 
 
+class TicketColumnListField(serializers.ListField):
+    """A list of ticket-table column keys (core.models.TICKET_COLUMNS).
+
+    Unknown keys are refused rather than stored and repeats collapse, so the client
+    can trust what it reads back. With `keep_one`, a list naming every column is
+    refused too — used where the list withholds columns, since withholding all of
+    them leaves a table with nothing in it.
+    """
+
+    def __init__(self, keep_one=False, **kwargs):
+        self.keep_one = keep_one
+        kwargs.setdefault('child', serializers.ChoiceField(choices=TICKET_COLUMNS))
+        kwargs.setdefault('required', False)
+        super().__init__(**kwargs)
+
+    def to_internal_value(self, data):
+        columns = list(dict.fromkeys(super().to_internal_value(data)))
+        if self.keep_one and set(columns) >= set(TICKET_COLUMNS):
+            raise serializers.ValidationError('Leave at least one column visible.')
+        return columns
+
+
 class MeSerializer(serializers.ModelSerializer):
     # What the signed-in user may actually do, already resolved from their role
     # (or the site-wide defaults). The client gates its UI on this rather than
@@ -65,20 +87,34 @@ class MeSerializer(serializers.ModelSerializer):
     permissions = serializers.SerializerMethodField()
     staff_role_name = serializers.CharField(source='staff_role.name', read_only=True, default=None)
     is_full_admin = serializers.BooleanField(read_only=True)
+    # Columns the role allows (resolved, read-only) next to the ones this person hid
+    # themselves (theirs to change). The table shows the first minus the second.
+    allowed_ticket_columns = serializers.SerializerMethodField()
+    hidden_ticket_columns = TicketColumnListField()
 
     class Meta:
         model = User
         fields = [
             'id', 'username', 'full_name', 'email', 'role', 'is_available', 'avatar',
             'date_joined', 'staff_role', 'staff_role_name', 'is_full_admin', 'permissions',
+            'allowed_ticket_columns', 'hidden_ticket_columns',
         ]
         read_only_fields = [
             'id', 'username', 'role', 'avatar', 'date_joined', 'staff_role',
-            'staff_role_name', 'is_full_admin', 'permissions',
+            'staff_role_name', 'is_full_admin', 'permissions', 'allowed_ticket_columns',
         ]
 
     def get_permissions(self, obj):
         return obj.permission_map()
+
+    def get_allowed_ticket_columns(self, obj):
+        return obj.allowed_ticket_columns()
+
+    def validate_hidden_ticket_columns(self, value):
+        allowed = set(self.instance.allowed_ticket_columns()) if self.instance else set()
+        if allowed and allowed <= set(value):
+            raise serializers.ValidationError('Leave at least one column visible.')
+        return value
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -103,10 +139,14 @@ class NotificationPreferenceSerializer(serializers.ModelSerializer):
 
 class StaffRoleSerializer(serializers.ModelSerializer):
     user_count = serializers.IntegerField(read_only=True)
+    withheld_ticket_columns = TicketColumnListField(keep_one=True)
 
     class Meta:
         model = StaffRole
-        fields = ['id', 'name', 'description', 'user_count', *PERMISSION_FLAGS]
+        fields = [
+            'id', 'name', 'description', 'user_count', *PERMISSION_FLAGS,
+            'withheld_ticket_columns',
+        ]
 
     def validate_name(self, value):
         value = value.strip()

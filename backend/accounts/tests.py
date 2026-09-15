@@ -215,6 +215,84 @@ class StaffRoleApiTests(TestCase):
         self.assertTrue(data['permissions']['allow_agent_manage_kb'])
 
 
+class TicketColumnVisibilityTests(TestCase):
+    """Which ticket-table columns someone may see resolves like a permission; what
+    they hide for themselves can only narrow it."""
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def make(self, role, staff_role=None):
+        return User.objects.create_user(
+            username=f'{role}{User.objects.count()}',
+            full_name='Test Person',
+            password='testpass123',
+            role=role,
+            staff_role=staff_role,
+        )
+
+    def test_nothing_is_withheld_from_staff_by_default(self):
+        """Upgrading must not take a column away from anyone."""
+        from core.models import TICKET_COLUMNS
+
+        self.assertEqual(self.make(User.Role.AGENT).allowed_ticket_columns(), list(TICKET_COLUMNS))
+        self.assertEqual(self.make(User.Role.ADMIN).allowed_ticket_columns(), list(TICKET_COLUMNS))
+
+    def test_role_withholds_its_columns(self):
+        role = StaffRole.objects.create(
+            name='Front desk', withheld_ticket_columns=['predefined_priority']
+        )
+        allowed = self.make(User.Role.AGENT, staff_role=role).allowed_ticket_columns()
+        self.assertNotIn('predefined_priority', allowed)
+        self.assertIn('requested_priority', allowed)
+
+    def test_agent_without_role_uses_site_settings_and_a_role_replaces_them(self):
+        settings = TicketSettings.get_solo()
+        settings.withheld_ticket_columns = ['customer']
+        settings.save()
+        self.assertNotIn('customer', self.make(User.Role.AGENT).allowed_ticket_columns())
+
+        role = StaffRole.objects.create(name='Sees customers')
+        self.assertIn('customer', self.make(User.Role.AGENT, staff_role=role).allowed_ticket_columns())
+
+    def test_customer_never_sees_assignment_columns(self):
+        allowed = self.make(User.Role.CUSTOMER).allowed_ticket_columns()
+        self.assertNotIn('assigned_agent', allowed)
+        self.assertNotIn('assigned_at', allowed)
+        self.assertIn('subject', allowed)
+
+    def test_me_saves_hidden_columns_and_refuses_unknown_ones(self):
+        self.client.force_authenticate(user=self.make(User.Role.AGENT))
+        response = self.client.patch(
+            '/api/auth/me/', {'hidden_ticket_columns': ['status', 'status']}, format='json'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['hidden_ticket_columns'], ['status'])
+        # Hiding a column is personal; it is still one they are allowed to show again.
+        self.assertIn('status', response.json()['allowed_ticket_columns'])
+
+        response = self.client.patch(
+            '/api/auth/me/', {'hidden_ticket_columns': ['not_a_column']}, format='json'
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_every_column_cannot_be_hidden_or_withheld(self):
+        from core.models import TICKET_COLUMNS
+
+        self.client.force_authenticate(user=self.make(User.Role.ADMIN))
+        response = self.client.patch(
+            '/api/auth/me/', {'hidden_ticket_columns': list(TICKET_COLUMNS)}, format='json'
+        )
+        self.assertEqual(response.status_code, 400)
+
+        response = self.client.post(
+            '/api/roles/',
+            {'name': 'Blind', 'withheld_ticket_columns': list(TICKET_COLUMNS)},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+
+
 class NewCustomerIsActiveTests(TestCase):
     """The customer form posts multipart (it can carry attachments) and never
     sends is_active. DRF reads a missing boolean in form data as False, which

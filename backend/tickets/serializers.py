@@ -1,7 +1,7 @@
 import re
 
 from accounts.models import CustomerBranch, User
-from accounts.serializers import CustomerBranchSerializer, UserSerializer
+from accounts.serializers import CustomerBranchSerializer, TicketColumnListField, UserSerializer
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -335,6 +335,9 @@ class TicketAssignSerializer(serializers.ModelSerializer):
 
 
 class TicketSettingsSerializer(serializers.ModelSerializer):
+    # Columns withheld from agents who hold no role.
+    withheld_ticket_columns = TicketColumnListField(keep_one=True)
+
     class Meta:
         model = TicketSettings
         fields = [
@@ -343,6 +346,7 @@ class TicketSettingsSerializer(serializers.ModelSerializer):
             'allow_agent_manage_kb', 'allow_agent_assign_projects',
             'allow_agent_unassign_projects', 'allow_agent_assign_tasks',
             'allow_agent_create_customers', 'allow_agent_view_reports',
+            'withheld_ticket_columns',
         ]
 
 

@@ -82,6 +82,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     tax_number = models.CharField(max_length=100, blank=True)
     software_type = models.CharField(max_length=100, blank=True)
 
+    # Ticket-table columns this person chose to hide for themselves. It only narrows
+    # what allowed_ticket_columns() permits; it can never bring a withheld one back.
+    hidden_ticket_columns = models.JSONField(default=list, blank=True)
+
     objects = UserManager()
 
     USERNAME_FIELD = 'username'
@@ -127,6 +131,31 @@ class User(AbstractBaseUser, PermissionsMixin):
         from core.models import PERMISSION_FLAGS
 
         return {flag: self.has_staff_permission(flag) for flag in PERMISSION_FLAGS}
+
+    def allowed_ticket_columns(self):
+        """Ticket-table columns this user may see, in display order.
+
+        Resolved like has_staff_permission: a role wins, a full admin sees every
+        column, and an agent without a role falls back to the site-wide
+        TicketSettings. Customers hold no role; they only lose the assignment
+        columns. What someone hides for themselves is applied on top of this, never
+        instead of it.
+        """
+        from core.models import CUSTOMER_WITHHELD_TICKET_COLUMNS, TICKET_COLUMNS
+
+        if self.role == self.Role.CUSTOMER:
+            withheld = CUSTOMER_WITHHELD_TICKET_COLUMNS
+        elif self.staff_role_id:
+            withheld = self.staff_role.withheld_ticket_columns
+        elif self.role == self.Role.ADMIN:
+            withheld = ()
+        else:
+            # Same reason as in has_staff_permission: a top-level import is circular.
+            from tickets.models import TicketSettings
+
+            withheld = TicketSettings.get_solo().withheld_ticket_columns
+        withheld = set(withheld or ())
+        return [column for column in TICKET_COLUMNS if column not in withheld]
 
 
 class SoftwareType(models.Model):

@@ -4,6 +4,10 @@ export default {
     // List page
     'tickets.create': 'Create Ticket',
     'tickets.exportExcel': 'Export to Excel',
+    'tickets.columns': 'Columns',
+    'tickets.columnsHidden': 'hidden',
+    'tickets.showAllColumns': 'Show all',
+    'tickets.columnsSaveError': 'Could not save.',
     'tickets.loadError': 'Failed to load tickets.',
     'tickets.notFound': 'Ticket not found',
     'tickets.notFoundHint': 'It may have been deleted.',
@@ -142,6 +146,10 @@ export default {
     // List page
     'tickets.create': 'إنشاء تذكرة',
     'tickets.exportExcel': 'تصدير إلى Excel',
+    'tickets.columns': 'الأعمدة',
+    'tickets.columnsHidden': 'مخفية',
+    'tickets.showAllColumns': 'إظهار الكل',
+    'tickets.columnsSaveError': 'تعذّر الحفظ.',
     'tickets.loadError': 'تعذّر تحميل التذاكر.',
     'tickets.notFound': 'التذكرة غير موجودة',
     'tickets.notFoundHint': 'ربما تم حذفها.',
