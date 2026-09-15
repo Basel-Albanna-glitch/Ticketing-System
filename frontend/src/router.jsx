@@ -16,6 +16,7 @@ import TicketDetailPage from './pages/TicketDetailPage'
 import CalendarPage from './pages/CalendarPage'
 import CustomersPage from './pages/CustomersPage'
 import CustomerProfilePage from './pages/CustomerProfilePage'
+import CustomerLicensesPage from './pages/CustomerLicensesPage'
 import MyAccountPage from './pages/MyAccountPage'
 import KbListPage from './pages/KbListPage'
 import KbArticlePage from './pages/KbArticlePage'
@@ -84,6 +85,8 @@ const router = createBrowserRouter([
             ),
             children: [
               { path: '/customers', element: <CustomersPage /> },
+              // A literal segment outranks :id, so this is never read as customer "licenses".
+              { path: '/customers/licenses', element: <CustomerLicensesPage /> },
               { path: '/customers/:id', element: <CustomerProfilePage /> },
             ],
           },

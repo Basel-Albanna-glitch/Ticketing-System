@@ -44,7 +44,27 @@ const NAV_ITEMS = [
       { to: '/todo/report', labelKey: 'todo.viewReport', icon: ReportsIcon },
     ],
   },
-  { to: '/customers', labelKey: 'nav.customers', icon: UsersIcon, roles: ['agent', 'admin'], permission: 'allow_agent_view_customers' },
+  {
+    to: '/customers',
+    labelKey: 'nav.customers',
+    icon: UsersIcon,
+    roles: ['agent', 'admin'],
+    permission: 'allow_agent_view_customers',
+    // The list is the section's landing page, so "All customers" also owns a customer's
+    // profile — everything under /customers except the licences table. Licences share the
+    // glyph the profile and Reports give them.
+    children: [
+      {
+        to: '/customers',
+        labelKey: 'customers.allCustomers',
+        icon: UsersIcon,
+        activeWhen: (pathname) =>
+          pathname === '/customers' ||
+          (pathname.startsWith('/customers/') && pathname !== '/customers/licenses'),
+      },
+      { to: '/customers/licenses', labelKey: 'customers.licenses', icon: BadgeIcon },
+    ],
+  },
   { to: '/agents', labelKey: 'nav.agents', icon: BadgeIcon, roles: ['admin'] },
   // Visible to whoever holds the view-reports permission rather than to admins
   // by role, so a role can grant it to an agent — or withhold it from a
@@ -80,6 +100,11 @@ function subLinkClass({ isActive }) {
 }
 
 function NavItem({ item, open, onNavigate, t, sectionActive }) {
+  const { pathname } = useLocation()
+  // When the section's landing page is also its first sub-link (Customers → All customers),
+  // `end` alone would still light both up on that page; the sub-link keeps the marker.
+  const landingIsChild = Boolean(item.children?.some((child) => child.to === item.to))
+
   return (
     <>
       <NavLink
@@ -89,11 +114,11 @@ function NavItem({ item, open, onNavigate, t, sectionActive }) {
         end={Boolean(item.children)}
         tabIndex={open ? undefined : -1}
         onClick={onNavigate}
-        className={navLinkClass}
+        className={({ isActive }) => navLinkClass({ isActive: isActive && !landingIsChild })}
       >
         {({ isActive }) => (
           <>
-            {isActive && (
+            {isActive && !landingIsChild && (
               <span className="absolute start-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-e-full bg-indigo-500" />
             )}
             <item.icon className="h-5 w-5 shrink-0" />
@@ -109,7 +134,9 @@ function NavItem({ item, open, onNavigate, t, sectionActive }) {
               to={child.to}
               tabIndex={open ? undefined : -1}
               onClick={onNavigate}
-              className={subLinkClass}
+              className={({ isActive }) =>
+                subLinkClass({ isActive: child.activeWhen ? child.activeWhen(pathname) : isActive })
+              }
             >
               {/* Smaller than the parent's, so the nesting still reads as nesting. */}
               <child.icon className="h-4 w-4 shrink-0" />

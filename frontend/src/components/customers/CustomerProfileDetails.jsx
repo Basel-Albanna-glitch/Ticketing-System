@@ -10,9 +10,9 @@ import { BadgeIcon, BoardIcon, ChevronRightIcon, PaperClipIcon, TicketIcon, User
 import TicketTable from '../tickets/TicketTable'
 import { useTickets } from '../../hooks/useTickets'
 import { isImageAttachment } from '../../utils/attachments'
-import { licenseStatus } from '../../utils/licenses'
 import { usePagedRows } from '../../utils/tablePage'
 import CustomerProjects from './CustomerProjects'
+import LicenseStatusBadge from './LicenseStatusBadge'
 import { useI18n } from '../../i18n/useI18n'
 
 function Detail({ label, value, full }) {
@@ -44,25 +44,6 @@ function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-// Where a licence stands against its end date. The colours match the reminder stages the
-// backend emails on, so a row goes amber in the same week the first warning is sent.
-function LicenseStatusBadge({ endDate }) {
-  const { t } = useI18n()
-  const status = licenseStatus(endDate)
-  if (!status) return <span className="text-gray-400 dark:text-gray-400">—</span>
-
-  const label =
-    status.state === 'expired'
-      ? t('customers.licenseExpired')
-      : status.state === 'today'
-        ? t('customers.licenseExpiresToday')
-        : status.state === 'active'
-          ? t('customers.licenseActive')
-          : `${status.days} ${t('customers.licenseDaysLeft')}`
-
-  return <Badge color={status.color}>{label}</Badge>
 }
 
 // Tickets attached to a single branch, loaded on demand when the branch row is expanded.

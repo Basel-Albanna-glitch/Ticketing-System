@@ -51,6 +51,13 @@ export default {
     'customers.noAttachments': 'No attachments',
     'customers.noTickets': 'No tickets',
 
+    // Licenses page (and the section's sub-nav)
+    'customers.allCustomers': 'All customers',
+    'customers.licensesSubtitle': "Every customer's licenses in one place, soonest to expire first.",
+    'customers.searchLicenses': 'Search customer or license…',
+    'customers.licenseExpiringSoon': 'Expiring within 30 days',
+    'customers.licenseNoEndDate': 'No end date',
+
     // Form modal
     'customers.newPassword': 'New password',
     'customers.addLicense': 'Add license',
@@ -114,6 +121,13 @@ export default {
     'customers.licenseDaysLeft': 'يوم متبقٍ',
     'customers.noAttachments': 'لا توجد مرفقات',
     'customers.noTickets': 'لا توجد تذاكر',
+
+    // Licenses page (and the section's sub-nav)
+    'customers.allCustomers': 'كل العملاء',
+    'customers.licensesSubtitle': 'تراخيص جميع العملاء في مكان واحد، الأقرب انتهاءً أولًا.',
+    'customers.searchLicenses': 'ابحث عن عميل أو ترخيص…',
+    'customers.licenseExpiringSoon': 'تنتهي خلال 30 يومًا',
+    'customers.licenseNoEndDate': 'بلا تاريخ انتهاء',
 
     // Form modal
     'customers.newPassword': 'كلمة مرور جديدة',
