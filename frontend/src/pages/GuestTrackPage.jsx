@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import GuestShell from '../components/layout/GuestShell'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
+import FileInput from '../components/ui/FileInput'
 import Input from '../components/ui/Input'
 import Textarea from '../components/ui/Textarea'
 import Spinner from '../components/ui/Spinner'
@@ -163,6 +164,10 @@ export default function GuestTrackPage() {
   const [reply, setReply] = useState('')
   const [replyError, setReplyError] = useState('')
   const [replying, setReplying] = useState(false)
+  const [replyFiles, setReplyFiles] = useState([])
+  // The file input is uncontrolled, so clearing replyFiles alone would leave the picked
+  // names showing in it; bumping this remounts it empty.
+  const [fileInputKey, setFileInputKey] = useState(0)
   const [ratingScore, setRatingScore] = useState(0)
   const [ratingHover, setRatingHover] = useState(0)
   const [ratingComment, setRatingComment] = useState('')
@@ -226,6 +231,9 @@ export default function GuestTrackPage() {
     setTicket(null)
     setError('')
     setCheckedAt(null)
+    // Files picked for this ticket's reply must not ride along onto the next one looked up.
+    setReplyFiles([])
+    setFileInputKey((k) => k + 1)
     sessionStorage.removeItem(SESSION_KEY)
   }
 
@@ -250,8 +258,10 @@ export default function GuestTrackPage() {
     setReplying(true)
     setReplyError('')
     try {
-      await replyGuestTicket({ phone, reference, body: reply })
+      await replyGuestTicket({ phone, reference, body: reply, attachments: replyFiles })
       setReply('')
+      setReplyFiles([])
+      setFileInputKey((k) => k + 1)
       await load({ ref: reference, tel: phone, silent: true })
     } catch {
       setReplyError(t('guest.track.replyError'))
@@ -559,6 +569,12 @@ export default function GuestTrackPage() {
                   rows={3}
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
+                />
+                <FileInput
+                  key={fileInputKey}
+                  label={t('guest.field.attachmentsOptional')}
+                  files={replyFiles}
+                  onChange={setReplyFiles}
                 />
                 {replyError && (
                   <p className="text-sm text-red-600 dark:text-red-400" role="alert">

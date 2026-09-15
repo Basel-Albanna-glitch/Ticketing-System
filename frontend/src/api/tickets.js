@@ -206,8 +206,16 @@ export async function trackGuestTicket({ phone, reference }) {
   return data
 }
 
-export async function replyGuestTicket({ phone, reference, body }) {
-  const { data } = await client.post('/tickets/guest/reply/', { phone, reference, body })
+// Multipart so the reply can carry files; the phone + reference pair still gates it.
+export async function replyGuestTicket({ phone, reference, body, attachments = [] }) {
+  const form = new FormData()
+  form.append('phone', phone)
+  form.append('reference', reference)
+  form.append('body', body)
+  attachments.forEach((file) => form.append('attachments', file))
+  const { data } = await client.post('/tickets/guest/reply/', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
   return data
 }
 

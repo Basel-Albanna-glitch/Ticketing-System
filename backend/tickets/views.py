@@ -1122,8 +1122,10 @@ class GuestTicketTrackView(APIView):
 
 
 class GuestTicketReplyView(APIView):
-    """Let a guest post a reply on their own ticket (verified by reference + phone)."""
+    """Let a guest post a reply on their own ticket (verified by reference + phone),
+    optionally with files attached to it — the same way a staff comment carries them."""
     permission_classes = [AllowAny]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request):
         ticket = _find_guest_ticket(request.data.get('reference'), request.data.get('phone'))
@@ -1139,7 +1141,14 @@ class GuestTicketReplyView(APIView):
             comment = Comment.objects.create(
                 ticket=ticket, author=None, guest_name=ticket.guest_name, body=body
             )
+            files = request.FILES.getlist('attachments')
+            create_attachments(ticket, files, None, comment=comment)
             log_activity(ticket, None, TicketActivity.ActivityType.COMMENTED, 'Guest added a comment')
+            if files:
+                log_activity(
+                    ticket, None, TicketActivity.ActivityType.ATTACHMENT_ADDED,
+                    f'Guest added {len(files)} attachment(s)',
+                )
             # Notify the assigned agent (or all staff if unassigned) about the guest reply.
             if ticket.assigned_agent:
                 staff = User.objects.filter(pk=ticket.assigned_agent_id)
