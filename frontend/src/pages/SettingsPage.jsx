@@ -75,6 +75,10 @@ import { sameColumnSet } from '../constants/ticketColumns'
 import RolesSection from '../components/settings/RolesSection'
 import TicketColumnAccess from '../components/settings/TicketColumnAccess'
 
+// The site-wide permissions card is hidden for now. Agents without a role keep whatever it
+// last saved, and roles are how permissions are set. Flip this to bring the card back.
+const SHOW_SITE_PERMISSIONS = false
+
 function ProfileSection() {
   const { t } = useI18n()
   const { user, refreshUser } = useAuth()
@@ -997,7 +1001,7 @@ export default function SettingsPage() {
     { id: 'profile', label: t('settings.nav.profile'), icon: UserIcon, Component: ProfileSection },
     { id: 'security', label: t('settings.nav.security'), icon: LockIcon, Component: PasswordSection },
     { id: 'notifications', label: t('settings.nav.notifications'), icon: BellIcon, Component: NotificationSection },
-    isAdmin && { id: 'permissions', label: t('settings.nav.permissions'), icon: BadgeIcon, Component: PermissionsSection },
+    SHOW_SITE_PERMISSIONS && isAdmin && { id: 'permissions', label: t('settings.nav.permissions'), icon: BadgeIcon, Component: PermissionsSection },
     isFullAdmin && { id: 'roles', label: t('settings.nav.roles'), icon: LockIcon, Component: RolesSection },
     isAdmin && { id: 'categories', label: t('settings.nav.categories'), icon: FolderOpenIcon, Component: CategoriesSection },
     canManageKb && { id: 'kb', label: t('settings.nav.kb'), icon: BookIcon, Component: ArticlesSection },

@@ -68,7 +68,7 @@ export default {
     // Roles section
     'settings.roles.title': 'Permission roles',
     'settings.roles.subtitle':
-      'Named sets of permissions you can assign to staff. A role replaces the defaults above for whoever holds it; anyone without one falls back to those defaults.',
+      'Named sets of permissions you can assign to staff. A role replaces the default permissions for whoever holds it; anyone without one keeps the defaults.',
     'settings.roles.addRole': 'Add role',
     'settings.roles.editRole': 'Edit role',
     'settings.roles.name': 'Role name',
@@ -78,7 +78,7 @@ export default {
     'settings.roles.grantedCount': '{n} permission(s) granted',
     'settings.roles.userCount': '{n} user(s)',
     'settings.roles.noPermissions': 'No permissions granted',
-    'settings.roles.empty': 'No roles yet. Staff use the default permissions above.',
+    'settings.roles.empty': 'No roles yet. Staff use the default permissions.',
     'settings.roles.errorSave': 'Could not save the role.',
     'settings.roles.confirmDelete': 'Delete the role "{name}"?',
     'settings.roles.confirmDeleteInUse':
@@ -259,7 +259,7 @@ export default {
     // Roles section
     'settings.roles.title': 'أدوار الصلاحيات',
     'settings.roles.subtitle':
-      'مجموعات صلاحيات مُسمّاة يمكنك إسنادها للموظفين. يحلّ الدور محلّ الإعدادات الافتراضية أعلاه لمن يحمله، ومن لا يحمل دوراً تُطبَّق عليه تلك الإعدادات.',
+      'مجموعات صلاحيات مُسمّاة يمكنك إسنادها للموظفين. يحلّ الدور محلّ الإعدادات الافتراضية لمن يحمله، ومن لا يحمل دوراً تُطبَّق عليه تلك الإعدادات.',
     'settings.roles.addRole': 'إضافة دور',
     'settings.roles.editRole': 'تعديل الدور',
     'settings.roles.name': 'اسم الدور',
@@ -269,7 +269,7 @@ export default {
     'settings.roles.grantedCount': 'الصلاحيات الممنوحة: {n}',
     'settings.roles.userCount': 'عدد المستخدمين: {n}',
     'settings.roles.noPermissions': 'لا توجد صلاحيات ممنوحة',
-    'settings.roles.empty': 'لا توجد أدوار بعد. يستخدم الموظفون الصلاحيات الافتراضية أعلاه.',
+    'settings.roles.empty': 'لا توجد أدوار بعد. يستخدم الموظفون الصلاحيات الافتراضية.',
     'settings.roles.errorSave': 'تعذّر حفظ الدور.',
     'settings.roles.confirmDelete': 'حذف الدور "{name}"؟',
     'settings.roles.confirmDeleteInUse':
