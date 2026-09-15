@@ -5,7 +5,7 @@ import Button from '../ui/Button'
 import FileInput from '../ui/FileInput'
 import Input from '../ui/Input'
 import Modal from '../ui/Modal'
-import Select from '../ui/Select'
+import MultiSelect from '../ui/MultiSelect'
 import Table from '../ui/Table'
 import Textarea from '../ui/Textarea'
 import { PlusIcon } from '../ui/icons'
@@ -23,7 +23,7 @@ const EMPTY_FORM = {
   address: '',
   phone: '',
   tax_number: '',
-  software_type: '',
+  software_types: [],
 }
 
 const EMPTY_LICENSE = { name: '', start_date: '', end_date: '' }
@@ -44,7 +44,7 @@ function formToState(customer) {
       address: customer.address || '',
       phone: customer.phone || '',
       tax_number: customer.tax_number || '',
-      software_type: customer.software_type || '',
+      software_types: customer.software_types || [],
     },
     licenses: (customer.licenses || []).map((l) => ({
       name: l.name || '',
@@ -132,7 +132,7 @@ export default function CustomerFormModal({ open, onClose, onCreated, customer =
       address: form.address,
       phone: form.phone,
       tax_number: form.tax_number,
-      software_type: form.software_type,
+      software_types: form.software_types,
       password: form.password,
       licenses: cleanedLicenses,
       branches: cleanedBranches,
@@ -177,6 +177,13 @@ export default function CustomerFormModal({ open, onClose, onCreated, customer =
   }
 
   const pending = createCustomer.isPending || updateCustomer.isPending
+  // Values are names, as stored. A name the customer already has that is no longer in the
+  // list (renamed or removed since) is still offered, so saving never silently drops it.
+  const softwareTypeNames = (softwareTypes || []).map((st) => st.name)
+  const softwareTypeOptions = [
+    ...softwareTypeNames,
+    ...form.software_types.filter((name) => !softwareTypeNames.includes(name)),
+  ].map((name) => ({ value: name, label: name }))
   // Upload immediately once the account exists; before that the file is held locally.
   const avatarTargetId = customer?.id || createdId
 
@@ -253,18 +260,12 @@ export default function CustomerFormModal({ open, onClose, onCreated, customer =
             value={form.tax_number}
             onChange={(e) => setForm({ ...form, tax_number: e.target.value })}
           />
-          <Select
+          <MultiSelect
             label={t('customers.softwareType')}
-            value={form.software_type}
-            onChange={(e) => setForm({ ...form, software_type: e.target.value })}
-          >
-            <option value="">{t('common.select')}</option>
-            {(softwareTypes || []).map((st) => (
-              <option key={st.id} value={st.name}>
-                {st.name}
-              </option>
-            ))}
-          </Select>
+            value={form.software_types}
+            onChange={(next) => setForm({ ...form, software_types: next })}
+            options={softwareTypeOptions}
+          />
         </div>
 
         <Textarea

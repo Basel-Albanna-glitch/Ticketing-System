@@ -101,7 +101,7 @@ export default function CustomerProfileDetails({ customer, customerId }) {
       <Card>
         <SectionTitle icon={UserIcon}>{t('customers.details')}</SectionTitle>
         <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-          <Detail label={t('customers.softwareType')} value={customer?.software_type} />
+          <Detail label={t('customers.softwareType')} value={customer?.software_types?.join(', ')} />
           <Detail label={t('field.phone')} value={customer?.phone} />
           <Detail label={t('customers.taxNumber')} value={customer?.tax_number} />
           <Detail label={t('field.email')} value={customer?.email} />

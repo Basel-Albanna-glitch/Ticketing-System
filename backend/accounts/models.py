@@ -80,7 +80,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     address = models.TextField(blank=True)
     phone = models.CharField(max_length=50, blank=True)
     tax_number = models.CharField(max_length=100, blank=True)
-    software_type = models.CharField(max_length=100, blank=True)
+    # Names of the SoftwareType entries this customer runs — names rather than ids, so
+    # renaming or removing a type never rewrites a customer's record — as a list, since a
+    # customer can run more than one.
+    software_types = models.JSONField(default=list, blank=True)
 
     # Ticket-table columns this person chose to hide for themselves. It only narrows
     # what allowed_ticket_columns() permits; it can never bring a withheld one back.

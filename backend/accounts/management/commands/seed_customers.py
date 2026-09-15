@@ -82,7 +82,7 @@ class Command(BaseCommand):
                 phone=CUSTOMER['phone'],
                 address=CUSTOMER['address'],
                 tax_number=CUSTOMER['tax_number'],
-                software_type=software,
+                software_types=[software] if software else [],
             )
             created = True
         else:

@@ -1,4 +1,7 @@
+import json
+
 from rest_framework import serializers
+from rest_framework.utils import html
 
 from core.models import PERMISSION_FLAGS, TICKET_COLUMNS
 
@@ -260,6 +263,35 @@ class CustomerAttachmentSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class SoftwareTypesField(serializers.ListField):
+    """The software type names a customer runs.
+
+    The customer form posts multipart (it can carry attachments), and a multipart list
+    has no way to say "empty" — an absent key reads as "not sent" — so the list arrives
+    JSON-encoded, the same way `licenses` does. A JSON body may send a plain list.
+    """
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault('child', serializers.CharField(max_length=100, allow_blank=True))
+        kwargs.setdefault('required', False)
+        super().__init__(**kwargs)
+
+    def get_value(self, dictionary):
+        if html.is_html_input(dictionary):
+            return dictionary.get(self.field_name, serializers.empty)
+        return super().get_value(dictionary)
+
+    def to_internal_value(self, data):
+        if isinstance(data, str):
+            try:
+                data = json.loads(data) if data.strip() else []
+            except ValueError:
+                raise serializers.ValidationError('Expected a JSON list of software type names.')
+        names = super().to_internal_value(data)
+        # Blank picks drop out and repeats collapse, keeping the order they were chosen in.
+        return list(dict.fromkeys(name.strip() for name in names if name.strip()))
+
+
 class CustomerSerializer(serializers.ModelSerializer):
     ticket_count = serializers.IntegerField(read_only=True)
     open_count = serializers.IntegerField(read_only=True)
@@ -268,14 +300,20 @@ class CustomerSerializer(serializers.ModelSerializer):
     attachments = CustomerAttachmentSerializer(
         source='customer_attachments', many=True, read_only=True
     )
+    # For clients that predate the list (the mobile app): the names joined into the single
+    # string this field used to hold.
+    software_type = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'username', 'full_name', 'email', 'address', 'phone',
-            'tax_number', 'software_type', 'is_active', 'ticket_count', 'open_count',
-            'licenses', 'branches', 'attachments', 'avatar', 'date_joined',
+            'tax_number', 'software_types', 'software_type', 'is_active', 'ticket_count',
+            'open_count', 'licenses', 'branches', 'attachments', 'avatar', 'date_joined',
         ]
+
+    def get_software_type(self, obj):
+        return ', '.join(obj.software_types or [])
 
 
 class CustomerCreateUpdateSerializer(serializers.ModelSerializer):
@@ -283,13 +321,30 @@ class CustomerCreateUpdateSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=False, allow_blank=True)
     # Multipart posts must not be read as "unchecked" — see OptionalBooleanField.
     is_active = OptionalBooleanField(required=False)
+    software_types = SoftwareTypesField()
+    # The single-name field older clients still send. Not stored as such — see validate().
+    software_type = serializers.CharField(
+        required=False, allow_blank=True, write_only=True, max_length=255
+    )
 
     class Meta:
         model = User
         fields = [
             'id', 'username', 'full_name', 'email', 'address', 'phone',
-            'tax_number', 'software_type', 'is_active', 'password',
+            'tax_number', 'software_types', 'software_type', 'is_active', 'password',
         ]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        legacy = attrs.pop('software_type', None)
+        # A client that only knows the single field (the mobile app) sends back the joined
+        # string it was given, so an unchanged one means "left alone", not one type named
+        # "Aloha, Micros". Anything else it sends is a genuine single pick.
+        if legacy is not None and 'software_types' not in attrs:
+            current = ', '.join(self.instance.software_types) if self.instance else ''
+            if legacy != current:
+                attrs['software_types'] = [legacy] if legacy else []
+        return attrs
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)

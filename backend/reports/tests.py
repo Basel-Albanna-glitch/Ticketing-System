@@ -20,7 +20,7 @@ class ReportsTests(APITestCase):
         )
         self.customer = User.objects.create_user(
             username='cust', full_name='Zaytoun Grill', role=User.Role.CUSTOMER,
-            software_type='POS',
+            software_types=['POS'],
         )
         self.quiet_customer = User.objects.create_user(
             username='quiet', full_name='No Tickets Ltd', role=User.Role.CUSTOMER

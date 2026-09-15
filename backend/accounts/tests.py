@@ -1,3 +1,5 @@
+import json
+
 from django.test import TestCase
 from rest_framework.test import APIClient
 
@@ -334,3 +336,58 @@ class NewCustomerIsActiveTests(TestCase):
             f'/api/users/customers/{customer.pk}/', {'is_active': True}, format='json'
         )
         self.assertTrue(on.json()['is_active'])
+
+
+class CustomerSoftwareTypesTests(TestCase):
+    """A customer can run several software types. The web form sends the list; the
+    mobile app still knows only the single field, and must neither break nor
+    flatten a customer it did not change."""
+
+    def setUp(self):
+        self.client = APIClient()
+        admin = User.objects.create_user(
+            username='stadmin', full_name='Admin', password='testpass123', role=User.Role.ADMIN
+        )
+        self.client.force_authenticate(user=admin)
+
+    def create(self, names):
+        payload = {
+            'username': 'runsmany', 'full_name': 'Runs Many', 'password': 'abcd12345',
+            'licenses': '[]', 'branches': '[]', 'software_types': json.dumps(names),
+        }
+        return self.client.post('/api/users/customers/', payload, format='multipart')
+
+    def patch(self, customer_id, payload, format='json'):
+        return self.client.patch(f'/api/users/customers/{customer_id}/', payload, format=format)
+
+    def test_the_form_saves_several_types(self):
+        response = self.create(['Aloha', 'Micros', 'Aloha', ' '])
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()['software_types'], ['Aloha', 'Micros'])
+        self.assertEqual(response.json()['software_type'], 'Aloha, Micros')
+
+    def test_an_empty_list_clears_them(self):
+        customer_id = self.create(['Aloha']).json()['id']
+        response = self.patch(
+            customer_id,
+            {'software_types': '[]', 'licenses': '[]', 'branches': '[]'},
+            format='multipart',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['software_types'], [])
+
+    def test_a_save_that_leaves_them_out_keeps_them(self):
+        customer_id = self.create(['Aloha', 'Micros']).json()['id']
+        self.patch(customer_id, {'is_active': False})
+        self.assertEqual(User.objects.get(pk=customer_id).software_types, ['Aloha', 'Micros'])
+
+    def test_an_older_client_sending_back_the_joined_string_changes_nothing(self):
+        customer_id = self.create(['Aloha', 'Micros']).json()['id']
+        response = self.patch(customer_id, {'software_type': 'Aloha, Micros'})
+        self.assertEqual(response.json()['software_types'], ['Aloha', 'Micros'])
+
+    def test_an_older_client_picking_one_type_sets_just_that_one(self):
+        customer_id = self.create(['Aloha', 'Micros']).json()['id']
+        response = self.patch(customer_id, {'software_type': 'Symphony'})
+        self.assertEqual(response.json()['software_types'], ['Symphony'])
+

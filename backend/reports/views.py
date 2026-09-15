@@ -334,7 +334,7 @@ def customer_activity_rows(date_from, date_to):
         {
             'customer_id': customer.id,
             'customer_name': customer.full_name or customer.username,
-            'software_type': customer.software_type,
+            'software_type': ', '.join(customer.software_types or []),
             'ticket_count': customer.ticket_count,
             'open_count': customer.open_count,
             'closed_count': customer.closed_count,
