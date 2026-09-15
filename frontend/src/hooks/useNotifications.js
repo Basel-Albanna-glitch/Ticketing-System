@@ -10,6 +10,9 @@ export function useNotifications() {
     queryKey: ['notifications'],
     queryFn: fetchNotifications,
     refetchInterval: 15000, // poll every 15s for new notifications
+    // Keep polling while the tab is in the background: that is exactly when a desktop
+    // notification is worth having. Browsers slow hidden tabs' timers, never stop them.
+    refetchIntervalInBackground: true,
   })
 }
 

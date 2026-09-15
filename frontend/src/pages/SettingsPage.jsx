@@ -72,6 +72,13 @@ import { usePagedRows } from '../utils/tablePage'
 import { useI18n } from '../i18n/useI18n'
 import { PERMISSION_FIELDS, PERMISSION_GROUPS } from '../constants/permissions'
 import { sameColumnSet } from '../constants/ticketColumns'
+import {
+  desktopNotificationsWanted,
+  desktopPermission,
+  enableDesktopNotifications,
+  setDesktopNotificationsWanted,
+  showDesktopNotification,
+} from '../utils/desktopNotifications'
 import RolesSection from '../components/settings/RolesSection'
 import TicketColumnAccess from '../components/settings/TicketColumnAccess'
 
@@ -219,6 +226,67 @@ function PreferenceRow({ icon: Icon, label, hint, checked, disabled, onChange })
   )
 }
 
+// The one notification setting kept in this browser rather than on the account: the browser
+// decides whether it may show desktop notifications at all, and asks the person itself.
+function DesktopNotificationRow() {
+  const { t } = useI18n()
+  const [permission, setPermission] = useState(desktopPermission)
+  const [wanted, setWanted] = useState(desktopNotificationsWanted)
+  const unavailable = permission === 'unsupported' || permission === 'denied'
+  const active = permission === 'granted' && wanted
+
+  async function handleChange(next) {
+    if (!next) {
+      setDesktopNotificationsWanted(false)
+      setWanted(false)
+      return
+    }
+    const result = await enableDesktopNotifications()
+    setPermission(result)
+    setWanted(result === 'granted')
+  }
+
+  // Why it can't be switched on, when it can't — otherwise what it does.
+  const hint =
+    permission === 'unsupported'
+      ? t('settings.notifications.desktop.unsupported')
+      : permission === 'denied'
+        ? t('settings.notifications.desktop.denied')
+        : t('settings.notifications.desktop.hint')
+
+  return (
+    <>
+      <p className="mb-1 mt-6 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-400">
+        {t('settings.notifications.desktopGroup')}
+      </p>
+      <PreferenceRow
+        icon={BellIcon}
+        label={t('settings.notifications.desktop.label')}
+        hint={hint}
+        checked={active}
+        disabled={unavailable}
+        onChange={handleChange}
+      />
+      {active && (
+        <div className="mt-3">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() =>
+              showDesktopNotification(t('notifications.appName'), {
+                body: t('settings.notifications.desktop.testBody'),
+                tag: 'hermes-test',
+              })
+            }
+          >
+            {t('settings.notifications.desktop.test')}
+          </Button>
+        </div>
+      )}
+    </>
+  )
+}
+
 function NotificationSection() {
   const { t } = useI18n()
   const { user } = useAuth()
@@ -315,6 +383,8 @@ function NotificationSection() {
           />
         ))}
       </div>
+
+      <DesktopNotificationRow />
 
       <p className="mt-4 border-t border-gray-100 pt-4 text-xs text-gray-500 dark:border-white/10 dark:text-gray-300">
         {allOff && hasEmail

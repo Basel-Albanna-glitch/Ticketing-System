@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import AssignmentAlert from './AssignmentAlert'
+import DesktopNotifications from './DesktopNotifications'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import Footer from './Footer'
@@ -52,6 +53,7 @@ export default function AppShell() {
       {/* Mounted once for the whole signed-in app, so an assignment interrupts whichever
           page the person happens to be on. */}
       <AssignmentAlert />
+      <DesktopNotifications />
     </div>
   )
 }

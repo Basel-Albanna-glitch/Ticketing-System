@@ -57,6 +57,16 @@ export default {
     'settings.notifications.todoReminder.hint':
       'For to-dos assigned to you, and ones you wrote that nobody has taken.',
     'settings.notifications.emailGroup': 'Email',
+    'settings.notifications.desktopGroup': 'Desktop',
+    'settings.notifications.desktop.label': 'Show desktop notifications',
+    'settings.notifications.desktop.hint':
+      'Pops up a Windows notification for anything new in the bell while the app is open — even in a background tab. Set for this browser only.',
+    'settings.notifications.desktop.unsupported':
+      "This browser can't show them for this site: desktop notifications only work on a secure (HTTPS) address.",
+    'settings.notifications.desktop.denied':
+      "Blocked for this site. Allow notifications in the browser's site settings (the icon beside the address), then turn this on.",
+    'settings.notifications.desktop.test': 'Send a test',
+    'settings.notifications.desktop.testBody': 'Desktop notifications are working.',
     'settings.notifications.saved': 'Saved',
     'settings.notifications.inAppNote':
       "In-app notifications in the bell menu are always on — these settings only control email.",
@@ -248,6 +258,16 @@ export default {
     'settings.notifications.todoReminder.hint':
       'للمهام المُسندة إليك، وتلك التي أنشأتها ولم يتولَّها أحد.',
     'settings.notifications.emailGroup': 'البريد الإلكتروني',
+    'settings.notifications.desktopGroup': 'سطح المكتب',
+    'settings.notifications.desktop.label': 'إظهار إشعارات سطح المكتب',
+    'settings.notifications.desktop.hint':
+      'يُظهر إشعار ويندوز لكل جديد في قائمة الجرس أثناء فتح التطبيق، حتى في علامة تبويب بالخلفية. يُحفظ لهذا المتصفح فقط.',
+    'settings.notifications.desktop.unsupported':
+      'لا يستطيع هذا المتصفح إظهارها لهذا الموقع: إشعارات سطح المكتب تعمل فقط على عنوان آمن (HTTPS).',
+    'settings.notifications.desktop.denied':
+      'محظورة لهذا الموقع. اسمح بالإشعارات من إعدادات الموقع في المتصفح (الرمز بجانب العنوان)، ثم فعّل هذا الخيار.',
+    'settings.notifications.desktop.test': 'إرسال تجربة',
+    'settings.notifications.desktop.testBody': 'إشعارات سطح المكتب تعمل.',
     'settings.notifications.saved': 'تم الحفظ',
     'settings.notifications.inAppNote':
       'إشعارات التطبيق في قائمة الجرس تعمل دائمًا — هذه الإعدادات تتحكم بالبريد الإلكتروني فقط.',
